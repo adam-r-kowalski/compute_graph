@@ -24,6 +24,8 @@ pub fn Graph(comptime T: type) type {
         constants: std.ArrayList(Constant(T)),
         operations: std.ArrayList(Operation(T)),
 
+        pub const elementType: type = T;
+
         pub fn init(allocator: *std.mem.Allocator) Graph(T) {
             return .{
                 .constants = std.ArrayList(Constant(T)).init(allocator),
@@ -33,14 +35,15 @@ pub fn Graph(comptime T: type) type {
     };
 }
 
-pub fn constant(comptime T: type, graph: *Graph(T), value: T) !Tensor(T) {
+pub fn constant(graph: var, value: var) !Tensor(@typeOf(graph.*).elementType) {
+    const T = @typeOf(graph.*).elementType;
     try graph.constants.append(.{ .value = value });
     return Tensor(T){ .shape = &[_]u64{} };
 }
 
-pub fn add(comptime T: type, graph: *Graph(T), x: Tensor(T), y: Tensor(T)) !Tensor(T) {
+pub fn add(graph: var, x: var, y: @typeOf(x)) !@typeOf(x) {
     try graph.operations.append(.{ .left = x, .right = y });
-    return Tensor(T){ .shape = &[_]u64{} };
+    return @typeOf(x){ .shape = &[_]u64{} };
 }
 
 test "create graph" {
@@ -48,11 +51,10 @@ test "create graph" {
     defer arena.deinit();
     const allocator = &arena.allocator;
 
-    const T = f64;
-    var graph = Graph(T).init(allocator);
-    const x = try constant(T, &graph, 5);
-    const y = try constant(T, &graph, 10);
-    const z = try add(T, &graph, x, y);
+    var graph = Graph(f64).init(allocator);
+    const x = try constant(&graph, 5);
+    const y = try constant(&graph, 10);
+    const z = try add(&graph, x, y);
 }
 
 pub fn main() !void {}
