@@ -71,8 +71,12 @@ test "add" {
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
     const z = try add(&graph, x, y);
-    std.testing.expectEqual(graph.constants.at(x.constant), graph.constants.at(graph.operations.at(z.operation).left.constant));
-    std.testing.expectEqual(graph.constants.at(y.constant), graph.constants.at(graph.operations.at(z.operation).right.constant));
+
+    const operation = graph.operations.at(z.operation);
+    const left = graph.constants.at(operation.left.constant);
+    const right = graph.constants.at(operation.right.constant);
+    std.testing.expectEqual(graph.constants.at(x.constant), left);
+    std.testing.expectEqual(graph.constants.at(y.constant), right);
 }
 
 pub fn main() !void {}
