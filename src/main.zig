@@ -38,8 +38,7 @@ pub fn Graph(comptime T: type) type {
 
 pub fn constant(graph: var, value: var) !Tensor(@typeOf(graph.*).elementType) {
     const T = @typeOf(graph.*).elementType;
-    const c = try graph.constants.addOne();
-    c.* = .{ .value = value };
+    try graph.constants.append(.{ .value = value });
     return Tensor(T){ .constant = graph.constants.count() - 1 };
 }
 
@@ -57,8 +56,7 @@ test "constant" {
 
 pub fn add(graph: var, x: var, y: @typeOf(x)) !@typeOf(x) {
     const T = @typeOf(graph.*).elementType;
-    const o = try graph.operations.addOne();
-    o.* = .{ .left = x, .right = y };
+    try graph.operations.append(.{ .left = x, .right = y });
     return Tensor(T){ .operation = graph.operations.count() - 1 };
 }
 
