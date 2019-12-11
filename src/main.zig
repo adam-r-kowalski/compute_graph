@@ -8,9 +8,66 @@ pub fn Constant(comptime T: type) type {
 
 pub fn Operation(comptime T: type) type {
     return struct {
+        inputs: fn (self: *const Operation(T)) []const Tensor(T),
+    };
+}
+
+pub fn Add(comptime T: type) type {
+    return struct {
+        operation: Operation(T),
         left: Tensor(T),
         right: Tensor(T),
+
+        pub fn init(left: Tensor(T), right: Tensor(T)) Add(T) {
+            return .{
+                .operation = .{ .inputs = inputs },
+                .left = left,
+                .right = right,
+            };
+        }
+
+        pub fn inputs(operation: *const Operation(T)) []const Tensor(T) {
+            const self = @fieldParentPtr(Add(T), "operation", operation);
+            return &[_]Tensor(T){ self.left, self.right };
+        }
     };
+}
+
+pub fn add(graph: var, x: var, y: @typeOf(x)) !@typeOf(x) {
+    const T = @typeOf(graph.*).elementType;
+    var a = try graph.arena.allocator.create(Add(T));
+    a.* = Add(T).init(x, y);
+    try graph.operations.append(&a.operation);
+    return Tensor(T){ .operation = graph.operations.count() - 1 };
+}
+
+pub fn Multiply(comptime T: type) type {
+    return struct {
+        operation: Operation(T),
+        left: Tensor(T),
+        right: Tensor(T),
+
+        pub fn init(left: Tensor(T), right: Tensor(T)) Multiply(T) {
+            return .{
+                .operation = .{ .inputs = inputs },
+                .left = left,
+                .right = right,
+            };
+        }
+
+        pub fn inputs(operation: *const Operation(T)) []const Tensor(T) {
+            const self = @fieldParentPtr(Multiply(T), "operation", operation);
+            return &[_]Tensor(T){ self.left, self.right };
+        }
+    };
+}
+
+pub fn multiply(graph: var, x: var, y: @typeOf(x)) !@typeOf(x) {
+    const T = @typeOf(graph.*).elementType;
+    var a = try graph.arena.allocator.create(Multiply(T));
+    a.* = Multiply(T).init(x, y);
+    try graph.operations.append(&a.operation);
+    return Tensor(T){ .operation = graph.operations.count() - 1 };
 }
 
 pub fn Tensor(comptime T: type) type {
@@ -22,16 +79,24 @@ pub fn Tensor(comptime T: type) type {
 
 pub fn Graph(comptime T: type) type {
     return struct {
+        arena: std.heap.ArenaAllocator,
         constants: std.ArrayList(Constant(T)),
-        operations: std.ArrayList(Operation(T)),
+        operations: std.ArrayList(*const Operation(T)),
 
         pub const elementType: type = T;
 
-        pub fn init(allocator: *std.mem.Allocator) Graph(T) {
-            return .{
-                .constants = std.ArrayList(Constant(T)).init(allocator),
-                .operations = std.ArrayList(Operation(T)).init(allocator),
+        pub fn init(self: *Graph(T), allocator: *std.mem.Allocator) void {
+            self.* = Graph(T){
+                .arena = std.heap.ArenaAllocator.init(allocator),
+                .constants = undefined,
+                .operations = undefined,
             };
+            self.constants = std.ArrayList(Constant(T)).init(&self.arena.allocator);
+            self.operations = std.ArrayList(*const Operation(T)).init(&self.arena.allocator);
+        }
+
+        pub fn deinit(self: *Graph(T)) void {
+            self.arena.deinit();
         }
     };
 }
@@ -43,36 +108,44 @@ pub fn constant(graph: var, value: var) !Tensor(@typeOf(graph.*).elementType) {
 }
 
 test "constant" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = &arena.allocator;
-
-    var graph = Graph(f64).init(allocator);
+    var graph: Graph(f64) = undefined;
+    graph.init(std.heap.page_allocator);
+    defer graph.deinit();
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
+
     std.testing.expectEqual(graph.constants.at(x.constant).value, 5);
     std.testing.expectEqual(graph.constants.at(y.constant).value, 10);
 }
 
-pub fn add(graph: var, x: var, y: @typeOf(x)) !@typeOf(x) {
-    const T = @typeOf(graph.*).elementType;
-    try graph.operations.append(.{ .left = x, .right = y });
-    return Tensor(T){ .operation = graph.operations.count() - 1 };
-}
-
 test "add" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = &arena.allocator;
-
-    var graph = Graph(f64).init(allocator);
+    var graph: Graph(f64) = undefined;
+    graph.init(std.heap.page_allocator);
+    defer graph.deinit();
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
     const z = try add(&graph, x, y);
 
     const operation = graph.operations.at(z.operation);
-    const left = graph.constants.at(operation.left.constant);
-    const right = graph.constants.at(operation.right.constant);
+    const a = @fieldParentPtr(Add(f64), "operation", operation);
+    const left = graph.constants.at(a.left.constant);
+    const right = graph.constants.at(a.right.constant);
+    std.testing.expectEqual(graph.constants.at(x.constant), left);
+    std.testing.expectEqual(graph.constants.at(y.constant), right);
+}
+
+test "multiply" {
+    var graph: Graph(f64) = undefined;
+    graph.init(std.heap.page_allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, 5);
+    const y = try constant(&graph, 10);
+    const z = try multiply(&graph, x, y);
+
+    const operation = graph.operations.at(z.operation);
+    const a = @fieldParentPtr(Multiply(f64), "operation", operation);
+    const left = graph.constants.at(a.left.constant);
+    const right = graph.constants.at(a.right.constant);
     std.testing.expectEqual(graph.constants.at(x.constant), left);
     std.testing.expectEqual(graph.constants.at(y.constant), right);
 }
