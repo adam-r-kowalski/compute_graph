@@ -9,20 +9,20 @@ pub fn Tensor(comptime T: type) type {
 
 pub fn Graph(comptime T: type) type {
     return struct {
-        arena: std.heap.ArenaAllocator,
+        arena: *std.heap.ArenaAllocator,
         constants: std.ArrayList(Constant(T)),
         operations: std.ArrayList(*const Operation(T)),
 
         pub const elementType: type = T;
 
-        pub fn init(self: *Graph(T), allocator: *std.mem.Allocator) void {
-            self.* = Graph(T){
-                .arena = std.heap.ArenaAllocator.init(allocator),
-                .constants = undefined,
-                .operations = undefined,
+        pub fn init(allocator: *std.mem.Allocator) !Graph(T) {
+            const arena = try allocator.create(std.heap.ArenaAllocator);
+            arena.* = std.heap.ArenaAllocator.init(allocator);
+            return Graph(T){
+                .arena = arena,
+                .constants = std.ArrayList(Constant(T)).init(&arena.allocator),
+                .operations = std.ArrayList(*const Operation(T)).init(&arena.allocator),
             };
-            self.constants = std.ArrayList(Constant(T)).init(&self.arena.allocator);
-            self.operations = std.ArrayList(*const Operation(T)).init(&self.arena.allocator);
         }
 
         pub fn deinit(self: *Graph(T)) void {
@@ -44,8 +44,7 @@ pub fn constant(graph: var, value: var) !Tensor(@typeOf(graph.*).elementType) {
 }
 
 test "constant" {
-    var graph: Graph(f64) = undefined;
-    graph.init(std.heap.page_allocator);
+    var graph = try Graph(f64).init(std.heap.page_allocator);
     defer graph.deinit();
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
@@ -90,8 +89,7 @@ pub fn add(graph: var, x: var, y: @typeOf(x)) !@typeOf(x) {
 }
 
 test "add" {
-    var graph: Graph(f64) = undefined;
-    graph.init(std.heap.page_allocator);
+    var graph = try Graph(f64).init(std.heap.page_allocator);
     defer graph.deinit();
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
@@ -135,8 +133,7 @@ pub fn multiply(graph: var, x: var, y: @typeOf(x)) !@typeOf(x) {
 }
 
 test "multiply" {
-    var graph: Graph(f64) = undefined;
-    graph.init(std.heap.page_allocator);
+    var graph = try Graph(f64).init(std.heap.page_allocator);
     defer graph.deinit();
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
