@@ -9,7 +9,6 @@ pub fn Tensor(comptime T: type) type {
 
 pub fn Graph(comptime T: type) type {
     return struct {
-        parent_allocator: *std.mem.Allocator,
         arena: *std.heap.ArenaAllocator,
         constants: std.ArrayList(Constant(T)),
         operations: std.ArrayList(*const Operation(T)),
@@ -20,7 +19,6 @@ pub fn Graph(comptime T: type) type {
             const arena = try allocator.create(std.heap.ArenaAllocator);
             arena.* = std.heap.ArenaAllocator.init(allocator);
             return Graph(T){
-                .parent_allocator = allocator,
                 .arena = arena,
                 .constants = std.ArrayList(Constant(T)).init(&arena.allocator),
                 .operations = std.ArrayList(*const Operation(T)).init(&arena.allocator),
@@ -28,8 +26,9 @@ pub fn Graph(comptime T: type) type {
         }
 
         pub fn deinit(self: *Graph(T)) void {
+            const child_allocator = self.arena.child_allocator;
             self.arena.deinit();
-            self.parent_allocator.destroy(self.arena);
+            child_allocator.destroy(self.arena);
         }
     };
 }
