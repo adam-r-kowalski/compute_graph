@@ -33,12 +33,12 @@ const Graph = struct {
     }
 };
 
-const Constant = struct {
-    value: f64,
+const Constant = union(enum) {
+    f64: f64,
 };
 
 pub fn constant(graph: var, value: var) !Tensor(f64, 0) {
-    try graph.constants.append(.{ .value = value });
+    try graph.constants.append(.{ .f64 = value });
     const node = Node{ .constant = graph.constants.len - 1 };
     return Tensor(f64, 0){ .node = node };
 }
@@ -49,8 +49,8 @@ test "constant" {
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
 
-    std.testing.expectEqual(graph.constants.at(x.node.constant).value, 5);
-    std.testing.expectEqual(graph.constants.at(y.node.constant).value, 10);
+    std.testing.expectEqual(graph.constants.at(x.node.constant).f64, 5);
+    std.testing.expectEqual(graph.constants.at(y.node.constant).f64, 10);
 }
 
 const Operation = struct {
