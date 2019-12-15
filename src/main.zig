@@ -1,7 +1,12 @@
 const std = @import("std");
 
-pub fn Tensor(comptime T: type, comptime rank: u64) type {
-    return Node;
+pub fn Tensor(comptime S: type, comptime r: u64) type {
+    return struct {
+        node: Node,
+
+        pub const Scalar = S;
+        pub const rank = r;
+    };
 }
 
 const Node = union(enum) {
@@ -37,7 +42,8 @@ const Constant = union(enum) {
 
 pub fn constant(graph: var, value: var) !Tensor(f64, 0) {
     try graph.constants.append(.{ .f64 = value });
-    return Tensor(f64, 0){ .constant = graph.constants.len - 1 };
+    const node = Node{ .constant = graph.constants.len - 1 };
+    return Tensor(f64, 0){ .node = node };
 }
 
 test "constant" {
@@ -46,8 +52,13 @@ test "constant" {
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
 
-    std.testing.expectEqual(graph.constants.at(x.constant).f64, 5);
-    std.testing.expectEqual(graph.constants.at(y.constant).f64, 10);
+    std.testing.expectEqual(graph.constants.at(x.node.constant).f64, 5);
+    std.testing.expectEqual(@TypeOf(x).Scalar, f64);
+    std.testing.expectEqual(@TypeOf(x).rank, 0);
+
+    std.testing.expectEqual(graph.constants.at(y.node.constant).f64, 10);
+    std.testing.expectEqual(@TypeOf(y).Scalar, f64);
+    std.testing.expectEqual(@TypeOf(y).rank, 0);
 }
 
 const Operation = struct {
@@ -62,8 +73,8 @@ const Add = struct {
     pub fn init(left: Tensor(f64, 0), right: Tensor(f64, 0)) Add {
         return .{
             .operation = .{ .inputs = inputs },
-            .left = left,
-            .right = right,
+            .left = left.node,
+            .right = right.node,
         };
     }
 
@@ -77,7 +88,8 @@ pub fn add(graph: var, x: var, y: @TypeOf(x)) !@TypeOf(x) {
     var a = try graph.arena.allocator.create(Add);
     a.* = Add.init(x, y);
     try graph.operations.append(&a.operation);
-    return Tensor(f64, 0){ .operation = graph.operations.len - 1 };
+    const node = Node{ .operation = graph.operations.len - 1 };
+    return Tensor(f64, 0){ .node = node };
 }
 
 test "add" {
@@ -87,12 +99,18 @@ test "add" {
     const y = try constant(&graph, 10);
     const z = try add(&graph, x, y);
 
-    const operation = graph.operations.at(z.operation);
+    const operation = graph.operations.at(z.node.operation);
     const a = @fieldParentPtr(Add, "operation", operation);
     const left = graph.constants.at(a.left.constant);
     const right = graph.constants.at(a.right.constant);
-    std.testing.expectEqual(graph.constants.at(x.constant), left);
-    std.testing.expectEqual(graph.constants.at(y.constant), right);
+    std.testing.expectEqual(graph.constants.at(x.node.constant), left);
+    std.testing.expectEqual(@TypeOf(x).Scalar, f64);
+    std.testing.expectEqual(@TypeOf(x).rank, 0);
+    std.testing.expectEqual(graph.constants.at(y.node.constant), right);
+    std.testing.expectEqual(@TypeOf(y).Scalar, f64);
+    std.testing.expectEqual(@TypeOf(y).rank, 0);
+    std.testing.expectEqual(@TypeOf(z).Scalar, f64);
+    std.testing.expectEqual(@TypeOf(z).rank, 0);
 }
 
 const Multiply = struct {
@@ -103,8 +121,8 @@ const Multiply = struct {
     pub fn init(left: Tensor(f64, 0), right: Tensor(f64, 0)) Multiply {
         return .{
             .operation = .{ .inputs = inputs },
-            .left = left,
-            .right = right,
+            .left = left.node,
+            .right = right.node,
         };
     }
 
@@ -118,7 +136,8 @@ pub fn multiply(graph: var, x: var, y: @TypeOf(x)) !@TypeOf(x) {
     var a = try graph.arena.allocator.create(Multiply);
     a.* = Multiply.init(x, y);
     try graph.operations.append(&a.operation);
-    return Tensor(f64, 0){ .operation = graph.operations.len - 1 };
+    const node = Node{ .operation = graph.operations.len - 1 };
+    return Tensor(f64, 0){ .node = node };
 }
 
 test "multiply" {
@@ -128,12 +147,18 @@ test "multiply" {
     const y = try constant(&graph, 10);
     const z = try multiply(&graph, x, y);
 
-    const operation = graph.operations.at(z.operation);
+    const operation = graph.operations.at(z.node.operation);
     const a = @fieldParentPtr(Multiply, "operation", operation);
     const left = graph.constants.at(a.left.constant);
     const right = graph.constants.at(a.right.constant);
-    std.testing.expectEqual(graph.constants.at(x.constant), left);
-    std.testing.expectEqual(graph.constants.at(y.constant), right);
+    std.testing.expectEqual(graph.constants.at(x.node.constant), left);
+    std.testing.expectEqual(@TypeOf(x).Scalar, f64);
+    std.testing.expectEqual(@TypeOf(x).rank, 0);
+    std.testing.expectEqual(graph.constants.at(y.node.constant), right);
+    std.testing.expectEqual(@TypeOf(y).Scalar, f64);
+    std.testing.expectEqual(@TypeOf(y).rank, 0);
+    std.testing.expectEqual(@TypeOf(z).Scalar, f64);
+    std.testing.expectEqual(@TypeOf(z).rank, 0);
 }
 
 pub fn main() !void {}
