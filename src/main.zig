@@ -3,9 +3,6 @@ const std = @import("std");
 pub fn Tensor(comptime S: type, comptime r: u64) type {
     return struct {
         node: Node,
-
-        pub const Scalar = S;
-        pub const rank = r;
     };
 }
 
@@ -53,12 +50,7 @@ test "constant" {
     const y = try constant(&graph, 10);
 
     std.testing.expectEqual(graph.constants.at(x.node.constant).f64, 5);
-    std.testing.expectEqual(@TypeOf(x).Scalar, f64);
-    std.testing.expectEqual(@TypeOf(x).rank, 0);
-
     std.testing.expectEqual(graph.constants.at(y.node.constant).f64, 10);
-    std.testing.expectEqual(@TypeOf(y).Scalar, f64);
-    std.testing.expectEqual(@TypeOf(y).rank, 0);
 }
 
 const Operation = struct {
@@ -104,13 +96,7 @@ test "add" {
     const left = graph.constants.at(a.left.constant);
     const right = graph.constants.at(a.right.constant);
     std.testing.expectEqual(graph.constants.at(x.node.constant), left);
-    std.testing.expectEqual(@TypeOf(x).Scalar, f64);
-    std.testing.expectEqual(@TypeOf(x).rank, 0);
     std.testing.expectEqual(graph.constants.at(y.node.constant), right);
-    std.testing.expectEqual(@TypeOf(y).Scalar, f64);
-    std.testing.expectEqual(@TypeOf(y).rank, 0);
-    std.testing.expectEqual(@TypeOf(z).Scalar, f64);
-    std.testing.expectEqual(@TypeOf(z).rank, 0);
 }
 
 const Multiply = struct {
@@ -152,13 +138,52 @@ test "multiply" {
     const left = graph.constants.at(a.left.constant);
     const right = graph.constants.at(a.right.constant);
     std.testing.expectEqual(graph.constants.at(x.node.constant), left);
-    std.testing.expectEqual(@TypeOf(x).Scalar, f64);
-    std.testing.expectEqual(@TypeOf(x).rank, 0);
     std.testing.expectEqual(graph.constants.at(y.node.constant), right);
-    std.testing.expectEqual(@TypeOf(y).Scalar, f64);
-    std.testing.expectEqual(@TypeOf(y).rank, 0);
-    std.testing.expectEqual(@TypeOf(z).Scalar, f64);
-    std.testing.expectEqual(@TypeOf(z).rank, 0);
+}
+
+const Session = struct {
+    arena: *std.heap.ArenaAllocator,
+
+    pub fn init(allocator: *std.mem.Allocator) !Session {
+        const arena = try allocator.create(std.heap.ArenaAllocator);
+        arena.* = std.heap.ArenaAllocator.init(allocator);
+        return Session{
+            .arena = arena,
+        };
+    }
+
+    pub fn deinit(self: *Session) void {
+        const child_allocator = self.arena.child_allocator;
+        self.arena.deinit();
+        child_allocator.destroy(self.arena);
+    }
+};
+
+fn topologicalSort(session: Session, graph: Graph, node: Node) !std.ArrayList(Node) {
+    var execution_order = std.ArrayList(Node).init(&session.arena.allocator);
+    const op = graph.operations.at(node.operation);
+    for (op.inputs(op)) |i| {
+        std.debug.warn("\ni = {}", .{i});
+        // try execution_order.append(i);
+    }
+    try execution_order.append(node);
+    return execution_order;
+}
+
+test "session" {
+    const allocator = std.heap.page_allocator;
+
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, 5);
+    const y = try constant(&graph, 10);
+    const z = try add(&graph, x, y);
+
+    var session = try Session.init(allocator);
+    defer session.deinit();
+
+    const execution_order = try topologicalSort(session, graph, z.node);
+    defer execution_order.deinit();
 }
 
 pub fn main() !void {}
