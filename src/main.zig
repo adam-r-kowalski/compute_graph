@@ -33,12 +33,12 @@ const Graph = struct {
     }
 };
 
-const Constant = union(enum) {
-    f64: f64,
+const Constant = struct {
+    value: f64,
 };
 
 pub fn constant(graph: var, value: var) !Tensor(f64, 0) {
-    try graph.constants.append(.{ .f64 = value });
+    try graph.constants.append(.{ .value = value });
     const node = Node{ .constant = graph.constants.len - 1 };
     return Tensor(f64, 0){ .node = node };
 }
@@ -49,8 +49,8 @@ test "constant" {
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
 
-    std.testing.expectEqual(graph.constants.at(x.node.constant).f64, 5);
-    std.testing.expectEqual(graph.constants.at(y.node.constant).f64, 10);
+    std.testing.expectEqual(graph.constants.at(x.node.constant).value, 5);
+    std.testing.expectEqual(graph.constants.at(y.node.constant).value, 10);
 }
 
 const Operation = struct {
@@ -159,15 +159,25 @@ const Session = struct {
     }
 };
 
-fn topologicalSort(session: Session, graph: Graph, node: Node) !std.ArrayList(Node) {
+fn topologicalSort(session: Session, graph: Graph, node: Node) !void {
     var execution_order = std.ArrayList(Node).init(&session.arena.allocator);
     const op = graph.operations.at(node.operation);
-    for (op.inputs(op)) |i| {
-        std.debug.warn("\ni = {}", .{i});
-        // try execution_order.append(i);
-    }
+    const inputs = op.inputs(op);
+
+    const x = inputs[0];
+    const y = inputs[1];
+    try execution_order.append(x);
+    try execution_order.append(y);
+
+    // try execution_order.append(inputs[0]);
+    // try execution_order.append(inputs[1]);
+
     try execution_order.append(node);
-    return execution_order;
+    std.debug.warn("\n{}\n{}\n{}\n", .{
+        execution_order.at(0),
+        execution_order.at(1),
+        execution_order.at(2),
+    });
 }
 
 test "session" {
@@ -182,8 +192,7 @@ test "session" {
     var session = try Session.init(allocator);
     defer session.deinit();
 
-    const execution_order = try topologicalSort(session, graph, z.node);
-    defer execution_order.deinit();
+    try topologicalSort(session, graph, z.node);
 }
 
 pub fn main() !void {}
