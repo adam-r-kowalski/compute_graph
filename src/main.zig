@@ -182,6 +182,19 @@ fn topologicalSort3(allocator: *std.mem.Allocator, graph: Graph, node: Node) !vo
     std.debug.warn("\n{}\n{}\n{}\n", .{ nodes.at(0), nodes.at(1), nodes.at(2) });
 }
 
+fn topologicalSort4(allocator: *std.mem.Allocator, graph: Graph, node: Node) !void {
+    const operation = graph.operations.at(node.operation);
+    const inputs = operation.inputs(operation);
+    var nodes = std.ArrayList(Node).init(allocator);
+    defer nodes.deinit();
+    const input_0 = inputs[0];
+    const input_1 = inputs[1];
+    try nodes.append(input_0);
+    try nodes.append(input_1);
+    try nodes.append(node);
+    std.debug.warn("\n{}\n{}\n{}\n", .{ nodes.at(0), nodes.at(1), nodes.at(2) });
+}
+
 test "topologicalSort" {
     const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
@@ -194,6 +207,7 @@ test "topologicalSort" {
     topologicalSort(graph, z.node);
     topologicalSort2(graph, z.node);
     try topologicalSort3(allocator, graph, z.node);
+    try topologicalSort4(allocator, graph, z.node);
 }
 
 pub fn main() !void {}
