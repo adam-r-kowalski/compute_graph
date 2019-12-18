@@ -58,20 +58,18 @@ const Operation = struct {
 
 const Add = struct {
     operation: Operation,
-    left: Node,
-    right: Node,
+    nodes: [2]Node,
 
     pub fn init(left: Tensor(f64, 0), right: Tensor(f64, 0)) Add {
         return .{
             .operation = .{ .inputs = inputs },
-            .left = left.node,
-            .right = right.node,
+            .nodes = .{ left.node, right.node },
         };
     }
 
     pub fn inputs(operation: *const Operation) []const Node {
         const self = @fieldParentPtr(Add, "operation", operation);
-        return &[_]Node{ self.left, self.right };
+        return &self.nodes;
     }
 };
 
@@ -91,28 +89,26 @@ test "add" {
     const z = try add(&graph, x, y);
     const operation = graph.operations.at(z.node.operation);
     const a = @fieldParentPtr(Add, "operation", operation);
-    const left = graph.constants.at(a.left.constant);
-    const right = graph.constants.at(a.right.constant);
+    const left = graph.constants.at(a.nodes[0].constant);
+    const right = graph.constants.at(a.nodes[1].constant);
     std.testing.expectEqual(graph.constants.at(x.node.constant), left);
     std.testing.expectEqual(graph.constants.at(y.node.constant), right);
 }
 
 const Multiply = struct {
     operation: Operation,
-    left: Node,
-    right: Node,
+    nodes: [2]Node,
 
     pub fn init(left: Tensor(f64, 0), right: Tensor(f64, 0)) Multiply {
         return .{
             .operation = .{ .inputs = inputs },
-            .left = left.node,
-            .right = right.node,
+            .nodes = .{ left.node, right.node },
         };
     }
 
     pub fn inputs(operation: *const Operation) []const Node {
         const self = @fieldParentPtr(Multiply, "operation", operation);
-        return &[_]Node{ self.left, self.right };
+        return &self.nodes;
     }
 };
 
@@ -132,8 +128,8 @@ test "multiply" {
     const z = try multiply(&graph, x, y);
     const operation = graph.operations.at(z.node.operation);
     const a = @fieldParentPtr(Multiply, "operation", operation);
-    const left = graph.constants.at(a.left.constant);
-    const right = graph.constants.at(a.right.constant);
+    const left = graph.constants.at(a.nodes[0].constant);
+    const right = graph.constants.at(a.nodes[1].constant);
     std.testing.expectEqual(graph.constants.at(x.node.constant), left);
     std.testing.expectEqual(graph.constants.at(y.node.constant), right);
 }
@@ -156,41 +152,13 @@ const Session = struct {
     }
 };
 
-fn topologicalSort(graph: Graph, node: Node) void {
-    const operation = graph.operations.at(node.operation);
-    const inputs = operation.inputs(operation);
-    const left = inputs[0];
-    const right = inputs[1];
-    std.debug.warn("\n{}\n{}\n{}\n", .{ left, right, node });
-}
-
-fn topologicalSort2(graph: Graph, node: Node) void {
-    const operation = graph.operations.at(node.operation);
-    const inputs = operation.inputs(operation);
-    const nodes = .{ inputs[0], inputs[1], node };
-    std.debug.warn("\n{}\n{}\n{}\n", .{ nodes[0], nodes[1], nodes[2] });
-}
-
-fn topologicalSort3(allocator: *std.mem.Allocator, graph: Graph, node: Node) !void {
+fn topologicalSort(allocator: *std.mem.Allocator, graph: Graph, node: Node) !void {
     const operation = graph.operations.at(node.operation);
     const inputs = operation.inputs(operation);
     var nodes = std.ArrayList(Node).init(allocator);
     defer nodes.deinit();
     try nodes.append(inputs[0]);
     try nodes.append(inputs[1]);
-    try nodes.append(node);
-    std.debug.warn("\n{}\n{}\n{}\n", .{ nodes.at(0), nodes.at(1), nodes.at(2) });
-}
-
-fn topologicalSort4(allocator: *std.mem.Allocator, graph: Graph, node: Node) !void {
-    const operation = graph.operations.at(node.operation);
-    const inputs = operation.inputs(operation);
-    var nodes = std.ArrayList(Node).init(allocator);
-    defer nodes.deinit();
-    const input_0 = inputs[0];
-    const input_1 = inputs[1];
-    try nodes.append(input_0);
-    try nodes.append(input_1);
     try nodes.append(node);
     std.debug.warn("\n{}\n{}\n{}\n", .{ nodes.at(0), nodes.at(1), nodes.at(2) });
 }
@@ -204,10 +172,7 @@ test "topologicalSort" {
     const z = try add(&graph, x, y);
     var session = try Session.init(allocator);
     defer session.deinit();
-    topologicalSort(graph, z.node);
-    topologicalSort2(graph, z.node);
-    try topologicalSort3(allocator, graph, z.node);
-    try topologicalSort4(allocator, graph, z.node);
+    try topologicalSort(allocator, graph, z.node);
 }
 
 pub fn main() !void {}
