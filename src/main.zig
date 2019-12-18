@@ -48,7 +48,6 @@ test "constant" {
     defer graph.deinit();
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
-
     std.testing.expectEqual(graph.constants.at(x.node.constant).value, 5);
     std.testing.expectEqual(graph.constants.at(y.node.constant).value, 10);
 }
@@ -90,7 +89,6 @@ test "add" {
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
     const z = try add(&graph, x, y);
-
     const operation = graph.operations.at(z.node.operation);
     const a = @fieldParentPtr(Add, "operation", operation);
     const left = graph.constants.at(a.left.constant);
@@ -132,7 +130,6 @@ test "multiply" {
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
     const z = try multiply(&graph, x, y);
-
     const operation = graph.operations.at(z.node.operation);
     const a = @fieldParentPtr(Multiply, "operation", operation);
     const left = graph.constants.at(a.left.constant);
@@ -159,40 +156,44 @@ const Session = struct {
     }
 };
 
-fn topologicalSort(session: Session, graph: Graph, node: Node) !void {
-    var execution_order = std.ArrayList(Node).init(&session.arena.allocator);
-    const op = graph.operations.at(node.operation);
-    const inputs = op.inputs(op);
-
-    const x = inputs[0];
-    const y = inputs[1];
-    try execution_order.append(x);
-    try execution_order.append(y);
-
-    // try execution_order.append(inputs[0]);
-    // try execution_order.append(inputs[1]);
-
-    try execution_order.append(node);
-    std.debug.warn("\n{}\n{}\n{}\n", .{
-        execution_order.at(0),
-        execution_order.at(1),
-        execution_order.at(2),
-    });
+fn topologicalSort(graph: Graph, node: Node) void {
+    const operation = graph.operations.at(node.operation);
+    const inputs = operation.inputs(operation);
+    const left = inputs[0];
+    const right = inputs[1];
+    std.debug.warn("\n{}\n{}\n{}\n", .{ left, right, node });
 }
 
-test "session" {
-    const allocator = std.heap.page_allocator;
+fn topologicalSort2(graph: Graph, node: Node) void {
+    const operation = graph.operations.at(node.operation);
+    const inputs = operation.inputs(operation);
+    const nodes = .{ inputs[0], inputs[1], node };
+    std.debug.warn("\n{}\n{}\n{}\n", .{ nodes[0], nodes[1], nodes[2] });
+}
 
+fn topologicalSort3(allocator: *std.mem.Allocator, graph: Graph, node: Node) !void {
+    const operation = graph.operations.at(node.operation);
+    const inputs = operation.inputs(operation);
+    var nodes = std.ArrayList(Node).init(allocator);
+    defer nodes.deinit();
+    try nodes.append(inputs[0]);
+    try nodes.append(inputs[1]);
+    try nodes.append(node);
+    std.debug.warn("\n{}\n{}\n{}\n", .{ nodes.at(0), nodes.at(1), nodes.at(2) });
+}
+
+test "topologicalSort" {
+    const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, 5);
     const y = try constant(&graph, 10);
     const z = try add(&graph, x, y);
-
     var session = try Session.init(allocator);
     defer session.deinit();
-
-    try topologicalSort(session, graph, z.node);
+    topologicalSort(graph, z.node);
+    topologicalSort2(graph, z.node);
+    try topologicalSort3(allocator, graph, z.node);
 }
 
 pub fn main() !void {}
