@@ -134,6 +134,45 @@ test "multiply" {
     std.testing.expectEqual(graph.constants.at(y.node.constant), right);
 }
 
+const Subtract = struct {
+    operation: Operation,
+    nodes: [2]Node,
+
+    pub fn init(left: Tensor(f64, 0), right: Tensor(f64, 0)) Subtract {
+        return .{
+            .operation = .{ .inputs = inputs },
+            .nodes = .{ left.node, right.node },
+        };
+    }
+
+    pub fn inputs(operation: *const Operation) []const Node {
+        const self = @fieldParentPtr(Subtract, "operation", operation);
+        return &self.nodes;
+    }
+};
+
+pub fn subtract(graph: var, x: var, y: @TypeOf(x)) !@TypeOf(x) {
+    var a = try graph.arena.allocator.create(Subtract);
+    a.* = Subtract.init(x, y);
+    try graph.operations.append(&a.operation);
+    const node = Node{ .operation = graph.operations.len - 1 };
+    return Tensor(f64, 0){ .node = node };
+}
+
+test "subtract" {
+    var graph = try Graph.init(std.heap.page_allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, 5);
+    const y = try constant(&graph, 10);
+    const z = try subtract(&graph, x, y);
+    const operation = graph.operations.at(z.node.operation);
+    const nodes = operation.inputs(operation);
+    const left = graph.constants.at(nodes[0].constant);
+    const right = graph.constants.at(nodes[1].constant);
+    std.testing.expectEqual(graph.constants.at(x.node.constant), left);
+    std.testing.expectEqual(graph.constants.at(y.node.constant), right);
+}
+
 const Session = struct {
     arena: *std.heap.ArenaAllocator,
 
@@ -179,21 +218,28 @@ const TopologicalSort = struct {
     }
 };
 
-test "topologicalSort" {
+test "topological sort" {
     const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, 5);
-    const b = try constant(&graph, 10);
-    const c = try add(&graph, a, b);
-    const d = try constant(&graph, 2);
-    const e = try multiply(&graph, c, d);
+    const m = try constant(&graph, 3);
+    const b = try constant(&graph, 5);
+    const y = try constant(&graph, 35);
+    const x = try constant(&graph, 10);
+    const h = try multiply(&graph, m, x);
+    const y_hat = try add(&graph, h, b);
+    const loss = try subtract(&graph, y, y_hat);
     var session = try Session.init(allocator);
     defer session.deinit();
     var topological_sort = TopologicalSort.init(session);
-    const execution_order = try topological_sort.execution_order(graph, e);
-    for (execution_order) |node|
-        std.debug.warn("\n{}", .{node});
+    const execution_order = try topological_sort.execution_order(graph, loss);
+    std.testing.expectEqual(execution_order[0], y.node);
+    std.testing.expectEqual(execution_order[1], m.node);
+    std.testing.expectEqual(execution_order[2], x.node);
+    std.testing.expectEqual(execution_order[3], h.node);
+    std.testing.expectEqual(execution_order[4], b.node);
+    std.testing.expectEqual(execution_order[5], y_hat.node);
+    std.testing.expectEqual(execution_order[6], loss.node);
 }
 
 pub fn main() !void {}
