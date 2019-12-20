@@ -231,6 +231,7 @@ test "execution order" {
     var session = try Session.init(allocator);
     defer session.deinit();
     const order = try execution_order(session, graph, loss);
+    std.testing.expectEqual(order.len, 7);
     std.testing.expectEqual(order[0], y.node);
     std.testing.expectEqual(order[1], m.node);
     std.testing.expectEqual(order[2], x.node);
@@ -247,10 +248,11 @@ test "execution order repeated nodes" {
     const a = try constant(&graph, 3);
     const b = try constant(&graph, 5);
     const c = try add(&graph, a, b);
-    const d = try add(&graph, a, c);
+    const d = try add(&graph, c, c);
     var session = try Session.init(allocator);
     defer session.deinit();
     const order = try execution_order(session, graph, d);
+    std.testing.expectEqual(order.len, 4);
     std.testing.expectEqual(order[0], a.node);
     std.testing.expectEqual(order[1], b.node);
     std.testing.expectEqual(order[2], c.node);
