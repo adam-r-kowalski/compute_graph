@@ -191,35 +191,33 @@ const Session = struct {
     }
 };
 
-const topological_sort = struct {
+fn execution_order(session: Session, graph: Graph, tensor: var) ![]const Node {
     const Nodes = std.ArrayList(Node);
     const Set = std.AutoHashMap(Node, void);
     const Error = error{OutOfMemory};
-
-    fn recurse(nodes: *Nodes, visited: *Set, graph: Graph, node: Node) Error!void {
-        switch (node) {
-            .operation => |o| {
-                const operation = graph.operations.at(o);
-                for (operation.inputs(operation)) |input|
-                    if (!visited.contains(input))
-                        try recurse(nodes, visited, graph, input);
-            },
-            else => {},
+    const Helper = struct {
+        fn recurse(nodes: *Nodes, visited: *Set, g: Graph, node: Node) Error!void {
+            switch (node) {
+                .operation => |o| {
+                    const operation = g.operations.at(o);
+                    for (operation.inputs(operation)) |input|
+                        if (!visited.contains(input))
+                            try recurse(nodes, visited, g, input);
+                },
+                else => {},
+            }
+            try visited.putNoClobber(node, undefined);
+            try nodes.append(node);
         }
-        try visited.putNoClobber(node, undefined);
-        try nodes.append(node);
-    }
+    };
+    var nodes = Nodes.init(&session.arena.allocator);
+    var visited = Set.init(session.arena.child_allocator);
+    defer visited.deinit();
+    try Helper.recurse(&nodes, &visited, graph, tensor.node);
+    return nodes.toSlice();
+}
 
-    fn execution_order(session: Session, graph: Graph, tensor: var) ![]const Node {
-        var nodes = Nodes.init(&session.arena.allocator);
-        var visited = Set.init(session.arena.child_allocator);
-        defer visited.deinit();
-        try recurse(&nodes, &visited, graph, tensor.node);
-        return nodes.toSlice();
-    }
-};
-
-test "topological sort" {
+test "execution order" {
     const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
     defer graph.deinit();
@@ -232,17 +230,17 @@ test "topological sort" {
     const loss = try subtract(&graph, y, y_hat);
     var session = try Session.init(allocator);
     defer session.deinit();
-    const execution_order = try topological_sort.execution_order(session, graph, loss);
-    std.testing.expectEqual(execution_order[0], y.node);
-    std.testing.expectEqual(execution_order[1], m.node);
-    std.testing.expectEqual(execution_order[2], x.node);
-    std.testing.expectEqual(execution_order[3], h.node);
-    std.testing.expectEqual(execution_order[4], b.node);
-    std.testing.expectEqual(execution_order[5], y_hat.node);
-    std.testing.expectEqual(execution_order[6], loss.node);
+    const order = try execution_order(session, graph, loss);
+    std.testing.expectEqual(order[0], y.node);
+    std.testing.expectEqual(order[1], m.node);
+    std.testing.expectEqual(order[2], x.node);
+    std.testing.expectEqual(order[3], h.node);
+    std.testing.expectEqual(order[4], b.node);
+    std.testing.expectEqual(order[5], y_hat.node);
+    std.testing.expectEqual(order[6], loss.node);
 }
 
-test "topological sort two nodes" {
+test "execution order repeated nodes" {
     const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
     defer graph.deinit();
@@ -252,11 +250,11 @@ test "topological sort two nodes" {
     const d = try add(&graph, a, c);
     var session = try Session.init(allocator);
     defer session.deinit();
-    const execution_order = try topological_sort.execution_order(session, graph, d);
-    std.testing.expectEqual(execution_order[0], a.node);
-    std.testing.expectEqual(execution_order[1], b.node);
-    std.testing.expectEqual(execution_order[2], c.node);
-    std.testing.expectEqual(execution_order[3], d.node);
+    const order = try execution_order(session, graph, d);
+    std.testing.expectEqual(order[0], a.node);
+    std.testing.expectEqual(order[1], b.node);
+    std.testing.expectEqual(order[2], c.node);
+    std.testing.expectEqual(order[3], d.node);
 }
 
 pub fn main() !void {}
