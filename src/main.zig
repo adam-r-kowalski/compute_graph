@@ -191,30 +191,31 @@ const Session = struct {
     }
 };
 
-const TopologicalSort = struct {
-    nodes: std.ArrayList(Node),
+const topological_sort = struct {
+    const Nodes = std.ArrayList(Node);
+    const Set = std.AutoHashMap(Node, void);
+    const Error = error{OutOfMemory};
 
-    fn init(session: Session) TopologicalSort {
-        return .{
-            .nodes = std.ArrayList(Node).init(&session.arena.allocator),
-        };
-    }
-
-    fn recurse(self: *TopologicalSort, graph: Graph, node: Node) error{OutOfMemory}!void {
+    fn recurse(nodes: *Nodes, visited: *Set, graph: Graph, node: Node) Error!void {
         switch (node) {
             .operation => |o| {
                 const operation = graph.operations.at(o);
-                for (operation.inputs(operation)) |i|
-                    try self.recurse(graph, i);
+                for (operation.inputs(operation)) |input|
+                    if (!visited.contains(input))
+                        try recurse(nodes, visited, graph, input);
             },
             else => {},
         }
-        try self.nodes.append(node);
+        try visited.putNoClobber(node, undefined);
+        try nodes.append(node);
     }
 
-    fn execution_order(self: *TopologicalSort, graph: Graph, tensor: var) ![]const Node {
-        try self.recurse(graph, tensor.node);
-        return self.nodes.toSlice();
+    fn execution_order(session: Session, graph: Graph, tensor: var) ![]const Node {
+        var nodes = Nodes.init(&session.arena.allocator);
+        var visited = Set.init(session.arena.child_allocator);
+        defer visited.deinit();
+        try recurse(&nodes, &visited, graph, tensor.node);
+        return nodes.toSlice();
     }
 };
 
@@ -231,8 +232,7 @@ test "topological sort" {
     const loss = try subtract(&graph, y, y_hat);
     var session = try Session.init(allocator);
     defer session.deinit();
-    var topological_sort = TopologicalSort.init(session);
-    const execution_order = try topological_sort.execution_order(graph, loss);
+    const execution_order = try topological_sort.execution_order(session, graph, loss);
     std.testing.expectEqual(execution_order[0], y.node);
     std.testing.expectEqual(execution_order[1], m.node);
     std.testing.expectEqual(execution_order[2], x.node);
@@ -240,6 +240,23 @@ test "topological sort" {
     std.testing.expectEqual(execution_order[4], b.node);
     std.testing.expectEqual(execution_order[5], y_hat.node);
     std.testing.expectEqual(execution_order[6], loss.node);
+}
+
+test "topological sort two nodes" {
+    const allocator = std.heap.page_allocator;
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, 3);
+    const b = try constant(&graph, 5);
+    const c = try add(&graph, a, b);
+    const d = try add(&graph, a, c);
+    var session = try Session.init(allocator);
+    defer session.deinit();
+    const execution_order = try topological_sort.execution_order(session, graph, d);
+    std.testing.expectEqual(execution_order[0], a.node);
+    std.testing.expectEqual(execution_order[1], b.node);
+    std.testing.expectEqual(execution_order[2], c.node);
+    std.testing.expectEqual(execution_order[3], d.node);
 }
 
 pub fn main() !void {}
