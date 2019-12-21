@@ -54,6 +54,7 @@ test "constant" {
 
 const Operation = struct {
     inputs: fn (self: *const Operation) []const Node,
+    forward: fn (self: *const Operation, values: []const f64) f64,
 };
 
 const Add = struct {
@@ -62,7 +63,10 @@ const Add = struct {
 
     pub fn init(left: Tensor(f64, 0), right: Tensor(f64, 0)) Add {
         return .{
-            .operation = .{ .inputs = inputs },
+            .operation = .{
+                .inputs = inputs,
+                .forward = forward,
+            },
             .nodes = .{ left.node, right.node },
         };
     }
@@ -70,6 +74,11 @@ const Add = struct {
     pub fn inputs(operation: *const Operation) []const Node {
         const self = @fieldParentPtr(Add, "operation", operation);
         return &self.nodes;
+    }
+
+    pub fn forward(operation: *const Operation, values: []const f64) f64 {
+        std.debug.assert(values.len == 2);
+        return values[0] + values[1];
     }
 };
 
@@ -101,7 +110,10 @@ const Multiply = struct {
 
     pub fn init(left: Tensor(f64, 0), right: Tensor(f64, 0)) Multiply {
         return .{
-            .operation = .{ .inputs = inputs },
+            .operation = .{
+                .inputs = inputs,
+                .forward = forward,
+            },
             .nodes = .{ left.node, right.node },
         };
     }
@@ -109,6 +121,11 @@ const Multiply = struct {
     pub fn inputs(operation: *const Operation) []const Node {
         const self = @fieldParentPtr(Multiply, "operation", operation);
         return &self.nodes;
+    }
+
+    pub fn forward(operation: *const Operation, values: []const f64) f64 {
+        std.debug.assert(values.len == 2);
+        return values[0] * values[1];
     }
 };
 
@@ -140,7 +157,10 @@ const Subtract = struct {
 
     pub fn init(left: Tensor(f64, 0), right: Tensor(f64, 0)) Subtract {
         return .{
-            .operation = .{ .inputs = inputs },
+            .operation = .{
+                .inputs = inputs,
+                .forward = forward,
+            },
             .nodes = .{ left.node, right.node },
         };
     }
@@ -148,6 +168,11 @@ const Subtract = struct {
     pub fn inputs(operation: *const Operation) []const Node {
         const self = @fieldParentPtr(Subtract, "operation", operation);
         return &self.nodes;
+    }
+
+    pub fn forward(operation: *const Operation, values: []const f64) f64 {
+        std.debug.assert(values.len == 2);
+        return values[0] - values[1];
     }
 };
 
@@ -173,47 +198,75 @@ test "subtract" {
     std.testing.expectEqual(graph.constants.at(y.node.constant), right);
 }
 
-const Session = struct {
-    arena: *std.heap.ArenaAllocator,
+const Absolute = struct {
+    operation: Operation,
+    nodes: [1]Node,
 
-    pub fn init(allocator: *std.mem.Allocator) !Session {
-        const arena = try allocator.create(std.heap.ArenaAllocator);
-        arena.* = std.heap.ArenaAllocator.init(allocator);
-        return Session{
-            .arena = arena,
+    pub fn init(input: Tensor(f64, 0)) Absolute {
+        return .{
+            .operation = .{
+                .inputs = inputs,
+                .forward = forward,
+            },
+            .nodes = .{input.node},
         };
     }
 
-    pub fn deinit(self: *Session) void {
-        const child_allocator = self.arena.child_allocator;
-        self.arena.deinit();
-        child_allocator.destroy(self.arena);
+    pub fn inputs(operation: *const Operation) []const Node {
+        const self = @fieldParentPtr(Absolute, "operation", operation);
+        return &self.nodes;
+    }
+
+    pub fn forward(operation: *const Operation, values: []const f64) f64 {
+        std.debug.assert(values.len == 1);
+        return std.math.absFloat(values[0]);
     }
 };
 
-fn execution_order(session: Session, graph: Graph, tensor: var) ![]const Node {
+pub fn absolute(graph: var, input: var) !@TypeOf(input) {
+    var a = try graph.arena.allocator.create(Absolute);
+    a.* = Absolute.init(input);
+    try graph.operations.append(&a.operation);
+    const node = Node{ .operation = graph.operations.len - 1 };
+    return Tensor(f64, 0){ .node = node };
+}
+
+test "absolute" {
+    var graph = try Graph.init(std.heap.page_allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, -5);
+    const b = try absolute(&graph, a);
+    const operation = graph.operations.at(b.node.operation);
+    const nodes = operation.inputs(operation);
+    const input = graph.constants.at(nodes[0].constant);
+    std.testing.expectEqual(graph.constants.at(a.node.constant), input);
+}
+
+const ExecutionOrder = struct {
     const Nodes = std.ArrayList(Node);
-    const Set = std.AutoHashMap(Node, void);
+    const Visited = std.AutoHashMap(Node, void);
     const Error = error{OutOfMemory};
-    const Helper = struct {
-        fn recurse(nodes: *Nodes, visited: *Set, g: Graph, node: Node) Error!void {
-            switch (node) {
-                .operation => |o| {
-                    const operation = g.operations.at(o);
-                    for (operation.inputs(operation)) |input|
-                        if (!visited.contains(input))
-                            try recurse(nodes, visited, g, input);
-                },
-                else => {},
-            }
-            try visited.putNoClobber(node, undefined);
-            try nodes.append(node);
+
+    fn recurse(nodes: *Nodes, visited: *Visited, graph: *const Graph, node: Node) Error!void {
+        switch (node) {
+            .operation => |o| {
+                const operation = graph.operations.at(o);
+                for (operation.inputs(operation)) |input|
+                    if (!visited.contains(input))
+                        try recurse(nodes, visited, graph, input);
+            },
+            else => {},
         }
-    };
-    var nodes = Nodes.init(&session.arena.allocator);
-    var visited = Set.init(session.arena.child_allocator);
+        try visited.putNoClobber(node, undefined);
+        try nodes.append(node);
+    }
+};
+
+fn executionOrder(session: Session, tensor: var) ![]const Node {
+    var nodes = ExecutionOrder.Nodes.init(&session.arena.allocator);
+    var visited = ExecutionOrder.Visited.init(session.arena.child_allocator);
     defer visited.deinit();
-    try Helper.recurse(&nodes, &visited, graph, tensor.node);
+    try ExecutionOrder.recurse(&nodes, &visited, session.graph, tensor.node);
     return nodes.toSlice();
 }
 
@@ -228,17 +281,17 @@ test "execution order" {
     const h = try multiply(&graph, m, x);
     const y_hat = try add(&graph, h, b);
     const loss = try subtract(&graph, y, y_hat);
-    var session = try Session.init(allocator);
+    var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const order = try execution_order(session, graph, loss);
-    std.testing.expectEqual(order.len, 7);
-    std.testing.expectEqual(order[0], y.node);
-    std.testing.expectEqual(order[1], m.node);
-    std.testing.expectEqual(order[2], x.node);
-    std.testing.expectEqual(order[3], h.node);
-    std.testing.expectEqual(order[4], b.node);
-    std.testing.expectEqual(order[5], y_hat.node);
-    std.testing.expectEqual(order[6], loss.node);
+    const execution_order = try executionOrder(session, loss);
+    std.testing.expectEqual(execution_order.len, 7);
+    std.testing.expectEqual(execution_order[0], y.node);
+    std.testing.expectEqual(execution_order[1], m.node);
+    std.testing.expectEqual(execution_order[2], x.node);
+    std.testing.expectEqual(execution_order[3], h.node);
+    std.testing.expectEqual(execution_order[4], b.node);
+    std.testing.expectEqual(execution_order[5], y_hat.node);
+    std.testing.expectEqual(execution_order[6], loss.node);
 }
 
 test "execution order repeated nodes" {
@@ -249,14 +302,81 @@ test "execution order repeated nodes" {
     const b = try constant(&graph, 5);
     const c = try add(&graph, a, b);
     const d = try add(&graph, c, c);
-    var session = try Session.init(allocator);
+    var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const order = try execution_order(session, graph, d);
-    std.testing.expectEqual(order.len, 4);
-    std.testing.expectEqual(order[0], a.node);
-    std.testing.expectEqual(order[1], b.node);
-    std.testing.expectEqual(order[2], c.node);
-    std.testing.expectEqual(order[3], d.node);
+    const execution_order = try executionOrder(session, d);
+    std.testing.expectEqual(execution_order.len, 4);
+    std.testing.expectEqual(execution_order[0], a.node);
+    std.testing.expectEqual(execution_order[1], b.node);
+    std.testing.expectEqual(execution_order[2], c.node);
+    std.testing.expectEqual(execution_order[3], d.node);
 }
 
-pub fn main() !void {}
+fn getValue(map: var, key: var) !f64 {
+    if (map.getValue(key)) |value| return value;
+    return error.KeyNotFound;
+}
+
+const Session = struct {
+    arena: *std.heap.ArenaAllocator,
+    graph: *const Graph,
+
+    pub fn init(allocator: *std.mem.Allocator, graph: *const Graph) !Session {
+        const arena = try allocator.create(std.heap.ArenaAllocator);
+        arena.* = std.heap.ArenaAllocator.init(allocator);
+        return Session{
+            .arena = arena,
+            .graph = graph,
+        };
+    }
+
+    pub fn deinit(self: *Session) void {
+        const child_allocator = self.arena.child_allocator;
+        self.arena.deinit();
+        child_allocator.destroy(self.arena);
+    }
+
+    pub fn run(self: Session, tensor: var) !f64 {
+        const allocator = self.arena.child_allocator;
+        const graph = self.graph;
+        var cache = std.AutoHashMap(Node, f64).init(allocator);
+        defer cache.deinit();
+        for (try executionOrder(self, tensor)) |node| {
+            switch (node) {
+                .constant => |c| {
+                    const value = graph.constants.at(c).value;
+                    try cache.putNoClobber(node, value);
+                },
+                .operation => |o| {
+                    const op = graph.operations.at(o);
+                    var values = std.ArrayList(f64).init(allocator);
+                    defer values.deinit();
+                    for (op.inputs(op)) |input| {
+                        const value = try getValue(cache, input);
+                        try values.append(value);
+                    }
+                    try cache.putNoClobber(node, op.forward(op, values.toSlice()));
+                },
+            }
+        }
+        return try getValue(cache, tensor.node);
+    }
+};
+
+test "session run" {
+    const allocator = std.heap.page_allocator;
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const m = try constant(&graph, 3);
+    const b = try constant(&graph, 5);
+    const y = try constant(&graph, 25);
+    const x = try constant(&graph, 10);
+    const h = try multiply(&graph, m, x);
+    const y_hat = try add(&graph, h, b);
+    const delta = try subtract(&graph, y, y_hat);
+    const loss = try absolute(&graph, delta);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const output = try session.run(loss);
+    std.testing.expectEqual(output, 10);
+}
