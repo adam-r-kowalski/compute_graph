@@ -1,4 +1,4 @@
-test "run all tests" {
+test "" {
     const absolute = @import("absolute.zig");
     const add = @import("add.zig");
     const constant = @import("constant.zig");
