@@ -85,11 +85,36 @@ fn tensorShape(comptime rank: u64, literal: var) [rank]u64 {
     return shape;
 }
 
+fn tensorStride(comptime rank: u64, shape: [rank]u64) [rank]u64 {
+    var stride: [rank]u64 = undefined;
+    stride[0] = 1;
+    var i: u64 = 1;
+    var product: u64 = 1;
+    while (i < rank) : (i += 1) {
+        product *= shape[i - 1];
+        stride[i] = product;
+    }
+    return stride;
+}
+
+test "stride rank 3" {
+    const shape = [_]u64{ 3, 2, 3 };
+    const stride = tensorStride(3, shape);
+    std.testing.expect(std.mem.eql(u64, &stride, &[_]u64{ 1, 3, 6 }));
+}
+
+test "stride rank 4" {
+    const shape = [_]u64{ 3, 4, 5, 6 };
+    const stride = tensorStride(4, shape);
+    std.testing.expect(std.mem.eql(u64, &stride, &[_]u64{ 1, 3, 12, 60 }));
+}
+
 pub fn cpuTensor(literal: var) tensorType(@TypeOf(literal)) {
     const T = tensorType(@TypeOf(literal));
+    const shape = tensorShape(T.rank, literal);
     return T{
-        .shape = tensorShape(T.rank, literal),
-        .stride = undefined,
+        .shape = shape,
+        .stride = tensorStride(T.rank, shape),
         .data = undefined,
     };
 }
@@ -97,6 +122,7 @@ pub fn cpuTensor(literal: var) tensorType(@TypeOf(literal)) {
 test "cpu tensor rank 1" {
     const tensor = cpuTensor(&[_]f64{ 1, 2, 3 });
     std.testing.expect(std.mem.eql(u64, tensor.shape[0..], &[_]u64{3}));
+    std.testing.expect(std.mem.eql(u64, tensor.stride[0..], &[_]u64{1}));
 }
 
 test "cpu tensor rank 2" {
@@ -105,6 +131,7 @@ test "cpu tensor rank 2" {
         .{ 4, 5, 6 },
     });
     std.testing.expect(std.mem.eql(u64, tensor.shape[0..], &[_]u64{ 2, 3 }));
+    std.testing.expect(std.mem.eql(u64, tensor.stride[0..], &[_]u64{ 1, 2 }));
 }
 
 test "cpu tensor rank 3" {
@@ -123,4 +150,5 @@ test "cpu tensor rank 3" {
         },
     });
     std.testing.expect(std.mem.eql(u64, tensor.shape[0..], &[_]u64{ 3, 2, 3 }));
+    std.testing.expect(std.mem.eql(u64, tensor.stride[0..], &[_]u64{ 1, 3, 6 }));
 }
