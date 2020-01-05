@@ -43,6 +43,8 @@ pub fn CpuTensor(comptime ScalarType: type) type {
         data: TensorData(ScalarType),
 
         pub fn deinit(self: @This(), allocator: *std.mem.Allocator) void {
+            allocator.free(self.shape);
+            allocator.free(self.stride);
             switch (self.data) {
                 .array => |array| allocator.free(array),
                 else => {},
