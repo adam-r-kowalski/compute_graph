@@ -54,12 +54,12 @@ test "array info rank 3" {
 
 fn TensorData(comptime ScalarType: type, comptime rank: usize) type {
     return union(enum) {
-        Scalar: ScalarType,
-        Array: []const ScalarType,
+        scalar: ScalarType,
+        array: []const ScalarType,
 
-        fn init(allocator: *std.mem.Allocator, shape: [rank]u64, literal: var) !@This() {
+        fn init(allocator: *std.mem.Allocator, shape: [rank]u64, literal: var) error{OutOfMemory}!@This() {
             if (rank == 0)
-                return @This(){ .Scalar = literal };
+                return @This(){ .scalar = literal };
 
             var data = try allocator.alloc(ScalarType, tensorLength(rank, shape));
             errdefer allocator.free(data);
@@ -70,9 +70,8 @@ fn TensorData(comptime ScalarType: type, comptime rank: usize) type {
                     switch (@typeInfo(@TypeOf(l))) {
                         .Pointer, .Array => {
                             var j: usize = 0;
-                            while (j < l.len) : (j += 1) {
+                            while (j < l.len) : (j += 1)
                                 call(d, l[j], i);
-                            }
                         },
                         else => {
                             d[i.*] = l;
@@ -83,7 +82,7 @@ fn TensorData(comptime ScalarType: type, comptime rank: usize) type {
             };
 
             Closure.call(data, literal, &index);
-            return @This(){ .Array = data };
+            return @This(){ .array = data };
         }
     };
 }
@@ -98,7 +97,8 @@ pub fn CpuTensor(comptime T: type, comptime r: u64) type {
         data: TensorData(ScalarType, rank),
 
         pub fn deinit(self: @This(), allocator: *std.mem.Allocator) void {
-            allocator.free(self.data.Array);
+            if (rank > 0)
+                allocator.free(self.data.array);
         }
     };
 }
@@ -195,18 +195,22 @@ test "cpu tensor rank 0" {
     const allocator = std.heap.page_allocator;
     const tensor = try cpuTensor(allocator, @as(f16, 5));
     defer tensor.deinit(allocator);
-    // std.testing.expect(std.mem.eql(u64, tensor.shape[0..], &[_]u64{3}));
-    // std.testing.expect(std.mem.eql(u64, tensor.stride[0..], &[_]u64{1}));
-    // std.testing.expect(std.mem.eql(f64, tensor.data, &[_]f64{ 1, 2, 3 }));
+    std.testing.expectEqual(@TypeOf(tensor).ScalarType, f16);
+    std.testing.expectEqual(@TypeOf(tensor).rank, 0);
+    std.testing.expect(std.mem.eql(u64, tensor.shape[0..], &[_]u64{}));
+    std.testing.expect(std.mem.eql(u64, tensor.stride[0..], &[_]u64{}));
+    std.testing.expectEqual(tensor.data.scalar, 5);
 }
 
 test "cpu tensor rank 1" {
     const allocator = std.heap.page_allocator;
     const tensor = try cpuTensor(allocator, &[_]f64{ 1, 2, 3 });
     defer tensor.deinit(allocator);
+    std.testing.expectEqual(@TypeOf(tensor).ScalarType, f64);
+    std.testing.expectEqual(@TypeOf(tensor).rank, 1);
     std.testing.expect(std.mem.eql(u64, tensor.shape[0..], &[_]u64{3}));
     std.testing.expect(std.mem.eql(u64, tensor.stride[0..], &[_]u64{1}));
-    std.testing.expect(std.mem.eql(f64, tensor.data.Array, &[_]f64{ 1, 2, 3 }));
+    std.testing.expect(std.mem.eql(f64, tensor.data.array, &[_]f64{ 1, 2, 3 }));
 }
 
 test "cpu tensor rank 2" {
@@ -216,9 +220,11 @@ test "cpu tensor rank 2" {
         .{ 4, 5, 6 },
     });
     defer tensor.deinit(allocator);
+    std.testing.expectEqual(@TypeOf(tensor).ScalarType, i32);
+    std.testing.expectEqual(@TypeOf(tensor).rank, 2);
     std.testing.expect(std.mem.eql(u64, tensor.shape[0..], &[_]u64{ 2, 3 }));
     std.testing.expect(std.mem.eql(u64, tensor.stride[0..], &[_]u64{ 1, 2 }));
-    std.testing.expect(std.mem.eql(i32, tensor.data.Array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
+    std.testing.expect(std.mem.eql(i32, tensor.data.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
 }
 
 test "cpu tensor rank 3" {
@@ -238,9 +244,11 @@ test "cpu tensor rank 3" {
         },
     });
     defer tensor.deinit(allocator);
+    std.testing.expectEqual(@TypeOf(tensor).ScalarType, f16);
+    std.testing.expectEqual(@TypeOf(tensor).rank, 3);
     std.testing.expect(std.mem.eql(u64, tensor.shape[0..], &[_]u64{ 3, 2, 3 }));
     std.testing.expect(std.mem.eql(u64, tensor.stride[0..], &[_]u64{ 1, 3, 6 }));
-    std.testing.expect(std.mem.eql(f16, tensor.data.Array, &[_]f16{
+    std.testing.expect(std.mem.eql(f16, tensor.data.array, &[_]f16{
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     }));
 }
