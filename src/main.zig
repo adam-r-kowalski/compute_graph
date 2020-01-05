@@ -1,12 +1,13 @@
 test "" {
-    const absolute = @import("absolute.zig");
-    const add = @import("add.zig");
-    const constant = @import("constant.zig");
-    const graph = @import("graph.zig");
-    const multiply = @import("multiply.zig");
-    const node = @import("node.zig");
-    const operation = @import("operation.zig");
-    const session = @import("session.zig");
-    const subtract = @import("subtract.zig");
-    const tensor = @import("tensor.zig");
+    _ = @import("absolute.zig");
+    _ = @import("add.zig");
+    _ = @import("constant.zig");
+    _ = @import("graph.zig");
+    _ = @import("multiply.zig");
+    _ = @import("node.zig");
+    _ = @import("operation.zig");
+    _ = @import("session.zig");
+    _ = @import("subtract.zig");
+    _ = @import("tensor.zig");
+    _ = @import("cpu_tensor.zig");
 }
