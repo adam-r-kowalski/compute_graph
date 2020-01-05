@@ -10,4 +10,5 @@ test "" {
     _ = @import("subtract.zig");
     _ = @import("tensor.zig");
     _ = @import("cpu_tensor.zig");
+    _ = @import("array_info.zig");
 }
