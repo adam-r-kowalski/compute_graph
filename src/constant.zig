@@ -4,12 +4,9 @@ const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const cpuTensor = @import("cpu_tensor.zig").cpuTensor;
 
-fn TensorType(comptime T: type) type {
-    return Tensor(f64, 0);
-}
-
-pub fn constant(graph: *Graph, value: var) !TensorType(@TypeOf(value)) {
-    try graph.constants.append(.{ .value = value });
+pub fn constant(graph: *Graph, literal: var) !Tensor(f64, 0) {
+    const tensor = try cpuTensor(&graph.arena.allocator, literal);
+    try graph.constants.append(.{ .f64 = tensor });
     const node = Node{ .constant = graph.constants.len - 1 };
     return Tensor(f64, 0){ .node = node };
 }
@@ -19,8 +16,8 @@ test "constant" {
     const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, 5);
-    const y = try constant(&graph, 10);
+    const x = try constant(&graph, @as(f64, 5));
+    const y = try constant(&graph, @as(f64, 10));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const x_out = try session.run(x);

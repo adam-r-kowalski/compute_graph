@@ -39,10 +39,10 @@ test "execution order" {
     const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const m = try constant(&graph, 3);
-    const b = try constant(&graph, 5);
-    const y = try constant(&graph, 35);
-    const x = try constant(&graph, 10);
+    const m = try constant(&graph, @as(f64, 3));
+    const b = try constant(&graph, @as(f64, 5));
+    const y = try constant(&graph, @as(f64, 35));
+    const x = try constant(&graph, @as(f64, 10));
     const h = try multiply(&graph, m, x);
     const y_hat = try add(&graph, h, b);
     const loss = try subtract(&graph, y, y_hat);
@@ -65,8 +65,8 @@ test "execution order repeated nodes" {
     const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, 3);
-    const b = try constant(&graph, 5);
+    const a = try constant(&graph, @as(f64, 3));
+    const b = try constant(&graph, @as(f64, 5));
     const c = try add(&graph, a, b);
     const d = try add(&graph, c, c);
     var session = try Session.init(allocator, &graph);
@@ -111,7 +111,7 @@ pub const Session = struct {
         for (try executionOrder(self, tensor)) |node| {
             switch (node) {
                 .constant => |c| {
-                    const value = graph.constants.at(c).value;
+                    const value = graph.constants.at(c).f64.data.scalar;
                     try cache.putNoClobber(node, value);
                 },
                 .operation => |o| {
@@ -139,10 +139,10 @@ test "session run" {
     const allocator = std.heap.page_allocator;
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const m = try constant(&graph, 3);
-    const b = try constant(&graph, 5);
-    const y = try constant(&graph, 25);
-    const x = try constant(&graph, 10);
+    const m = try constant(&graph, @as(f64, 3));
+    const b = try constant(&graph, @as(f64, 5));
+    const y = try constant(&graph, @as(f64, 25));
+    const x = try constant(&graph, @as(f64, 10));
     const h = try multiply(&graph, m, x);
     const y_hat = try add(&graph, h, b);
     const delta = try subtract(&graph, y, y_hat);

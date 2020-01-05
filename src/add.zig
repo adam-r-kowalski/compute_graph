@@ -35,15 +35,15 @@ pub fn add(graph: *Graph, x: Tensor(f64, 0), y: Tensor(f64, 0)) !Tensor(f64, 0) 
 
 test "add" {
     const constant = @import("constant.zig").constant;
-    var graph = try Graph.init(std.heap.page_allocator);
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, 5);
-    const y = try constant(&graph, 10);
+    const x = try constant(&graph, @as(f64, 5));
+    const y = try constant(&graph, @as(f64, 10));
     const z = try add(&graph, x, y);
-    const operation = graph.operations.at(z.node.operation);
-    const nodes = operation.inputs(operation);
-    const left = graph.constants.at(nodes[0].constant);
-    const right = graph.constants.at(nodes[1].constant);
-    std.testing.expectEqual(graph.constants.at(x.node.constant), left);
-    std.testing.expectEqual(graph.constants.at(y.node.constant), right);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const z_out = try session.run(z);
+    std.testing.expectEqual(z_out, 15);
 }

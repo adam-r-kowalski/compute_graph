@@ -35,12 +35,18 @@ pub fn absolute(graph: *Graph, x: Tensor(f64, 0)) !Tensor(f64, 0) {
 
 test "absolute" {
     const constant = @import("constant.zig").constant;
-    var graph = try Graph.init(std.heap.page_allocator);
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, 5);
-    const y = try absolute(&graph, x);
-    const operation = graph.operations.at(y.node.operation);
-    const nodes = operation.inputs(operation);
-    const value = graph.constants.at(nodes[0].constant);
-    std.testing.expectEqual(graph.constants.at(x.node.constant), value);
+    const a = try constant(&graph, @as(f64, 5));
+    const b = try constant(&graph, @as(f64, -5));
+    const c = try absolute(&graph, a);
+    const d = try absolute(&graph, b);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const c_out = try session.run(c);
+    const d_out = try session.run(d);
+    std.testing.expectEqual(c_out, 5);
+    std.testing.expectEqual(d_out, 5);
 }

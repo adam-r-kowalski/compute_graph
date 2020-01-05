@@ -1,8 +1,9 @@
 const std = @import("std");
 const Operation = @import("operation.zig").Operation;
+const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 
 pub const Constant = struct {
-    value: f64,
+    f64: CpuTensor(f64),
 };
 
 pub const Graph = struct {
