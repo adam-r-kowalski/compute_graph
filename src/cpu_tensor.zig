@@ -6,32 +6,35 @@ fn TensorData(comptime ScalarType: type) type {
         scalar: ScalarType,
         array: []const ScalarType,
 
+        fn transfer_memory(data: []ScalarType, literal: var, index: *usize) void {
+            switch (@typeInfo(@TypeOf(literal))) {
+                .Pointer, .Array => {
+                    var i: usize = 0;
+                    while (i < literal.len) : (i += 1)
+                        transfer_memory(data, literal[i], index);
+                },
+                else => {
+                    data[index.*] = literal;
+                    index.* += @as(usize, 1);
+                },
+            }
+        }
+
         fn init(comptime rank: usize, allocator: *std.mem.Allocator, shape: []const usize, literal: var) error{OutOfMemory}!@This() {
             if (rank == 0)
                 return @This(){ .scalar = literal };
-
             var data = try allocator.alloc(ScalarType, tensorLength(rank, shape));
             errdefer allocator.free(data);
             var index: usize = 0;
-
-            const Closure = struct {
-                fn call(d: []ScalarType, l: var, i: *usize) void {
-                    switch (@typeInfo(@TypeOf(l))) {
-                        .Pointer, .Array => {
-                            var j: usize = 0;
-                            while (j < l.len) : (j += 1)
-                                call(d, l[j], i);
-                        },
-                        else => {
-                            d[i.*] = l;
-                            i.* += @as(usize, 1);
-                        },
-                    }
-                }
-            };
-
-            Closure.call(data, literal, &index);
+            transfer_memory(data, literal, &index);
             return @This(){ .array = data };
+        }
+
+        fn deinit(self: @This(), allocator: *std.mem.Allocator) void {
+            switch (self) {
+                .array => |array| allocator.free(array),
+                else => {},
+            }
         }
     };
 }
@@ -45,10 +48,7 @@ pub fn CpuTensor(comptime ScalarType: type) type {
         pub fn deinit(self: @This(), allocator: *std.mem.Allocator) void {
             allocator.free(self.shape);
             allocator.free(self.stride);
-            switch (self.data) {
-                .array => |array| allocator.free(array),
-                else => {},
-            }
+            self.data.deinit(allocator);
         }
     };
 }
