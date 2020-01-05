@@ -84,7 +84,7 @@ fn getValue(map: var, key: var) !f64 {
     return error.KeyNotFound;
 }
 
-const Session = struct {
+pub const Session = struct {
     arena: *std.heap.ArenaAllocator,
     graph: *const Graph,
 
