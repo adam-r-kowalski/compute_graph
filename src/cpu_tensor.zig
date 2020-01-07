@@ -42,23 +42,51 @@ fn TensorData(comptime ScalarType: type) type {
     };
 }
 
-pub fn CpuTensor(comptime ScalarType: type) type {
-    return struct {
-        shape: []const usize,
-        stride: []const usize,
-        data: TensorData(ScalarType),
+pub const CpuTensor = struct {
+    shape: []const usize,
+    stride: []const usize,
+    data: union(enum) {
+        f64: TensorData(f64),
+        f32: TensorData(f32),
+        f16: TensorData(f16),
+        i64: TensorData(i64),
+        i32: TensorData(i32),
+        i8: TensorData(i8),
+    },
 
-        pub fn deinit(self: @This(), allocator: *Allocator) void {
-            allocator.free(self.shape);
-            allocator.free(self.stride);
-            self.data.deinit(allocator);
+    pub fn deinit(self: CpuTensor, allocator: *Allocator) void {
+        allocator.free(self.shape);
+        allocator.free(self.stride);
+        switch (self.data) {
+            .f64 => |tensor_data| tensor_data.deinit(allocator),
+            .f32 => |tensor_data| tensor_data.deinit(allocator),
+            .f16 => |tensor_data| tensor_data.deinit(allocator),
+            .i64 => |tensor_data| tensor_data.deinit(allocator),
+            .i32 => |tensor_data| tensor_data.deinit(allocator),
+            .i8 => |tensor_data| tensor_data.deinit(allocator),
         }
-    };
-}
+    }
 
-fn tensorType(comptime T: type) type {
-    return CpuTensor(arrayInfo(T).ScalarType);
-}
+    pub fn init(allocator: *Allocator, literal: var) !CpuTensor {
+        const T = arrayInfo(@TypeOf(literal));
+        const shape = try tensorShape(T.rank, allocator, literal);
+        const data = try TensorData(T.ScalarType).init(T.rank, allocator, shape, literal);
+        return CpuTensor{
+            .shape = shape,
+            .stride = try tensorStride(T.rank, allocator, shape),
+            .data = switch(T.ScalarType) {
+                f64 => .{.f64 = data},
+                f32 => .{.f32 = data},
+                f16 => .{.f16 = data},
+                i64 => .{.i64 = data},
+                i32 => .{.i32 = data},
+                i8 => .{.i8 = data},
+                else => @panic("CpuTensor ScalarType not supported"),
+            },
+        };
+    }
+
+};
 
 fn tensorShape(comptime rank: usize, allocator: *Allocator, literal: var) ![]usize {
     var shape = try allocator.alloc(usize, rank);
@@ -140,49 +168,39 @@ test "length rank 4" {
     expectEqual(tensorLength(4, shape[0..]), 360);
 }
 
-pub fn cpuTensor(allocator: *Allocator, literal: var) !tensorType(@TypeOf(literal)) {
-    const T = arrayInfo(@TypeOf(literal));
-    const shape = try tensorShape(T.rank, allocator, literal);
-    return CpuTensor(T.ScalarType){
-        .shape = shape,
-        .stride = try tensorStride(T.rank, allocator, shape),
-        .data = try TensorData(T.ScalarType).init(T.rank, allocator, shape, literal),
-    };
-}
-
 test "cpu tensor rank 0" {
     const allocator = std.heap.page_allocator;
-    const tensor = try cpuTensor(allocator, @as(f16, 5));
+    const tensor = try CpuTensor.init(allocator, @as(f16, 5));
     defer tensor.deinit(allocator);
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{}));
-    expectEqual(tensor.data.scalar, 5);
+    expectEqual(tensor.data.f16.scalar, 5);
 }
 
 test "cpu tensor rank 1" {
     const allocator = std.heap.page_allocator;
-    const tensor = try cpuTensor(allocator, &[_]f64{ 1, 2, 3 });
+    const tensor = try CpuTensor.init(allocator, &[_]f64{ 1, 2, 3 });
     defer tensor.deinit(allocator);
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{3}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{1}));
-    expect(std.mem.eql(f64, tensor.data.array, &[_]f64{ 1, 2, 3 }));
+    expect(std.mem.eql(f64, tensor.data.f64.array, &[_]f64{ 1, 2, 3 }));
 }
 
 test "cpu tensor rank 2" {
     const allocator = std.heap.page_allocator;
-    const tensor = try cpuTensor(allocator, &[_][3]i32{
+    const tensor = try CpuTensor.init(allocator, &[_][3]i32{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
     defer tensor.deinit(allocator);
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 2, 3 }));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 1, 2 }));
-    expect(std.mem.eql(i32, tensor.data.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
+    expect(std.mem.eql(i32, tensor.data.i32.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
 }
 
 test "cpu tensor rank 3" {
     const allocator = std.heap.page_allocator;
-    const tensor = try cpuTensor(allocator, &[_][2][3]f16{
+    const tensor = try CpuTensor.init(allocator, &[_][2][3]f16{
         .{
             .{ 1, 2, 3 },
             .{ 4, 5, 6 },
@@ -199,7 +217,7 @@ test "cpu tensor rank 3" {
     defer tensor.deinit(allocator);
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 3, 2, 3 }));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 1, 3, 6 }));
-    expect(std.mem.eql(f16, tensor.data.array, &[_]f16{
+    expect(std.mem.eql(f16, tensor.data.f16.array, &[_]f16{
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     }));
 }

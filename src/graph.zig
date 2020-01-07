@@ -2,13 +2,9 @@ const std = @import("std");
 const Operation = @import("operation.zig").Operation;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 
-pub const Constant = struct {
-    f64: CpuTensor(f64),
-};
-
 pub const Graph = struct {
     arena: *std.heap.ArenaAllocator,
-    constants: std.ArrayList(Constant),
+    constants: std.ArrayList(CpuTensor),
     operations: std.ArrayList(*const Operation),
 
     pub fn init(allocator: *std.mem.Allocator) !Graph {
@@ -16,7 +12,7 @@ pub const Graph = struct {
         arena.* = std.heap.ArenaAllocator.init(allocator);
         return Graph{
             .arena = arena,
-            .constants = std.ArrayList(Constant).init(&arena.allocator),
+            .constants = std.ArrayList(CpuTensor).init(&arena.allocator),
             .operations = std.ArrayList(*const Operation).init(&arena.allocator),
         };
     }
