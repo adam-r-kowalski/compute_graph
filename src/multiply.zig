@@ -15,10 +15,12 @@ fn inputs(operation: *const Operation) []const Node {
     return &self.nodes;
 }
 
-fn forward(operation: *const Operation, values: []const CpuTensor) CpuTensor {
-    std.debug.assert(values.len == 2);
+fn forward(context: Operation.Context) Operation.Error!CpuTensor {
+    std.debug.assert(context.values.len == 2);
+    if (!std.mem.eql(usize, context.values[0].shape, context.values[1].shape))
+        return error.ShapeMismatch;
     // return values[0] * values[1];
-    return values[0];
+    return context.values[0];
 }
 
 pub fn multiply(graph: *Graph, x: Tensor(f64, 0), y: Tensor(f64, 0)) !Tensor(f64, 0) {

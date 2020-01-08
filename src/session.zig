@@ -24,7 +24,7 @@ const ExecutionOrder = struct {
     }
 };
 
-fn executionOrder(session: Session, tensor: Tensor(f64, 0)) ![]const Node {
+fn executionOrder(session: Session, tensor: var) ![]const Node {
     var nodes = ExecutionOrder.Nodes.init(&session.arena.allocator);
     var visited = ExecutionOrder.Visited.init(session.arena.child_allocator);
     defer visited.deinit();
@@ -123,7 +123,12 @@ pub const Session = struct {
                         const value = try getValue(cache, input);
                         try values.append(value);
                     }
-                    try cache.putNoClobber(node, op.forward(op, values.toSlice()));
+                    const result = try op.forward(.{
+                        .op = op,
+                        .allocator = &self.arena.allocator,
+                        .values = values.toSlice(),
+                    });
+                    try cache.putNoClobber(node, result);
                 },
             }
         }

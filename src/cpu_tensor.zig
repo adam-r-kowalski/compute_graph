@@ -4,7 +4,7 @@ const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
 const arrayInfo = @import("array_info.zig").arrayInfo;
 
-fn TensorData(comptime ScalarType: type) type {
+pub fn TensorData(comptime ScalarType: type) type {
     return union(enum) {
         scalar: ScalarType,
         array: []const ScalarType,
@@ -43,16 +43,18 @@ fn TensorData(comptime ScalarType: type) type {
 }
 
 pub const CpuTensor = struct {
-    shape: []const usize,
-    stride: []const usize,
-    data: union(enum) {
+    pub const Data = union(enum) {
         f64: TensorData(f64),
         f32: TensorData(f32),
         f16: TensorData(f16),
         i64: TensorData(i64),
         i32: TensorData(i32),
         i8: TensorData(i8),
-    },
+    };
+
+    shape: []const usize,
+    stride: []const usize,
+    data: Data,
 
     pub fn deinit(self: CpuTensor, allocator: *Allocator) void {
         allocator.free(self.shape);
@@ -74,18 +76,17 @@ pub const CpuTensor = struct {
         return CpuTensor{
             .shape = shape,
             .stride = try tensorStride(T.rank, allocator, shape),
-            .data = switch(T.ScalarType) {
-                f64 => .{.f64 = data},
-                f32 => .{.f32 = data},
-                f16 => .{.f16 = data},
-                i64 => .{.i64 = data},
-                i32 => .{.i32 = data},
-                i8 => .{.i8 = data},
-                else => @panic("CpuTensor ScalarType not supported"),
+            .data = switch (T.ScalarType) {
+                f64 => .{ .f64 = data },
+                f32 => .{ .f32 = data },
+                f16 => .{ .f16 = data },
+                i64 => .{ .i64 = data },
+                i32 => .{ .i32 = data },
+                i8 => .{ .i8 = data },
+                else => @compileError("CpuTensor ScalarType not supported"),
             },
         };
     }
-
 };
 
 fn tensorShape(comptime rank: usize, allocator: *Allocator, literal: var) ![]usize {

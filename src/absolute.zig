@@ -15,14 +15,15 @@ fn inputs(operation: *const Operation) []const Node {
     return &self.nodes;
 }
 
-fn forward(operation: *const Operation, values: []const CpuTensor) CpuTensor {
-    std.debug.assert(values.len == 1);
+fn forward(context: Operation.Context) Operation.Error!CpuTensor {
+    std.debug.assert(context.values.len == 1);
     // return std.math.absFloat(values[0]);
-    return values[0];
+    return context.values[0];
 }
 
 pub fn absolute(graph: *Graph, x: Tensor(f64, 0)) !Tensor(f64, 0) {
     var absolute_operation = try graph.arena.allocator.create(Absolute);
+    errdefer graph.arena.allocator.destroy(absolute_operation);
     absolute_operation.* = .{
         .operation = .{
             .inputs = inputs,

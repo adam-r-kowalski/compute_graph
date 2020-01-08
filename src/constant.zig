@@ -5,12 +5,18 @@ const Node = @import("node.zig").Node;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const arrayInfo = @import("array_info.zig").arrayInfo;
 
-pub fn constant(graph: *Graph, literal: var) !Tensor(f64, 0) {
+fn TensorType(comptime T: type) type {
+    const info = arrayInfo(T);
+    return Tensor(info.ScalarType, info.rank);
+}
+
+pub fn constant(graph: *Graph, literal: var) !TensorType(@TypeOf(literal)) {
     const tensor = try CpuTensor.init(&graph.arena.allocator, literal);
     try graph.constants.append(tensor);
     const node = Node{ .constant = graph.constants.len - 1 };
-    return Tensor(f64, 0){ .node = node };
+    return TensorType(@TypeOf(literal)){ .node = node };
 }
 
 test "constant scalar" {
