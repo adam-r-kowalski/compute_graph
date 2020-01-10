@@ -1,9 +1,14 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const expect = std.testing.expect;
+const expectEqual = std.testing.expectEqual;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const Node = @import("node.zig").Node;
 const Operation = @import("operation.zig").Operation;
-const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const cpu_tensor = @import("cpu_tensor.zig");
+const TensorData = cpu_tensor.TensorData;
+const CpuTensor = cpu_tensor.CpuTensor;
 
 const Absolute = struct {
     operation: Operation,
@@ -11,32 +16,95 @@ const Absolute = struct {
 };
 
 fn inputs(operation: *const Operation) []const Node {
-    const self = @fieldParentPtr(Absolute, "operation", operation);
-    return &self.nodes;
+    return &@fieldParentPtr(Absolute, "operation", operation).nodes;
+}
+
+fn abs(comptime T: type, x: T) error{Overflow}!T {
+    return switch (T) {
+        f64 => std.math.absFloat(x),
+        f32 => std.math.absFloat(x),
+        f16 => std.math.absFloat(x),
+        i64 => try std.math.absInt(x),
+        i32 => try std.math.absInt(x),
+        i8 => try std.math.absInt(x),
+        else => @compileError("ScalarType not supported"),
+    };
+}
+
+fn forwardScalar(comptime T: type, x: T) !CpuTensor.Data {
+    const scalar = try abs(T, x);
+    return switch (T) {
+        f64 => .{ .f64 = .{ .scalar = scalar } },
+        f32 => .{ .f32 = .{ .scalar = scalar } },
+        f16 => .{ .f16 = .{ .scalar = scalar } },
+        i64 => .{ .i64 = .{ .scalar = scalar } },
+        i32 => .{ .i32 = .{ .scalar = scalar } },
+        i8 => .{ .i8 = .{ .scalar = scalar } },
+        else => @compileError("ScalarType not supported"),
+    };
+}
+
+fn forwardArray(comptime T: type, allocator: *Allocator, x: []const T) !CpuTensor.Data {
+    const array = try allocator.alloc(T, x.len);
+    errdefer allocator.free(array);
+    var i: usize = 0;
+    while (i < x.len) : (i += 1)
+        array[i] = try abs(T, x[i]);
+    return switch (T) {
+        f64 => CpuTensor.Data{ .f64 = .{ .array = array } },
+        f32 => CpuTensor.Data{ .f32 = .{ .array = array } },
+        f16 => CpuTensor.Data{ .f16 = .{ .array = array } },
+        i64 => CpuTensor.Data{ .i64 = .{ .array = array } },
+        i32 => CpuTensor.Data{ .i32 = .{ .array = array } },
+        i8 => CpuTensor.Data{ .i8 = .{ .array = array } },
+        else => @compileError("ScalarType not supported"),
+    };
+}
+
+fn forwardData(comptime T: type, allocator: *Allocator, x: TensorData(T)) !CpuTensor.Data {
+    switch (x) {
+        .scalar => |scalar| return try forwardScalar(T, scalar),
+        .array => |array| return try forwardArray(T, allocator, array),
+    }
 }
 
 fn forward(context: Operation.Context) Operation.Error!CpuTensor {
     std.debug.assert(context.values.len == 1);
-    // return std.math.absFloat(values[0]);
-    return context.values[0];
+    const x = context.values[0];
+    const shape = try context.allocator.alloc(usize, x.shape.len);
+    errdefer context.allocator.free(shape);
+    std.mem.copy(usize, shape, x.shape);
+    const stride = try context.allocator.alloc(usize, x.stride.len);
+    errdefer context.allocator.free(stride);
+    std.mem.copy(usize, stride, x.stride);
+    const data = blk: {
+        switch (context.values[0].data) {
+            .f64 => |data| break :blk try forwardData(f64, context.allocator, data),
+            .f32 => |data| break :blk try forwardData(f32, context.allocator, data),
+            .f16 => |data| break :blk try forwardData(f16, context.allocator, data),
+            .i64 => |data| break :blk try forwardData(i64, context.allocator, data),
+            .i32 => |data| break :blk try forwardData(i32, context.allocator, data),
+            .i8 => |data| break :blk try forwardData(i8, context.allocator, data),
+        }
+    };
+    return CpuTensor{ .shape = shape, .stride = stride, .data = data };
 }
 
-pub fn absolute(graph: *Graph, x: Tensor(f64, 0)) !Tensor(f64, 0) {
+pub fn absolute(graph: *Graph, x: var) !@TypeOf(x) {
     var absolute_operation = try graph.arena.allocator.create(Absolute);
-    errdefer graph.arena.allocator.destroy(absolute_operation);
     absolute_operation.* = .{
         .operation = .{
             .inputs = inputs,
             .forward = forward,
         },
-        .nodes = .{x.node},
+        .nodes = .{ x.node },
     };
     try graph.operations.append(&absolute_operation.operation);
     const node = Node{ .operation = graph.operations.len - 1 };
-    return Tensor(f64, 0){ .node = node };
+    return @TypeOf(x){ .node = node };
 }
 
-test "absolute" {
+test "absolute scalar" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
@@ -48,8 +116,60 @@ test "absolute" {
     const d = try absolute(&graph, b);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    // const c_out = try session.run(c);
-    // const d_out = try session.run(d);
-    // std.testing.expectEqual(c_out, 5);
-    // std.testing.expectEqual(d_out, 5);
+    const c_out = try session.run(c);
+    expectEqual(c_out.data.f64.scalar, 5);
+    const d_out = try session.run(d);
+    expectEqual(d_out.data.f64.scalar, 5);
+}
+
+test "absolute matrix" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, [_][2]f64{
+        .{ 1, -2 },
+        .{ 3, -4 },
+        .{ -5, 6 },
+    });
+    expectEqual(@TypeOf(x), Tensor(f64, 2));
+    const z = try absolute(&graph, x);
+    expectEqual(@TypeOf(z), Tensor(f64, 2));
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(z);
+    const expected = try CpuTensor.init(allocator, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+        .{ 5, 6 },
+    });
+    defer expected.deinit(allocator);
+    expect(std.mem.eql(f64, actual.data.f64.array, expected.data.f64.array));
+}
+
+test "absolute matrix i32" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, [_][2]i32{
+        .{ 1, -2 },
+        .{ 3, -4 },
+        .{ -5, 6 },
+    });
+    expectEqual(@TypeOf(x), Tensor(i32, 2));
+    const z = try absolute(&graph, x);
+    expectEqual(@TypeOf(z), Tensor(i32, 2));
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(z);
+    const expected = try CpuTensor.init(allocator, [_][2]i32{
+        .{ 1, 2 },
+        .{ 3, 4 },
+        .{ 5, 6 },
+    });
+    defer expected.deinit(allocator);
+    expect(std.mem.eql(i32, actual.data.i32.array, expected.data.i32.array));
 }

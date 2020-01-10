@@ -6,6 +6,7 @@ pub const Operation = struct {
     pub const Error = error{
         OutOfMemory,
         ShapeMismatch,
+        Overflow
     };
 
     pub const Context = struct {

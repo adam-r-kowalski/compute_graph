@@ -16,18 +16,18 @@ const Add = struct {
 };
 
 fn inputs(operation: *const Operation) []const Node {
-    const self = @fieldParentPtr(Add, "operation", operation);
-    return &self.nodes;
+    return &@fieldParentPtr(Add, "operation", operation).nodes;
 }
 
 fn forwardScalar(comptime T: type, x: T, y: T) CpuTensor.Data {
+    const scalar = x + y;
     return switch (T) {
-        f64 => .{ .f64 = .{ .scalar = x + y } },
-        f32 => .{ .f32 = .{ .scalar = x + y } },
-        f16 => .{ .f16 = .{ .scalar = x + y } },
-        i64 => .{ .i64 = .{ .scalar = x + y } },
-        i32 => .{ .i32 = .{ .scalar = x + y } },
-        i8 => .{ .i8 = .{ .scalar = x + y } },
+        f64 => .{ .f64 = .{ .scalar = scalar } },
+        f32 => .{ .f32 = .{ .scalar = scalar } },
+        f16 => .{ .f16 = .{ .scalar = scalar } },
+        i64 => .{ .i64 = .{ .scalar = scalar } },
+        i32 => .{ .i32 = .{ .scalar = scalar } },
+        i8 => .{ .i8 = .{ .scalar = scalar } },
         else => @compileError("ScalarType not supported"),
     };
 }
@@ -50,14 +50,10 @@ fn forwardArray(comptime T: type, allocator: *Allocator, x: []const T, y: []cons
 }
 
 fn forwardData(comptime T: type, allocator: *Allocator, x: TensorData(T), y: TensorData(T)) !CpuTensor.Data {
-    switch (x) {
-        .scalar => |scalar| {
-            return forwardScalar(T, scalar, y.scalar);
-        },
-        .array => |array| {
-            return try forwardArray(T, allocator, array, y.array);
-        },
-    }
+    return switch (x) {
+        .scalar => |scalar| forwardScalar(T, scalar, y.scalar),
+        .array => |array| try forwardArray(T, allocator, array, y.array),
+    };
 }
 
 fn forward(context: Operation.Context) Operation.Error!CpuTensor {
