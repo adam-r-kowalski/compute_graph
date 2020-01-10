@@ -155,6 +155,6 @@ test "session run" {
     const loss = try absolute(&graph, delta);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    // const output = try session.run(loss);
-    // std.testing.expectEqual(output, 10);
+    const output = try session.run(loss);
+    std.testing.expectEqual(output.data.f64.scalar, 10);
 }
