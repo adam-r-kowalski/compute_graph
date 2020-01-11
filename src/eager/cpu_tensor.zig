@@ -6,7 +6,6 @@ pub fn CpuStorage(comptime ScalarType: type) type {
         scalar: ScalarType,
         array: []const ScalarType,
 
-
         fn deinit(self: @This(), allocator: *Allocator) void {
             switch (self) {
                 .array => |array| allocator.free(array),
@@ -16,11 +15,13 @@ pub fn CpuStorage(comptime ScalarType: type) type {
     };
 }
 
-pub fn CpuTensor(comptime ScalarType: type) type {
+pub fn CpuTensor(comptime T: type) type {
     return struct {
         shape: []const usize,
         stride: []const usize,
-        storage: CpuStorage(ScalarType),
+        storage: CpuStorage(T),
+
+        pub const ScalarType = T;
 
         pub fn deinit(self: @This(), allocator: *Allocator) void {
             allocator.free(self.shape);

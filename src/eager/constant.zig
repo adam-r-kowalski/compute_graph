@@ -144,21 +144,21 @@ test "constant rank 1" {
     expect(std.mem.eql(f64, tensor.storage.array, &[_]f64{ 1, 2, 3 }));
 }
 
-test "cpu tensor rank 2" {
+test "constant rank 2" {
     const allocator = std.heap.page_allocator;
-    const tensor = try CpuTensor.init(allocator, &[_][3]i32{
+    const tensor = try constant(allocator, &[_][3]i32{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
     defer tensor.deinit(allocator);
-    expect(std.mem.eql(usize, tensor.i32.shape, &[_]usize{ 2, 3 }));
-    expect(std.mem.eql(usize, tensor.i32.stride, &[_]usize{ 3, 1 }));
-    expect(std.mem.eql(i32, tensor.i32.data.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
+    expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 2, 3 }));
+    expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 3, 1 }));
+    expect(std.mem.eql(i32, tensor.storage.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
 }
 
-test "cpu tensor rank 3" {
+test "constant rank 3" {
     const allocator = std.heap.page_allocator;
-    const tensor = try CpuTensor.init(allocator, &[_][2][3]f16{
+    const tensor = try constant(allocator, &[_][2][3]f16{
         .{
             .{ 1, 2, 3 },
             .{ 4, 5, 6 },
@@ -173,9 +173,9 @@ test "cpu tensor rank 3" {
         },
     });
     defer tensor.deinit(allocator);
-    expect(std.mem.eql(usize, tensor.f16.shape, &[_]usize{ 3, 2, 3 }));
-    expect(std.mem.eql(usize, tensor.f16.stride, &[_]usize{ 6, 3, 1 }));
-    expect(std.mem.eql(f16, tensor.f16.data.array, &[_]f16{
+    expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 3, 2, 3 }));
+    expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 6, 3, 1 }));
+    expect(std.mem.eql(f16, tensor.storage.array, &[_]f16{
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     }));
 }
