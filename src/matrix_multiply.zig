@@ -9,18 +9,19 @@ const Operation = @import("operation.zig").Operation;
 const cpu_tensor = @import("cpu_tensor.zig");
 const TensorData = cpu_tensor.TensorData;
 const CpuTensor = cpu_tensor.CpuTensor;
+const tensorStride = cpu_tensor.tensorStride;
 
-const Add = struct {
+const MatrixMultiply = struct {
     operation: Operation,
     nodes: [2]Node,
 };
 
 fn inputs(operation: *const Operation) []const Node {
-    return &@fieldParentPtr(Add, "operation", operation).nodes;
+    return &@fieldParentPtr(MatrixMultiply, "operation", operation).nodes;
 }
 
 fn forwardScalar(comptime T: type, x: T, y: T) CpuTensor.Data {
-    const scalar = x + y;
+    const scalar = x * y;
     return switch (T) {
         f64 => .{ .f64 = .{ .scalar = scalar } },
         f32 => .{ .f32 = .{ .scalar = scalar } },
@@ -37,7 +38,7 @@ fn forwardArray(comptime T: type, allocator: *Allocator, x: []const T, y: []cons
     errdefer allocator.free(array);
     var i: usize = 0;
     while (i < x.len) : (i += 1)
-        array[i] = x[i] + y[i];
+        array[i] = x[i] * y[i];
     return switch (T) {
         f64 => CpuTensor.Data{ .f64 = .{ .array = array } },
         f32 => CpuTensor.Data{ .f32 = .{ .array = array } },
@@ -60,14 +61,14 @@ fn forward(context: Operation.Context) Operation.Error!CpuTensor {
     std.debug.assert(context.values.len == 2);
     const x = context.values[0];
     const y = context.values[1];
-    if (!std.mem.eql(usize, x.shape, y.shape))
+    if (x.shape[1] != y.shape[0])
         return error.ShapeMismatch;
-    const shape = try context.allocator.alloc(usize, x.shape.len);
+    const shape = try context.allocator.alloc(usize, 2);
     errdefer context.allocator.free(shape);
-    std.mem.copy(usize, shape, x.shape);
-    const stride = try context.allocator.alloc(usize, x.stride.len);
+    shape[0] = x.shape[0];
+    shape[1] = y.shape[1];
+    const stride = try tensorStride(2, context.allocator, shape);
     errdefer context.allocator.free(stride);
-    std.mem.copy(usize, stride, x.stride);
     const data = blk: {
         switch (context.values[0].data) {
             .f64 => |data| break :blk try forwardData(f64, context.allocator, data, y.data.f64),
@@ -81,36 +82,21 @@ fn forward(context: Operation.Context) Operation.Error!CpuTensor {
     return CpuTensor{ .shape = shape, .stride = stride, .data = data };
 }
 
-pub fn add(graph: *Graph, x: var, y: @TypeOf(x)) !@TypeOf(x) {
-    var add_operation = try graph.arena.allocator.create(Add);
-    add_operation.* = .{
+pub fn matrixMultiply(graph: *Graph, x: var, y: @TypeOf(x)) !@TypeOf(x) {
+    var multiply_operation = try graph.arena.allocator.create(MatrixMultiply);
+    multiply_operation.* = .{
         .operation = .{
             .inputs = inputs,
             .forward = forward,
         },
         .nodes = .{ x.node, y.node },
     };
-    try graph.operations.append(&add_operation.operation);
+    try graph.operations.append(&multiply_operation.operation);
     const node = Node{ .operation = graph.operations.len - 1 };
     return @TypeOf(x){ .node = node };
 }
 
-// test "add scalar" {
-//     const constant = @import("constant.zig").constant;
-//     const Session = @import("session.zig").Session;
-//     const allocator = std.heap.page_allocator;
-//     var graph = try Graph.init(allocator);
-//     defer graph.deinit();
-//     const x = try constant(&graph, @as(f64, 5));
-//     const y = try constant(&graph, @as(f64, 10));
-//     const z = try add(&graph, x, y);
-//     var session = try Session.init(allocator, &graph);
-//     defer session.deinit();
-//     const z_out = try session.run(z);
-//     expectEqual(z_out.f64.data.scalar, 15);
-// }
-
-// test "add matrix" {
+// test "matrix multiply" {
 //     const constant = @import("constant.zig").constant;
 //     const Session = @import("session.zig").Session;
 //     const allocator = std.heap.page_allocator;
@@ -128,21 +114,21 @@ pub fn add(graph: *Graph, x: var, y: @TypeOf(x)) !@TypeOf(x) {
 //         .{ 11, 12 },
 //     });
 //     expectEqual(@TypeOf(y), Tensor(f64, 2));
-//     const z = try add(&graph, x, y);
+//     const z = try matrixMultiply(&graph, x, y);
 //     expectEqual(@TypeOf(z), Tensor(f64, 2));
 //     var session = try Session.init(allocator, &graph);
 //     defer session.deinit();
 //     const actual = try session.run(z);
 //     const expected = try CpuTensor.init(allocator, [_][2]f64{
-//         .{ 8, 10 },
-//         .{ 12, 14 },
-//         .{ 16, 18 },
+//         .{ 7, 16 },
+//         .{ 27, 40 },
+//         .{ 55, 72 },
 //     });
 //     defer expected.deinit(allocator);
-//     expect(std.mem.eql(f64, actual.f64.data.array, expected.f64.data.array));
+//     expect(std.mem.eql(f64, actual.data.f64.array, expected.data.f64.array));
 // }
 
-// test "add matrix i32" {
+// test "matrix multiply i32" {
 //     const constant = @import("constant.zig").constant;
 //     const Session = @import("session.zig").Session;
 //     const allocator = std.heap.page_allocator;
@@ -160,16 +146,16 @@ pub fn add(graph: *Graph, x: var, y: @TypeOf(x)) !@TypeOf(x) {
 //         .{ 11, 12 },
 //     });
 //     expectEqual(@TypeOf(y), Tensor(i32, 2));
-//     const z = try add(&graph, x, y);
+//     const z = try matrixMultiply(&graph, x, y);
 //     expectEqual(@TypeOf(z), Tensor(i32, 2));
 //     var session = try Session.init(allocator, &graph);
 //     defer session.deinit();
 //     const actual = try session.run(z);
 //     const expected = try CpuTensor.init(allocator, [_][2]i32{
-//         .{ 8, 10 },
-//         .{ 12, 14 },
-//         .{ 16, 18 },
+//         .{ 7, 16 },
+//         .{ 27, 40 },
+//         .{ 55, 72 },
 //     });
 //     defer expected.deinit(allocator);
-//     expect(std.mem.eql(i32, actual.i32.data.array, expected.i32.data.array));
+//     expect(std.mem.eql(i32, actual.data.i32.array, expected.data.i32.array));
 // }

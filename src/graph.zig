@@ -1,6 +1,6 @@
 const std = @import("std");
 const Operation = @import("operation.zig").Operation;
-const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const CpuTensor = @import("eager/backup.zig").CpuTensor;
 
 pub const Graph = struct {
     arena: *std.heap.ArenaAllocator,

@@ -1,6 +1,6 @@
 const Allocator = @import("std").mem.Allocator;
 const Node = @import("node.zig").Node;
-const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const CpuTensor = @import("eager/backup.zig").CpuTensor;
 
 pub const Operation = struct {
     pub const Error = error{
