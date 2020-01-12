@@ -2,7 +2,7 @@ const std = @import("std");
 const Node = @import("node.zig").Node;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
-const CpuTensor = @import("eager/backup.zig").CpuTensor;
+const CpuTensorUnion = @import("../eager.zig").CpuTensorUnion;
 
 const ExecutionOrder = struct {
     const Nodes = std.ArrayList(Node);
@@ -80,7 +80,7 @@ fn executionOrder(session: Session, tensor: var) ![]const Node {
 //     std.testing.expectEqual(execution_order[3], d.node);
 // }
 
-fn getValue(map: var, key: var) !CpuTensor {
+fn getValue(map: var, key: var) !CpuTensorUnion {
     if (map.getValue(key)) |value| return value;
     return error.KeyNotFound;
 }
@@ -104,10 +104,10 @@ pub const Session = struct {
         child_allocator.destroy(self.arena);
     }
 
-    pub fn run(self: Session, tensor: var) !CpuTensor {
+    pub fn run(self: Session, tensor: var) !CpuTensorUnion {
         const allocator = self.arena.child_allocator;
         const graph = self.graph;
-        var cache = std.AutoHashMap(Node, CpuTensor).init(allocator);
+        var cache = std.AutoHashMap(Node, CpuTensorUnion).init(allocator);
         defer cache.deinit();
         for (try executionOrder(self, tensor)) |node| {
             switch (node) {
@@ -117,7 +117,7 @@ pub const Session = struct {
                 },
                 .operation => |o| {
                     const op = graph.operations.at(o);
-                    var values = std.ArrayList(CpuTensor).init(allocator);
+                    var values = std.ArrayList(CpuTensorUnion).init(allocator);
                     defer values.deinit();
                     for (op.inputs(op)) |input| {
                         const value = try getValue(cache, input);

@@ -1,0 +1,10 @@
+pub const absolute = @import("eager/absolute.zig").absolute;
+pub const constant = @import("eager/constant.zig").constant;
+const cpu_tensor = @import("eager/cpu_tensor.zig");
+pub const CpuTensor = cpu_tensor.CpuTensor;
+pub const CpuTensorUnion = cpu_tensor.CpuTensorUnion;
+
+test "" {
+    const std = @import("std");
+    std.meta.refAllDecls(@This());
+}

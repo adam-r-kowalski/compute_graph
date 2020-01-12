@@ -1,6 +1,6 @@
 const Allocator = @import("std").mem.Allocator;
 const Node = @import("node.zig").Node;
-const CpuTensor = @import("eager/backup.zig").CpuTensor;
+const CpuTensorUnion = @import("../eager.zig").CpuTensorUnion;
 
 pub const Operation = struct {
     pub const Error = error{
@@ -12,9 +12,9 @@ pub const Operation = struct {
     pub const Context = struct {
         op: *const Operation,
         allocator: *Allocator,
-        values: []const CpuTensor,
+        values: []const CpuTensorUnion,
     };
 
     inputs: fn (self: *const Operation) []const Node,
-    forward: fn (context: Context) Error!CpuTensor,
+    forward: fn (context: Context) Error!CpuTensorUnion,
 };

@@ -1,10 +1,10 @@
 const std = @import("std");
 const Operation = @import("operation.zig").Operation;
-const CpuTensor = @import("eager/backup.zig").CpuTensor;
+const CpuTensorUnion = @import("../eager.zig").CpuTensorUnion;
 
 pub const Graph = struct {
     arena: *std.heap.ArenaAllocator,
-    constants: std.ArrayList(CpuTensor),
+    constants: std.ArrayList(CpuTensorUnion),
     operations: std.ArrayList(*const Operation),
 
     pub fn init(allocator: *std.mem.Allocator) !Graph {
@@ -12,7 +12,7 @@ pub const Graph = struct {
         arena.* = std.heap.ArenaAllocator.init(allocator);
         return Graph{
             .arena = arena,
-            .constants = std.ArrayList(CpuTensor).init(&arena.allocator),
+            .constants = std.ArrayList(CpuTensorUnion).init(&arena.allocator),
             .operations = std.ArrayList(*const Operation).init(&arena.allocator),
         };
     }
