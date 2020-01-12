@@ -5,38 +5,29 @@ const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 
-fn absoluteScalar(x: var) error{Overflow}!@TypeOf(x) {
-    return switch (@TypeOf(x)) {
-        f64 => std.math.absFloat(x),
-        f32 => std.math.absFloat(x),
-        f16 => std.math.absFloat(x),
-        i64 => try std.math.absInt(x),
-        i32 => try std.math.absInt(x),
-        i8 => try std.math.absInt(x),
-        else => @compileError("ScalarType not supported"),
-    };
-}
-
-pub fn absolute(allocator: *Allocator, tensor: var) !@TypeOf(tensor) {
-    const T = @TypeOf(tensor);
-    const shape = try allocator.alloc(usize, tensor.shape.len);
+pub fn add(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x) {
+    if (!std.mem.eql(usize, x.shape, y.shape))
+        return error.ShapeMismatch;
+    const T = @TypeOf(x);
+    const shape = try allocator.alloc(usize, x.shape.len);
     errdefer allocator.free(shape);
-    std.mem.copy(usize, shape, tensor.shape);
-    const stride = try allocator.alloc(usize, tensor.stride.len);
+    std.mem.copy(usize, shape, x.shape);
+    const stride = try allocator.alloc(usize, x.stride.len);
     errdefer allocator.free(stride);
-    std.mem.copy(usize, stride, tensor.stride);
-    switch (tensor.storage) {
+    std.mem.copy(usize, stride, x.stride);
+    switch (x.storage) {
         .scalar => |scalar| {
             return T{
                 .shape=shape,
                 .stride=stride,
-                .storage=.{.scalar = try absoluteScalar(scalar)},
+                .storage=.{.scalar = scalar + y.storage.scalar},
             };
         },
         .array => |array| {
             const new_array = try allocator.alloc(T.ScalarType, array.len);
             errdefer allocator.free(new_array);
-            for (array) |e, i| new_array[i] = try absoluteScalar(e);
+            const y_array = y.storage.array;
+            for (array) |e, i| new_array[i] = e + y_array[i];
             return T{
                 .shape=shape,
                 .stride=stride,
@@ -46,32 +37,28 @@ pub fn absolute(allocator: *Allocator, tensor: var) !@TypeOf(tensor) {
     }
 }
 
-test "absolute rank 0" {
+test "add rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const a = try constant(&arena.allocator, @as(f64, -5));
-    const b = try constant(&arena.allocator, @as(f64, 5));
-    const c = try absolute(&arena.allocator, a);
-    const d = try absolute(&arena.allocator, b);
-    expect(std.mem.eql(usize, a.shape, c.shape));
-    expect(std.mem.eql(usize, b.shape, d.shape));
-    expect(std.mem.eql(usize, a.stride, c.stride));
-    expect(std.mem.eql(usize, b.stride, d.stride));
-    expectEqual(c.storage.scalar, 5);
-    expectEqual(d.storage.scalar, 5);
+    const x = try constant(&arena.allocator, @as(f64, 5));
+    const y = try constant(&arena.allocator, @as(f64, 10));
+    const z = try add(&arena.allocator, x, y);
+    expect(std.mem.eql(usize, x.shape, z.shape));
+    expect(std.mem.eql(usize, x.stride, z.stride));
+    expectEqual(z.storage.scalar, 15);
 }
 
-test "absolute rank 1" {
+test "add rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(&arena.allocator, [_]i32{1, -2, 3, -4, -5, 6});
-    const y = try absolute(&arena.allocator, x);
+    const y = try add(&arena.allocator, x, x);
     expect(std.mem.eql(usize, x.shape, y.shape));
     expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(i32, y.storage.array, &[_]i32{1, 2, 3, 4, 5, 6}));
+    expect(std.mem.eql(i32, y.storage.array, &[_]i32{2, -4, 6, -8, -10, 12}));
 }
 
-test "absolute rank 2" {
+test "add rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(&arena.allocator, [_][2]f16{
@@ -79,13 +66,13 @@ test "absolute rank 2" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const y = try absolute(&arena.allocator, x);
+    const y = try add(&arena.allocator, x, x);
     expect(std.mem.eql(usize, x.shape, y.shape));
     expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(f16, y.storage.array, &[_]f16{1, 2, 3, 4, 5, 6}));
+    expect(std.mem.eql(f16, y.storage.array, &[_]f16{2, -4, 6, -8, -10, 12}));
 }
 
-test "absolute rank 3" {
+test "add rank 3" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(&arena.allocator, [_][2][2]i8{
@@ -98,8 +85,8 @@ test "absolute rank 3" {
             .{ 7, -8 },
         },
     });
-    const y = try absolute(&arena.allocator, x);
+    const y = try add(&arena.allocator, x, x);
     expect(std.mem.eql(usize, x.shape, y.shape));
     expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(i8, y.storage.array, &[_]i8{1, 2, 3, 4, 5, 6, 7, 8}));
+    expect(std.mem.eql(i8, y.storage.array, &[_]i8{2, -4, 6, -8, 10, -12, 14, -16}));
 }

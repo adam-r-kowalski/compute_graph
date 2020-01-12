@@ -38,6 +38,8 @@ test "constant scalar" {
 test "constant array" {
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, [_][2]f32{
@@ -48,11 +50,10 @@ test "constant array" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(x);
-    const expected = try eager.constant(allocator, [_][2]f32{
+    const expected = try eager.constant(&arena.allocator, [_][2]f32{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    defer expected.deinit(allocator);
     expect(std.mem.eql(f32, actual.f32.storage.array, expected.storage.array));
 }

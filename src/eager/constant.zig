@@ -127,38 +127,39 @@ pub fn constant(allocator: *Allocator, literal: var) !ConstantType(@TypeOf(liter
 }
 
 test "constant rank 0" {
-    const allocator = std.heap.page_allocator;
-    const tensor = try constant(allocator, @as(f16, 5));
-    defer tensor.deinit(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(&arena.allocator, @as(f16, 5));
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{}));
     expectEqual(tensor.storage.scalar, 5);
 }
 
 test "constant rank 1" {
-    const allocator = std.heap.page_allocator;
-    const tensor = try constant(allocator, &[_]f64{ 1, 2, 3 });
-    defer tensor.deinit(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(&arena.allocator, &[_]f64{ 1, 2, 3 });
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{3}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{1}));
     expect(std.mem.eql(f64, tensor.storage.array, &[_]f64{ 1, 2, 3 }));
 }
 
 test "constant rank 2" {
-    const allocator = std.heap.page_allocator;
-    const tensor = try constant(allocator, &[_][3]i32{
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(&arena.allocator, &[_][3]i32{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
-    defer tensor.deinit(allocator);
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 2, 3 }));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 3, 1 }));
     expect(std.mem.eql(i32, tensor.storage.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
 }
 
 test "constant rank 3" {
-    const allocator = std.heap.page_allocator;
-    const tensor = try constant(allocator, &[_][2][3]f16{
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(&arena.allocator, &[_][2][3]f16{
         .{
             .{ 1, 2, 3 },
             .{ 4, 5, 6 },
@@ -172,7 +173,6 @@ test "constant rank 3" {
             .{ 16, 17, 18 },
         },
     });
-    defer tensor.deinit(allocator);
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 3, 2, 3 }));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 6, 3, 1 }));
     expect(std.mem.eql(f16, tensor.storage.array, &[_]f16{
