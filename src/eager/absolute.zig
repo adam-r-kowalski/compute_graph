@@ -1,9 +1,8 @@
 const std = @import("std");
-const expect = std.testing.expect;
-const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const expectEqual = @import("../testing.zig").expectEqual;
 
 fn absoluteScalar(x: var) error{Overflow}!@TypeOf(x) {
     return switch (@TypeOf(x)) {
@@ -49,26 +48,19 @@ pub fn absolute(allocator: *Allocator, tensor: var) !@TypeOf(tensor) {
 test "absolute rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const a = try constant(&arena.allocator, @as(f64, -5));
-    const b = try constant(&arena.allocator, @as(f64, 5));
-    const c = try absolute(&arena.allocator, a);
-    const d = try absolute(&arena.allocator, b);
-    expect(std.mem.eql(usize, a.shape, c.shape));
-    expect(std.mem.eql(usize, b.shape, d.shape));
-    expect(std.mem.eql(usize, a.stride, c.stride));
-    expect(std.mem.eql(usize, b.stride, d.stride));
-    expectEqual(c.storage.scalar, 5);
-    expectEqual(d.storage.scalar, 5);
+    const x = try constant(&arena.allocator, @as(f64, -5));
+    const actual = try absolute(&arena.allocator, x);
+    const expected = try constant(&arena.allocator, @as(f64, 5));
+    expectEqual(actual, expected);
 }
 
 test "absolute rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(&arena.allocator, [_]i32{1, -2, 3, -4, -5, 6});
-    const y = try absolute(&arena.allocator, x);
-    expect(std.mem.eql(usize, x.shape, y.shape));
-    expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(i32, y.storage.array, &[_]i32{1, 2, 3, 4, 5, 6}));
+    const actual = try absolute(&arena.allocator, x);
+    const expected = try constant(&arena.allocator, [_]i32{1, 2, 3, 4, 5, 6});
+    expectEqual(actual, expected);
 }
 
 test "absolute rank 2" {
@@ -79,10 +71,13 @@ test "absolute rank 2" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const y = try absolute(&arena.allocator, x);
-    expect(std.mem.eql(usize, x.shape, y.shape));
-    expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(f16, y.storage.array, &[_]f16{1, 2, 3, 4, 5, 6}));
+    const actual = try absolute(&arena.allocator, x);
+    const expected = try constant(&arena.allocator,[_][2]f16{
+        .{ 1, 2 },
+        .{ 3, 4 },
+        .{ 5, 6 },
+    });
+    expectEqual(actual, expected);
 }
 
 test "absolute rank 3" {
@@ -98,8 +93,16 @@ test "absolute rank 3" {
             .{ 7, -8 },
         },
     });
-    const y = try absolute(&arena.allocator, x);
-    expect(std.mem.eql(usize, x.shape, y.shape));
-    expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(i8, y.storage.array, &[_]i8{1, 2, 3, 4, 5, 6, 7, 8}));
+    const actual = try absolute(&arena.allocator, x);
+    const expected = try constant(&arena.allocator, [_][2][2]i8{
+        .{
+            .{ 1, 2 },
+            .{ 3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    expectEqual(actual, expected);
 }
