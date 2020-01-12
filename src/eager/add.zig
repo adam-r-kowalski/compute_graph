@@ -1,9 +1,8 @@
 const std = @import("std");
-const expect = std.testing.expect;
-const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const expectEqual = @import("../testing.zig").expectEqual;
 
 pub fn add(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x) {
     if (!std.mem.eql(usize, x.shape, y.shape))
@@ -42,20 +41,18 @@ test "add rank 0" {
     defer arena.deinit();
     const x = try constant(&arena.allocator, @as(f64, 5));
     const y = try constant(&arena.allocator, @as(f64, 10));
-    const z = try add(&arena.allocator, x, y);
-    expect(std.mem.eql(usize, x.shape, z.shape));
-    expect(std.mem.eql(usize, x.stride, z.stride));
-    expectEqual(z.storage.scalar, 15);
+    const actual = try add(&arena.allocator, x, y);
+    const expected = try constant(&arena.allocator, @as(f64, 15));
+    expectEqual(actual, expected);
 }
 
 test "add rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(&arena.allocator, [_]i32{1, -2, 3, -4, -5, 6});
-    const y = try add(&arena.allocator, x, x);
-    expect(std.mem.eql(usize, x.shape, y.shape));
-    expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(i32, y.storage.array, &[_]i32{2, -4, 6, -8, -10, 12}));
+    const actual = try add(&arena.allocator, x, x);
+    const expected = try constant(&arena.allocator, [_]i32{2, -4, 6, -8, -10, 12});
+    expectEqual(actual, expected);
 }
 
 test "add rank 2" {
@@ -66,10 +63,13 @@ test "add rank 2" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const y = try add(&arena.allocator, x, x);
-    expect(std.mem.eql(usize, x.shape, y.shape));
-    expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(f16, y.storage.array, &[_]f16{2, -4, 6, -8, -10, 12}));
+    const actual = try add(&arena.allocator, x, x);
+    const expected = try constant(&arena.allocator, [_][2]f16{
+        .{ 2, -4 },
+        .{ 6, -8 },
+        .{ -10, 12 },
+    });
+    expectEqual(actual, expected);
 }
 
 test "add rank 3" {
@@ -85,8 +85,16 @@ test "add rank 3" {
             .{ 7, -8 },
         },
     });
-    const y = try add(&arena.allocator, x, x);
-    expect(std.mem.eql(usize, x.shape, y.shape));
-    expect(std.mem.eql(usize, x.stride, y.stride));
-    expect(std.mem.eql(i8, y.storage.array, &[_]i8{2, -4, 6, -8, 10, -12, 14, -16}));
+    const actual = try add(&arena.allocator, x, x);
+    const expected = try constant(&arena.allocator, [_][2][2]i8{
+        .{
+            .{ 2, -4 },
+            .{ 6, -8 },
+        },
+        .{
+            .{ 10, -12 },
+            .{ 14, -16 },
+        },
+    });
+    expectEqual(actual, expected);
 }
