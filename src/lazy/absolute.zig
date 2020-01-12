@@ -1,13 +1,12 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const expect = std.testing.expect;
-const expectEqual = std.testing.expectEqual;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const Node = @import("node.zig").Node;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
 const CpuTensorUnion = eager.CpuTensorUnion;
+const expectEqual = @import("../testing.zig").expectEqual;
 
 const Absolute = struct {
     operation: Operation,
@@ -48,18 +47,17 @@ test "absolute scalar" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, @as(f64, 5));
-    const b = try constant(&graph, @as(f64, -5));
-    const c = try absolute(&graph, a);
-    const d = try absolute(&graph, b);
+    const x = try constant(&graph, @as(f64, -5));
+    const y = try absolute(&graph, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const c_out = try session.run(c);
-    expectEqual(c_out.f64.storage.scalar, 5);
-    const d_out = try session.run(d);
-    expectEqual(d_out.f64.storage.scalar, 5);
+    const actual = try session.run(y);
+    const expected = try eager.constant(&arena.allocator, @as(f64, 5));
+    expectEqual(actual.f64, expected);
 }
 
 test "absolute matrix" {
@@ -75,9 +73,7 @@ test "absolute matrix" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    expectEqual(@TypeOf(x), Tensor(f64, 2));
     const z = try absolute(&graph, x);
-    expectEqual(@TypeOf(z), Tensor(f64, 2));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(z);
@@ -86,7 +82,7 @@ test "absolute matrix" {
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expect(std.mem.eql(f64, actual.f64.storage.array, expected.storage.array));
+    expectEqual(actual.f64, expected);
 }
 
 test "absolute matrix i32" {
@@ -102,9 +98,7 @@ test "absolute matrix i32" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    expectEqual(@TypeOf(x), Tensor(i32, 2));
     const z = try absolute(&graph, x);
-    expectEqual(@TypeOf(z), Tensor(i32, 2));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(z);
@@ -113,5 +107,5 @@ test "absolute matrix i32" {
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expect(std.mem.eql(i32, actual.i32.storage.array, expected.storage.array));
+    expectEqual(actual.i32, expected);
 }

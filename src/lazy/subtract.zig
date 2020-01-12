@@ -1,12 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const expect = std.testing.expect;
-const expectEqual = std.testing.expectEqual;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const Node = @import("node.zig").Node;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
+const expectEqual = @import("../testing.zig").expectEqual;
 const CpuTensorUnion = eager.CpuTensorUnion;
 
 const Subtract = struct {
@@ -50,6 +49,8 @@ test "subtract scalar" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, 5));
@@ -57,8 +58,9 @@ test "subtract scalar" {
     const z = try subtract(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const z_out = try session.run(z);
-    expectEqual(z_out.f64.storage.scalar, -5);
+    const actual = try session.run(z);
+    const expected = try eager.constant(&arena.allocator, @as(f64, -5));
+    expectEqual(actual.f64, expected);
 }
 
 test "subtract matrix" {
@@ -74,15 +76,12 @@ test "subtract matrix" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    expectEqual(@TypeOf(x), Tensor(f64, 2));
     const y = try constant(&graph, [_][2]f64{
         .{ -1, 2 },
         .{ -3, 4 },
         .{ 5, -6 },
     });
-    expectEqual(@TypeOf(y), Tensor(f64, 2));
     const z = try subtract(&graph, x, y);
-    expectEqual(@TypeOf(z), Tensor(f64, 2));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(z);
@@ -91,7 +90,7 @@ test "subtract matrix" {
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expect(std.mem.eql(f64, actual.f64.storage.array, expected.storage.array));
+    expectEqual(actual.f64, expected);
 }
 
 test "subtract matrix i32" {
@@ -107,15 +106,12 @@ test "subtract matrix i32" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    expectEqual(@TypeOf(x), Tensor(i32, 2));
     const y = try constant(&graph, [_][2]i32{
         .{ -1, 2 },
         .{ -3, 4 },
         .{ 5, -6 },
     });
-    expectEqual(@TypeOf(y), Tensor(i32, 2));
     const z = try subtract(&graph, x, y);
-    expectEqual(@TypeOf(z), Tensor(i32, 2));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(z);
@@ -124,5 +120,5 @@ test "subtract matrix i32" {
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expect(std.mem.eql(i32, actual.i32.storage.array, expected.storage.array));
+    expectEqual(actual.i32, expected);
 }

@@ -2,7 +2,9 @@ const std = @import("std");
 const Node = @import("node.zig").Node;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
-const CpuTensorUnion = @import("../eager.zig").CpuTensorUnion;
+const eager = @import("../eager.zig");
+const expectEqual = @import("../testing.zig").expectEqual;
+const CpuTensorUnion = eager.CpuTensorUnion;
 
 const ExecutionOrder = struct {
     const Nodes = std.ArrayList(Node);
@@ -143,6 +145,8 @@ test "session run" {
     const subtract = @import("subtract.zig").subtract;
     const absolute = @import("absolute.zig").absolute;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const m = try constant(&graph, @as(f64, 3));
@@ -155,6 +159,7 @@ test "session run" {
     const loss = try absolute(&graph, delta);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const output = try session.run(loss);
-    std.testing.expectEqual(output.f64.storage.scalar, 10);
+    const actual = try session.run(loss);
+    const expected = try eager.constant(&arena.allocator, @as(f64, 10));
+    expectEqual(actual.f64, expected);
 }

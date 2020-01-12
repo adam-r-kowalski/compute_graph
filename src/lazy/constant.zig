@@ -1,12 +1,11 @@
 const std = @import("std");
-const expect = std.testing.expect;
-const expectEqual = std.testing.expectEqual;
 const Node = @import("node.zig").Node;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const eager = @import("../eager.zig");
 const CpuTensorUnion = eager.CpuTensorUnion;
 const arrayInfo = @import("../util/array_info.zig").arrayInfo;
+const expectEqual = @import("../testing.zig").expectEqual;
 
 fn TensorType(comptime T: type) type {
     const info = arrayInfo(T);
@@ -23,16 +22,16 @@ pub fn constant(graph: *Graph, literal: var) !TensorType(@TypeOf(literal)) {
 test "constant scalar" {
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, 5));
-    const y = try constant(&graph, @as(f64, 10));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const x_out = try session.run(x);
-    const y_out = try session.run(y);
-    expectEqual(x_out.f64.storage.scalar, 5);
-    expectEqual(y_out.f64.storage.scalar, 10);
+    const actual = try session.run(x);
+    const expected = try eager.constant(&arena.allocator, @as(f64, 5));
+    expectEqual(actual.f64, expected);
 }
 
 test "constant array" {
@@ -55,5 +54,5 @@ test "constant array" {
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expect(std.mem.eql(f32, actual.f32.storage.array, expected.storage.array));
+    expectEqual(actual.f32, expected);
 }

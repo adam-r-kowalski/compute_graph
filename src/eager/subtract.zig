@@ -1,9 +1,8 @@
 const std = @import("std");
-const expect = std.testing.expect;
-const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const expectEqual = @import("../testing.zig").expectEqual;
 
 pub fn subtract(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x) {
     if (!std.mem.eql(usize, x.shape, y.shape))
@@ -42,10 +41,9 @@ test "subtract rank 0" {
     defer arena.deinit();
     const x = try constant(&arena.allocator, @as(f64, 5));
     const y = try constant(&arena.allocator, @as(f64, 10));
-    const z = try subtract(&arena.allocator, x, y);
-    expect(std.mem.eql(usize, x.shape, z.shape));
-    expect(std.mem.eql(usize, x.stride, z.stride));
-    expectEqual(z.storage.scalar, -5);
+    const actual = try subtract(&arena.allocator, x, y);
+    const expected = try constant(&arena.allocator, @as(f64, -5));
+    expectEqual(actual, expected);
 }
 
 test "subtract rank 1" {
@@ -53,10 +51,9 @@ test "subtract rank 1" {
     defer arena.deinit();
     const x = try constant(&arena.allocator, [_]i32{1, -2, 3, -4, -5, 6});
     const y = try constant(&arena.allocator, [_]i32{-1, 2, -3, 4, 5, -6});
-    const z = try subtract(&arena.allocator, x, y);
-    expect(std.mem.eql(usize, x.shape, z.shape));
-    expect(std.mem.eql(usize, x.stride, z.stride));
-    expect(std.mem.eql(i32, z.storage.array, &[_]i32{2, -4, 6, -8, -10, 12}));
+    const actual = try subtract(&arena.allocator, x, y);
+    const expected = try constant(&arena.allocator, [_]i32{2, -4, 6, -8, -10, 12});
+    expectEqual(actual, expected);
 }
 
 test "subtract rank 2" {
@@ -72,10 +69,13 @@ test "subtract rank 2" {
         .{ -3, 4 },
         .{ 5, -6 },
     });
-    const z = try subtract(&arena.allocator, x, y);
-    expect(std.mem.eql(usize, x.shape, z.shape));
-    expect(std.mem.eql(usize, x.stride, z.stride));
-    expect(std.mem.eql(f16, z.storage.array, &[_]f16{2, -4, 6, -8, -10, 12}));
+    const actual = try subtract(&arena.allocator, x, y);
+    const expected = try constant(&arena.allocator, [_][2]f16{
+        .{ 2, -4 },
+        .{ 6, -8 },
+        .{ -10, 12 },
+    });
+    expectEqual(actual, expected);
 }
 
 test "subtract rank 3" {
@@ -101,8 +101,16 @@ test "subtract rank 3" {
             .{ -7, 8 },
         },
     });
-    const z = try subtract(&arena.allocator, x, y);
-    expect(std.mem.eql(usize, x.shape, z.shape));
-    expect(std.mem.eql(usize, x.stride, z.stride));
-    expect(std.mem.eql(i8, z.storage.array, &[_]i8{2, -4, 6, -8, 10, -12, 14, -16}));
+    const actual = try subtract(&arena.allocator, x, y);
+    const expected = try constant(&arena.allocator, [_][2][2]i8{
+        .{
+            .{ 2, -4 },
+            .{ 6, -8 },
+        },
+        .{
+            .{ 10, -12 },
+            .{ 14, -16 },
+        },
+    });
+    expectEqual(actual, expected);
 }

@@ -1,13 +1,12 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const expect = std.testing.expect;
-const expectEqual = std.testing.expectEqual;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const Node = @import("node.zig").Node;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
 const CpuTensorUnion = eager.CpuTensorUnion;
+const expectEqual = @import("../testing.zig").expectEqual;
 
 const Add = struct {
     operation: Operation,
@@ -50,6 +49,8 @@ test "add scalar" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, 5));
@@ -57,8 +58,9 @@ test "add scalar" {
     const z = try add(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const z_out = try session.run(z);
-    expectEqual(z_out.f64.storage.scalar, 15);
+    const actual = try session.run(z);
+    const expected = try eager.constant(&arena.allocator, @as(f64, 15));
+    expectEqual(actual.f64, expected);
 }
 
 test "add matrix" {
@@ -74,9 +76,7 @@ test "add matrix" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    expectEqual(@TypeOf(x), Tensor(f64, 2));
     const z = try add(&graph, x, x);
-    expectEqual(@TypeOf(z), Tensor(f64, 2));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(z);
@@ -85,7 +85,7 @@ test "add matrix" {
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expect(std.mem.eql(f64, actual.f64.storage.array, expected.storage.array));
+    expectEqual(actual.f64, expected);
 }
 
 test "add matrix i32" {
@@ -101,9 +101,7 @@ test "add matrix i32" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    expectEqual(@TypeOf(x), Tensor(i32, 2));
     const z = try add(&graph, x, x);
-    expectEqual(@TypeOf(z), Tensor(i32, 2));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(z);
@@ -112,5 +110,5 @@ test "add matrix i32" {
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expect(std.mem.eql(i32, actual.i32.storage.array, expected.storage.array));
+    expectEqual(actual.i32, expected);
 }
