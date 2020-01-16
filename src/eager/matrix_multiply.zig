@@ -8,7 +8,7 @@ const tensorLength = cpu_tensor.tensorLength;
 const tensorStride = cpu_tensor.tensorStride;
 const expectEqual = @import("../testing.zig").expectEqual;
 
-fn index(tensor: var, cartesian_index: []const usize) @TypeOf(tensor).ScalarType {
+fn index(tensor: var, cartesian_index: [2]usize) @TypeOf(tensor).ScalarType {
     var linear_index: usize = 0;
     for (tensor.stride) |s, i| {
         assert(cartesian_index[i] < tensor.shape[i]);
@@ -24,12 +24,12 @@ test "cpu tensor index" {
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
-    std.testing.expectEqual(index(tensor, &[_]usize{ 0, 0 }), 1);
-    std.testing.expectEqual(index(tensor, &[_]usize{ 0, 1 }), 2);
-    std.testing.expectEqual(index(tensor, &[_]usize{ 0, 2 }), 3);
-    std.testing.expectEqual(index(tensor, &[_]usize{ 1, 0 }), 4);
-    std.testing.expectEqual(index(tensor, &[_]usize{ 1, 1 }), 5);
-    std.testing.expectEqual(index(tensor, &[_]usize{ 1, 2 }), 6);
+    std.testing.expectEqual(index(tensor, .{ 0, 0 }), 1);
+    std.testing.expectEqual(index(tensor, .{ 0, 1 }), 2);
+    std.testing.expectEqual(index(tensor, .{ 0, 2 }), 3);
+    std.testing.expectEqual(index(tensor, .{ 1, 0 }), 4);
+    std.testing.expectEqual(index(tensor, .{ 1, 1 }), 5);
+    std.testing.expectEqual(index(tensor, .{ 1, 2 }), 6);
 }
 
 pub fn matrix_multiply(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x) {
@@ -58,7 +58,7 @@ pub fn matrix_multiply(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x)
         while (j < p - 1) : (j += 1) {
             var k: usize = 0;
             while (k < n - 1) : (k += 1) {
-                index(tensor, &[_]usize{ i, j }) += index(x, &[_]usize{ i, k }) * index(y, &[_]usize{ k, j });
+                index(tensor, .{ i, j }) += index(x, .{ i, k }) * index(y, .{ k, j });
             }
         }
     }
