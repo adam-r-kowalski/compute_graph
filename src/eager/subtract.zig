@@ -8,18 +8,14 @@ pub fn subtract(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x) {
     if (!std.mem.eql(usize, x.shape, y.shape))
         return error.ShapeMismatch;
     const T = @TypeOf(x);
-    const shape = try allocator.alloc(usize, x.shape.len);
-    errdefer allocator.free(shape);
-    std.mem.copy(usize, shape, x.shape);
-    const stride = try allocator.alloc(usize, x.stride.len);
-    errdefer allocator.free(stride);
-    std.mem.copy(usize, stride, x.stride);
+    const shape = x.shape;
+    const stride = x.stride;
     switch (x.storage) {
         .scalar => |scalar| {
             return T{
-                .shape=shape,
-                .stride=stride,
-                .storage=.{.scalar = scalar - y.storage.scalar},
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .scalar = scalar - y.storage.scalar },
             };
         },
         .array => |array| {
@@ -28,9 +24,9 @@ pub fn subtract(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x) {
             const y_array = y.storage.array;
             for (array) |e, i| new_array[i] = e - y_array[i];
             return T{
-                .shape=shape,
-                .stride=stride,
-                .storage=.{.array = new_array},
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .array = new_array },
             };
         },
     }
@@ -49,10 +45,10 @@ test "subtract rank 0" {
 test "subtract rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]i32{1, -2, 3, -4, -5, 6});
-    const y = try constant(&arena.allocator, [_]i32{-1, 2, -3, 4, 5, -6});
+    const x = try constant(&arena.allocator, [_]i32{ 1, -2, 3, -4, -5, 6 });
+    const y = try constant(&arena.allocator, [_]i32{ -1, 2, -3, 4, 5, -6 });
     const actual = try subtract(&arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, [_]i32{2, -4, 6, -8, -10, 12});
+    const expected = try constant(&arena.allocator, [_]i32{ 2, -4, 6, -8, -10, 12 });
     expectEqual(actual, expected);
 }
 

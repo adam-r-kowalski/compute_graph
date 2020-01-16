@@ -18,18 +18,14 @@ fn absoluteScalar(x: var) error{Overflow}!@TypeOf(x) {
 
 pub fn absolute(allocator: *Allocator, tensor: var) !@TypeOf(tensor) {
     const T = @TypeOf(tensor);
-    const shape = try allocator.alloc(usize, tensor.shape.len);
-    errdefer allocator.free(shape);
-    std.mem.copy(usize, shape, tensor.shape);
-    const stride = try allocator.alloc(usize, tensor.stride.len);
-    errdefer allocator.free(stride);
-    std.mem.copy(usize, stride, tensor.stride);
+    const shape = tensor.shape;
+    const stride = tensor.stride;
     switch (tensor.storage) {
         .scalar => |scalar| {
             return T{
-                .shape=shape,
-                .stride=stride,
-                .storage=.{.scalar = try absoluteScalar(scalar)},
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .scalar = try absoluteScalar(scalar) },
             };
         },
         .array => |array| {
@@ -37,9 +33,9 @@ pub fn absolute(allocator: *Allocator, tensor: var) !@TypeOf(tensor) {
             errdefer allocator.free(new_array);
             for (array) |e, i| new_array[i] = try absoluteScalar(e);
             return T{
-                .shape=shape,
-                .stride=stride,
-                .storage=.{.array = new_array},
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .array = new_array },
             };
         },
     }
@@ -57,9 +53,9 @@ test "absolute rank 0" {
 test "absolute rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]i32{1, -2, 3, -4, -5, 6});
+    const x = try constant(&arena.allocator, [_]i32{ 1, -2, 3, -4, -5, 6 });
     const actual = try absolute(&arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_]i32{1, 2, 3, 4, 5, 6});
+    const expected = try constant(&arena.allocator, [_]i32{ 1, 2, 3, 4, 5, 6 });
     expectEqual(actual, expected);
 }
 
@@ -72,7 +68,7 @@ test "absolute rank 2" {
         .{ -5, 6 },
     });
     const actual = try absolute(&arena.allocator, x);
-    const expected = try constant(&arena.allocator,[_][2]f16{
+    const expected = try constant(&arena.allocator, [_][2]f16{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },

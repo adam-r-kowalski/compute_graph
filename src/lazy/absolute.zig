@@ -20,12 +20,12 @@ fn inputs(operation: *const Operation) []const Node {
 fn forward(context: Operation.Context) Operation.Error!CpuTensorUnion {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
-        .f64 => |tensor| .{.f64 = try eager.absolute(context.allocator, tensor)},
-        .f32 => |tensor| .{.f32 = try eager.absolute(context.allocator, tensor)},
-        .f16 => |tensor| .{.f16 = try eager.absolute(context.allocator, tensor)},
-        .i64 => |tensor| .{.i64 = try eager.absolute(context.allocator, tensor)},
-        .i32 => |tensor| .{.i32 = try eager.absolute(context.allocator, tensor)},
-        .i8 => |tensor| .{.i8 = try eager.absolute(context.allocator, tensor)},
+        .f64 => |tensor| .{ .f64 = try eager.absolute(context.allocator, tensor) },
+        .f32 => |tensor| .{ .f32 = try eager.absolute(context.allocator, tensor) },
+        .f16 => |tensor| .{ .f16 = try eager.absolute(context.allocator, tensor) },
+        .i64 => |tensor| .{ .i64 = try eager.absolute(context.allocator, tensor) },
+        .i32 => |tensor| .{ .i32 = try eager.absolute(context.allocator, tensor) },
+        .i8 => |tensor| .{ .i8 = try eager.absolute(context.allocator, tensor) },
     };
 }
 
@@ -36,7 +36,7 @@ pub fn absolute(graph: *Graph, x: var) !@TypeOf(x) {
             .inputs = inputs,
             .forward = forward,
         },
-        .nodes = .{ x.node },
+        .nodes = .{x.node},
     };
     try graph.operations.append(&absolute_operation.operation);
     const node = Node{ .operation = graph.operations.len - 1 };
