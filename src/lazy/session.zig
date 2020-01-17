@@ -144,6 +144,7 @@ test "session run" {
     const matrix_multiply = @import("matrix_multiply.zig").matrix_multiply;
     const subtract = @import("subtract.zig").subtract;
     const absolute = @import("absolute.zig").absolute;
+    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -159,12 +160,12 @@ test "session run" {
         .{ 2 },
         .{ 3 }
     });
+    const h = try matrix_multiply(&graph, m, x);
     const b = try constant(&graph, [_][1]i64{
         .{ 3 },
         .{ 7 },
         .{ 5 }
     });
-    const h = try matrix_multiply(&graph, m, x);
     const y_hat = try add(&graph, h, b);
     const y = try constant(&graph, [_][1]i64{
         .{ 1 },
@@ -172,10 +173,11 @@ test "session run" {
         .{ 9 }
     });
     const delta = try subtract(&graph, y, y_hat);
-    const loss = try absolute(&graph, delta);
+    const magnitude = try absolute(&graph, delta);
+    const loss = try mean(&graph, magnitude);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(loss);
-    // const expected = try eager.constant(&arena.allocator, @as(f64, 10));
-    // expectEqual(actual.f64, expected);
+    const expected = try eager.constant(&arena.allocator, @as(f64, 26));
+    expectEqual(actual.f64, expected);
 }
