@@ -5,6 +5,7 @@ pub const add = @import("lazy/add.zig").add;
 pub const constant = @import("lazy/constant.zig").constant;
 pub const multiply = @import("lazy/multiply.zig").multiply;
 pub const matrix_multiply = @import("lazy/matrix_multiply.zig").matrix_multiply;
+pub const mean = @import("lazy/mean.zig").mean;
 pub const Node = @import("lazy/node.zig").Node;
 pub const Session = @import("lazy/session.zig").Session;
 pub const subtract = @import("lazy/subtract.zig").subtract;
