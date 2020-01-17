@@ -60,7 +60,7 @@ test "mean rank 0" {
 test "mean rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]i32{ 5, 10, 7, 8, 10});
+    const x = try constant(&arena.allocator, [_]i32{ 5, 10, 7, 8, 10 });
     const actual = try mean(&arena.allocator, x);
     const expected = try constant(&arena.allocator, @as(f32, 8));
     expectEqual(actual, expected);

@@ -151,26 +151,26 @@ test "session run" {
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const m = try constant(&graph, [_][3]i64{
-        .{   0,  7, 3 },
-        .{   4,  5, 6 },
-        .{ -10, -2, 0 }
+        .{ 0, 7, 3 },
+        .{ 4, 5, 6 },
+        .{ -10, -2, 0 },
     });
     const x = try constant(&graph, [_][1]i64{
-        .{ 1 },
-        .{ 2 },
-        .{ 3 }
+        .{1},
+        .{2},
+        .{3},
     });
     const h = try matrix_multiply(&graph, m, x);
     const b = try constant(&graph, [_][1]i64{
-        .{ 3 },
-        .{ 7 },
-        .{ 5 }
+        .{3},
+        .{7},
+        .{5},
     });
     const y_hat = try add(&graph, h, b);
     const y = try constant(&graph, [_][1]i64{
-        .{ 1 },
-        .{ 4 },
-        .{ 9 }
+        .{1},
+        .{4},
+        .{9},
     });
     const delta = try subtract(&graph, y, y_hat);
     const magnitude = try absolute(&graph, delta);
