@@ -114,3 +114,32 @@ test "mean matrix i32" {
     const expected = try eager.constant(&arena.allocator, @as(f32, 8));
     expectEqual(actual.f32, expected);
 }
+
+test "gradient mean" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][3]f64{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const b = try mean(&graph, a);
+    const c = try gradient(&graph, b, a);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(c);
+    const expected = try eager.constant(&arena.allocator, [_][3]f64{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    // const expected = try eager.constant(&arena.allocator, [_][3]f64{
+    //     .{ 1/6, 1/6, 1/6 },
+    //     .{ 1/6, 1/6, 1/6 },
+    // });
+    expectEqual(actual.f64, expected);
+}
