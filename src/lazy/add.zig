@@ -17,7 +17,7 @@ fn inputs(operation: *const Operation) []const Node {
     return &@fieldParentPtr(Add, "operation", operation).nodes;
 }
 
-fn forward(context: Operation.ForwardContext) Operation.Error!CpuTensorUnion {
+fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 2);
     const x = context.values[0];
     const y = context.values[1];

@@ -17,7 +17,7 @@ fn inputs(operation: *const Operation) []const Node {
     return &@fieldParentPtr(Absolute, "operation", operation).nodes;
 }
 
-fn forward(context: Operation.ForwardContext) Operation.Error!CpuTensorUnion {
+fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
         .f64 => |tensor| .{ .f64 = try eager.absolute(context.allocator, tensor) },

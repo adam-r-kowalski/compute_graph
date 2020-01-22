@@ -17,7 +17,7 @@ fn inputs(operation: *const Operation) []const Node {
     return &@fieldParentPtr(Mean, "operation", operation).nodes;
 }
 
-fn forward(context: Operation.ForwardContext) Operation.Error!CpuTensorUnion {
+fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
         .f64 => |tensor| .{ .f64 = try eager.mean(context.allocator, tensor) },
@@ -29,8 +29,16 @@ fn forward(context: Operation.ForwardContext) Operation.Error!CpuTensorUnion {
     };
 }
 
-fn backward(context: Operation.BackwardContext) Operation.Error![]const CpuTensorUnion {
-    return error.OutOfMemory;
+fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
+    const values = try context.allocator.alloc(CpuTensorUnion, 1);
+    errdefer context.allocator.free(values);
+    switch(context.value) {
+        .f64 => |tensor| { values[0] = .{ .f64 = tensor }; },
+        .f32 => |tensor| { values[0] = .{ .f32 = tensor }; },
+        .f16 => |tensor| { values[0] = .{ .f16 = tensor }; },
+        .i64, .i32, .i8 => { return error.CannotDifferentiateIntegral; },
+    }
+    return values;
 }
 
 pub fn mean(graph: *Graph, x: var) !@TypeOf(x) {
@@ -39,7 +47,7 @@ pub fn mean(graph: *Graph, x: var) !@TypeOf(x) {
         .operation = .{
             .inputs = inputs,
             .forward = forward,
-            .backward = null,
+            .backward = backward,
         },
         .nodes = .{x.node},
     };

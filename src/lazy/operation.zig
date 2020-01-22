@@ -3,9 +3,15 @@ const Node = @import("node.zig").Node;
 const CpuTensorUnion = @import("../eager.zig").CpuTensorUnion;
 
 pub const Operation = struct {
-    pub const Error = error{
+    pub const ForwardError = error{
         OutOfMemory,
         ShapeMismatch,
+        Overflow,
+    };
+
+    pub const BackwardError = error{
+        OutOfMemory,
+        CannotDifferentiateIntegral,
         Overflow,
     };
 
@@ -21,7 +27,10 @@ pub const Operation = struct {
         value: CpuTensorUnion,
     };
 
+    pub const ForwardResult = ForwardError!CpuTensorUnion;
+    pub const BackwardResult = BackwardError![]const CpuTensorUnion;
+
     inputs: fn (self: *const Operation) []const Node,
-    forward: fn (context: ForwardContext) Error!CpuTensorUnion,
-    backward: ?fn (context: BackwardContext) Error![]const CpuTensorUnion,
+    forward: fn (context: ForwardContext) ForwardResult,
+    backward: ?fn (context: BackwardContext) BackwardResult,
 };
