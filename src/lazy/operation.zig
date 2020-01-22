@@ -9,12 +9,19 @@ pub const Operation = struct {
         Overflow,
     };
 
-    pub const Context = struct {
+    pub const ForwardContext = struct {
         op: *const Operation,
         allocator: *Allocator,
         values: []const CpuTensorUnion,
     };
 
+    pub const BackwardContext = struct {
+        op: *const Operation,
+        allocator: *Allocator,
+        value: CpuTensorUnion,
+    };
+
     inputs: fn (self: *const Operation) []const Node,
-    forward: fn (context: Context) Error!CpuTensorUnion,
+    forward: fn (context: ForwardContext) Error!CpuTensorUnion,
+    backward: ?fn (context: BackwardContext) Error![]const CpuTensorUnion,
 };

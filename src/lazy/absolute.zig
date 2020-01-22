@@ -17,7 +17,7 @@ fn inputs(operation: *const Operation) []const Node {
     return &@fieldParentPtr(Absolute, "operation", operation).nodes;
 }
 
-fn forward(context: Operation.Context) Operation.Error!CpuTensorUnion {
+fn forward(context: Operation.ForwardContext) Operation.Error!CpuTensorUnion {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
         .f64 => |tensor| .{ .f64 = try eager.absolute(context.allocator, tensor) },
@@ -35,6 +35,7 @@ pub fn absolute(graph: *Graph, x: var) !@TypeOf(x) {
         .operation = .{
             .inputs = inputs,
             .forward = forward,
+            .backward = null,
         },
         .nodes = .{x.node},
     };

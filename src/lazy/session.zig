@@ -137,8 +137,23 @@ pub const Session = struct {
                     try cache.putNoClobber(node, result);
                 },
                 .gradient => |g| {
-                    const value = graph.gradients.at(g).with_respect_to;
-                    try cache.putNoClobber(node, graph.constants.at(value.constant));
+                    var gradient_cache = std.AutoHashMap(Node, CpuTensorUnion).init(allocator);
+                    defer gradient_cache.deinit();
+                    const gradient_operation = graph.gradients.at(g);
+                    const op = graph.operations.at(gradient_operation.of.operation);
+
+                    const value = gradient_operation.with_respect_to.constant;
+                    const constant = graph.constants.at(value);
+
+                    if (op.backward) |backward| {
+                        _ = try backward(.{
+                            .op = op,
+                            .allocator = &self.arena.allocator,
+                            .value = constant,
+                        });
+                    }
+
+                    try cache.putNoClobber(node, constant);
                 }
             }
             i += 1;

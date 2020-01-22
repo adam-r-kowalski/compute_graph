@@ -17,7 +17,7 @@ fn inputs(operation: *const Operation) []const Node {
     return &@fieldParentPtr(Mean, "operation", operation).nodes;
 }
 
-fn forward(context: Operation.Context) Operation.Error!CpuTensorUnion {
+fn forward(context: Operation.ForwardContext) Operation.Error!CpuTensorUnion {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
         .f64 => |tensor| .{ .f64 = try eager.mean(context.allocator, tensor) },
@@ -29,12 +29,17 @@ fn forward(context: Operation.Context) Operation.Error!CpuTensorUnion {
     };
 }
 
+fn backward(context: Operation.BackwardContext) Operation.Error![]const CpuTensorUnion {
+    return error.OutOfMemory;
+}
+
 pub fn mean(graph: *Graph, x: var) !@TypeOf(x) {
     var mean_operation = try graph.arena.allocator.create(Mean);
     mean_operation.* = .{
         .operation = .{
             .inputs = inputs,
             .forward = forward,
+            .backward = null,
         },
         .nodes = .{x.node},
     };
