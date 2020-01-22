@@ -1,5 +1,6 @@
 const std = @import("std");
 const Node = @import("node.zig").Node;
+const gradient = @import("gradient.zig");
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const eager = @import("../eager.zig");
@@ -111,7 +112,10 @@ pub const Session = struct {
         const graph = self.graph;
         var cache = std.AutoHashMap(Node, CpuTensorUnion).init(allocator);
         defer cache.deinit();
-        for (try executionOrder(self, tensor)) |node| {
+        var i: usize = 0;
+        const nodes = try executionOrder(self, tensor);
+        while (i < nodes.len) {
+            const node = nodes[i];
             switch (node) {
                 .constant => |c| {
                     const value = graph.constants.at(c);
@@ -132,7 +136,12 @@ pub const Session = struct {
                     });
                     try cache.putNoClobber(node, result);
                 },
+                .gradient => |g| {
+                    const value = graph.gradients.at(g).with_respect_to;
+                    try cache.putNoClobber(node, graph.constants.at(value.constant));
+                }
             }
+            i += 1;
         }
         return try getValue(cache, tensor.node);
     }
