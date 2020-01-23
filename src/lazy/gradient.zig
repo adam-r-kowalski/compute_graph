@@ -10,7 +10,7 @@ pub const Gradient = struct {
 pub fn gradient(graph: *Graph, of: var, with_respect_to: var) !@TypeOf(with_respect_to) {
     try graph.gradients.append(.{
         .of = of.node,
-        .with_respect_to = with_respect_to.node
+        .with_respect_to = with_respect_to.node,
     });
     const node = Node{ .gradient = graph.gradients.len - 1 };
     return @TypeOf(with_respect_to){ .node = node };

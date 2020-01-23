@@ -24,7 +24,8 @@ pub const Operation = struct {
     pub const BackwardContext = struct {
         op: *const Operation,
         allocator: *Allocator,
-        value: CpuTensorUnion,
+        gradient_input: CpuTensorUnion,
+        forward_inputs: []const CpuTensorUnion,
     };
 
     pub const ForwardResult = ForwardError!CpuTensorUnion;

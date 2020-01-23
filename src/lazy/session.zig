@@ -1,6 +1,6 @@
 const std = @import("std");
 const Node = @import("node.zig").Node;
-const gradient = @import("gradient.zig");
+const gradient = @import("gradient.zig").gradient;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const eager = @import("../eager.zig");
@@ -19,6 +19,11 @@ const ExecutionOrder = struct {
                 for (operation.inputs(operation)) |input|
                     if (!visited.contains(input))
                         try recurse(nodes, visited, graph, input);
+            },
+            .gradient => |g| {
+                const of = graph.gradients.at(g).of;
+                if (!visited.contains(of))
+                    try recurse(nodes, visited, graph, of);
             },
             else => {},
         }
@@ -61,6 +66,26 @@ test "execution order" {
     std.testing.expectEqual(execution_order[4], b.node);
     std.testing.expectEqual(execution_order[5], y_hat.node);
     std.testing.expectEqual(execution_order[6], loss.node);
+}
+
+test "execution order gradient" {
+    const constant = @import("constant.zig").constant;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, @as(f64, 5));
+    const b = try mean(&graph, a);
+    const c = try gradient(&graph, b, a);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const execution_order = try executionOrder(session, c);
+    std.testing.expectEqual(execution_order.len, 3);
+    std.testing.expectEqual(execution_order[0], a.node);
+    std.testing.expectEqual(execution_order[1], b.node);
+    std.testing.expectEqual(execution_order[2], c.node);
 }
 
 test "execution order repeated nodes" {
@@ -140,21 +165,33 @@ pub const Session = struct {
                     var gradient_cache = std.AutoHashMap(Node, CpuTensorUnion).init(allocator);
                     defer gradient_cache.deinit();
                     const gradient_operation = graph.gradients.at(g);
-                    const op = graph.operations.at(gradient_operation.of.operation);
 
-                    const value = gradient_operation.with_respect_to.constant;
-                    const constant = graph.constants.at(value);
+                    const of = gradient_operation.of;
+                    const one = try eager.constant(allocator, @as(f64, 1));
+                    try gradient_cache.putNoClobber(of, CpuTensorUnion.init(one));
+
+                    const op = graph.operations.at(of.operation);
+                    var forward_inputs = std.ArrayList(CpuTensorUnion).init(allocator);
+                    defer forward_inputs.deinit();
+                    for (op.inputs(op)) |input| {
+                        const value = try getValue(cache, input);
+                        try forward_inputs.append(value);
+                    }
+
+                    const gradient_input = try getValue(gradient_cache, of);
 
                     if (op.backward) |backward| {
                         _ = try backward(.{
                             .op = op,
                             .allocator = &self.arena.allocator,
-                            .value = constant,
+                            .gradient_input = gradient_input,
+                            .forward_inputs = forward_inputs.toSlice(),
                         });
                     }
 
-                    try cache.putNoClobber(node, constant);
-                }
+                    const value = try getValue(cache, gradient_operation.with_respect_to);
+                    try cache.putNoClobber(node, value);
+                },
             }
             i += 1;
         }
