@@ -34,6 +34,7 @@ const ExecutionOrder = struct {
 
 fn executionOrder(session: Session, tensor: var) ![]const Node {
     var nodes = ExecutionOrder.Nodes.init(&session.arena.allocator);
+    errdefer nodes.deinit();
     var visited = ExecutionOrder.Visited.init(session.arena.child_allocator);
     defer visited.deinit();
     try ExecutionOrder.recurse(&nodes, &visited, session.graph, tensor.node);

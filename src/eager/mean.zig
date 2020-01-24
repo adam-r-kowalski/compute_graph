@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const expectEqual = @import("../testing.zig").expectEqual;
+const backward = @import("backward.zig");
 
 fn TensorType(comptime T: type) type {
     const ScalarType = switch (T.ScalarType) {
@@ -95,4 +96,37 @@ test "mean rank 3" {
     const actual = try mean(&arena.allocator, x);
     const expected = try constant(&arena.allocator, @as(f16, 7));
     expectEqual(actual, expected);
+}
+
+pub fn mean_backward(context: var) !@TypeOf(context.forward_inputs) {
+    std.debug.assert(context.forward_inputs.len == 1);
+    const input = context.forward_inputs[0];
+    const outputs = try context.allocator.alloc(@TypeOf(input), 1);
+    errdefer context.allocator.free(outputs);
+    const scalar = context.gradient_input.storage.scalar;
+    // TODO(Adam) length should be factored into seperate function
+    //            returning the number of scalars in the tensor
+    //            const len = length(context.forward_inputs[0]);
+    const len = input.storage.array.len;
+    const value = scalar / @intToFloat(@TypeOf(scalar), len);
+    // TODO(Adam) build a function which creates a tensor given a value and a shape
+    //            const outputs[0] = fill(value, context.forward_inputs[0].shape);
+    outputs[0] = input;
+    return outputs;
+}
+
+test "mean backward" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const x = try constant(&arena.allocator, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const y = try mean(&arena.allocator, x);
+    const actual = try mean_backward(backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = y,
+        .forward_inputs = &[_]CpuTensor(f64){x},
+    });
+    expectEqual(actual[0], x);
 }
