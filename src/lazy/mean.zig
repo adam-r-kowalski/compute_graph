@@ -5,6 +5,8 @@ const Tensor = @import("tensor.zig").Tensor;
 const Node = @import("node.zig").Node;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
+const mean_backward = @import("../eager/mean.zig").mean_backward;
+const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 
@@ -33,14 +35,29 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     const values = try context.allocator.alloc(CpuTensorUnion, 1);
     errdefer context.allocator.free(values);
     switch (context.gradient_input) {
-        .f64 => |tensor| {
-            values[0] = .{ .f64 = tensor };
+        .f64 => |gradient_input| {
+            const gradients = try mean_backward(.{
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
+            });
+            values[0] = .{ .f64 = gradients[0] };
         },
-        .f32 => |tensor| {
-            values[0] = .{ .f32 = tensor };
+        .f32 => |gradient_input| {
+            const gradients = try mean_backward(.{
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
+            });
+            values[0] = .{ .f32 = gradients[0] };
         },
-        .f16 => |tensor| {
-            values[0] = .{ .f16 = tensor };
+        .f16 => |gradient_input| {
+            const gradients = try mean_backward(.{
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
+            });
+            values[0] = .{ .f16 = gradients[0] };
         },
         .i64, .i32, .i8 => {
             return error.CannotDifferentiateIntegral;
@@ -132,23 +149,18 @@ test "gradient mean" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][3]f64{
-        .{ 1, 2, 3 },
-        .{ 4, 5, 6 },
+    const a = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
     });
     const b = try mean(&graph, a);
     const c = try gradient(&graph, b, a);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(c);
-    // const expected = try eager.constant(&arena.allocator, [_][3]f64{
-    //     .{ 1/6, 1/6, 1/6 },
-    //     .{ 1/6, 1/6, 1/6 },
-    // });
-    // expectEqual(actual.f64, expected);
-
-    // std.debug.warn("\n", .{});
-    // for (actual.f64.storage.array) |e|
-    //     std.debug.warn("{} ", .{e});
-    // std.debug.warn("\n", .{});
+    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    expectEqual(actual.f64, expected);
 }

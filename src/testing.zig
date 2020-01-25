@@ -8,6 +8,9 @@ pub fn expectEqual(x: var, y: @TypeOf(x)) void {
     std.testing.expect(std.mem.eql(usize, x.stride, y.stride));
     switch (x.storage) {
         .scalar => |scalar| std.testing.expectEqual(scalar, y.storage.scalar),
-        .array => |array| std.testing.expect(std.mem.eql(T, array, y.storage.array)),
+        .array => |array| {
+            const y_array = y.storage.array;
+            for (array) |e, i| std.testing.expectEqual(e, y_array[i]);
+        },
     }
 }

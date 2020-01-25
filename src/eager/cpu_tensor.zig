@@ -41,7 +41,8 @@ pub const CpuTensorUnion = union(enum) {
     }
 };
 
-pub fn tensorStride(comptime rank: usize, allocator: *Allocator, shape: []const usize) ![]usize {
+pub fn tensorStride(allocator: *Allocator, shape: []const usize) ![]usize {
+    const rank = shape.len;
     var stride = try allocator.alloc(usize, rank);
     errdefer allocator.free(stride);
     if (rank == 0)
@@ -59,7 +60,7 @@ pub fn tensorStride(comptime rank: usize, allocator: *Allocator, shape: []const 
 test "stride rank 0" {
     const allocator = std.heap.page_allocator;
     const shape = [_]usize{};
-    const stride = try tensorStride(0, allocator, shape[0..]);
+    const stride = try tensorStride(allocator, shape[0..]);
     defer allocator.free(stride);
     expect(std.mem.eql(usize, stride, &[_]usize{}));
 }
@@ -67,7 +68,7 @@ test "stride rank 0" {
 test "stride rank 3" {
     const allocator = std.heap.page_allocator;
     const shape = [_]usize{ 3, 2, 3 };
-    const stride = try tensorStride(3, allocator, shape[0..]);
+    const stride = try tensorStride(allocator, shape[0..]);
     defer allocator.free(stride);
     expect(std.mem.eql(usize, stride, &[_]usize{ 6, 3, 1 }));
 }
@@ -75,7 +76,7 @@ test "stride rank 3" {
 test "stride rank 4" {
     const allocator = std.heap.page_allocator;
     const shape = [_]usize{ 3, 4, 5, 6 };
-    const stride = try tensorStride(4, allocator, shape[0..]);
+    const stride = try tensorStride(allocator, shape[0..]);
     defer allocator.free(stride);
     expect(std.mem.eql(usize, stride, &[_]usize{ 120, 30, 6, 1 }));
 }

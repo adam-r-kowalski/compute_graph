@@ -182,15 +182,16 @@ pub const Session = struct {
                     const gradient_input = try getValue(gradient_cache, of);
 
                     if (op.backward) |backward| {
-                        _ = try backward(.{
+                        const gradients = try backward(.{
                             .op = op,
                             .allocator = &self.arena.allocator,
                             .gradient_input = gradient_input,
                             .forward_inputs = forward_inputs.toSlice(),
                         });
+                        try gradient_cache.putNoClobber(gradient_operation.with_respect_to, gradients[0]);
                     }
 
-                    const value = try getValue(cache, gradient_operation.with_respect_to);
+                    const value = try getValue(gradient_cache, gradient_operation.with_respect_to);
                     try cache.putNoClobber(node, value);
                 },
             }

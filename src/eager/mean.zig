@@ -1,7 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
-const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const cpu_tensor = @import("cpu_tensor.zig");
+const CpuTensor = cpu_tensor.CpuTensor;
+const CpuStorage = cpu_tensor.CpuStorage;
+const tensorStride = cpu_tensor.tensorStride;
+const tensorLength = cpu_tensor.tensorLength;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
 
@@ -98,35 +102,140 @@ test "mean rank 3" {
     expectEqual(actual, expected);
 }
 
-pub fn mean_backward(context: var) !@TypeOf(context.forward_inputs) {
-    std.debug.assert(context.forward_inputs.len == 1);
-    const input = context.forward_inputs[0];
-    const outputs = try context.allocator.alloc(@TypeOf(input), 1);
-    errdefer context.allocator.free(outputs);
-    const scalar = context.gradient_input.storage.scalar;
-    // TODO(Adam) length should be factored into seperate function
-    //            returning the number of scalars in the tensor
-    //            const len = length(context.forward_inputs[0]);
-    const len = input.storage.array.len;
-    const value = scalar / @intToFloat(@TypeOf(scalar), len);
-    // TODO(Adam) build a function which creates a tensor given a value and a shape
-    //            const outputs[0] = fill(value, context.forward_inputs[0].shape);
-    outputs[0] = input;
-    return outputs;
+fn length(tensor: var) usize {
+    return switch (tensor.storage) {
+        .scalar => 1,
+        .array => |array| array.len,
+    };
 }
 
-test "mean backward" {
+test "length rank 0" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const x = try constant(&arena.allocator, @as(f64, 5));
+    std.testing.expectEqual(length(x), 1);
+}
+
+test "length rank 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const x = try constant(&arena.allocator, [_]f64{ 1, 2, 3 });
+    std.testing.expectEqual(length(x), 3);
+}
+
+test "length rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(&arena.allocator, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const y = try mean(&arena.allocator, x);
+    std.testing.expectEqual(length(x), 4);
+}
+
+fn fill(allocator: *Allocator, literal: var, shape: []const usize) !CpuTensor(@TypeOf(literal)) {
+    const T = @TypeOf(literal);
+    const stride = try tensorStride(allocator, shape);
+    errdefer allocator.free(stride);
+    if (shape.len == 0) {
+        return CpuTensor(T){
+            .shape = shape,
+            .stride = stride,
+            .storage = CpuStorage(T){ .scalar = literal },
+        };
+    }
+    var array = try allocator.alloc(T, tensorLength(shape));
+    errdefer allocator.free(array);
+    for (array) |*e| e.* = literal;
+    return CpuTensor(T){
+        .shape = shape,
+        .stride = stride,
+        .storage = CpuStorage(T){ .array = array },
+    };
+}
+
+test "fill scalar" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const actual = try fill(&arena.allocator, @as(f64, 0.15), &[_]usize{});
+    const expected = try constant(&arena.allocator, @as(f64, 0.15));
+    expectEqual(actual, expected);
+}
+
+test "fill vector" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const actual = try fill(&arena.allocator, @as(f64, 0.5), &[_]usize{3});
+    const expected = try constant(&arena.allocator, [_]f64{ 0.5, 0.5, 0.5 });
+    expectEqual(actual, expected);
+}
+
+test "fill matrix" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const actual = try fill(&arena.allocator, @as(f64, 5), &[_]usize{ 2, 3 });
+    const expected = try constant(&arena.allocator, [_][3]f64{
+        .{ 5, 5, 5 },
+        .{ 5, 5, 5 },
+    });
+    expectEqual(actual, expected);
+}
+
+pub fn mean_backward(context: var) ![]@TypeOf(context.gradient_input) {
+    std.debug.assert(context.forward_inputs.len == 1);
+    const input = context.forward_inputs[0];
+    const outputs = try context.allocator.alloc(@TypeOf(input), 1);
+    errdefer context.allocator.free(outputs);
+    const scalar = context.gradient_input.storage.scalar;
+    const value = scalar / @intToFloat(@TypeOf(scalar), length(input));
+    outputs[0] = try fill(context.allocator, value, context.forward_inputs[0].shape);
+    return outputs;
+}
+
+test "mean backward rank 0" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(&arena.allocator, @as(f64, 4));
+    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
     const actual = try mean_backward(backward.Context(f64){
         .allocator = &arena.allocator,
-        .gradient_input = y,
-        .forward_inputs = &[_]CpuTensor(f64){x},
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
     });
-    expectEqual(actual[0], x);
+    const expected = try constant(&arena.allocator, @as(f64, 1));
+    expectEqual(actual[0], expected);
+}
+
+test "mean backward rank 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(&arena.allocator, [_]f64{ 1, 2, 3, 4, 5 });
+    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const actual = try mean_backward(backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+    });
+    const expected = try constant(&arena.allocator, [_]f64{ 0.2, 0.2, 0.2, 0.2, 0.2 });
+    expectEqual(actual[0], expected);
+}
+
+test "mean backward rank 2" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(&arena.allocator, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const actual = try mean_backward(backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+    });
+    const expected = try constant(&arena.allocator, [_][2]f64{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    expectEqual(actual[0], expected);
 }

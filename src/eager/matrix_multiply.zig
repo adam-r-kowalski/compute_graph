@@ -43,7 +43,7 @@ pub fn matrix_multiply(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x)
     errdefer allocator.free(shape);
     shape[0] = m;
     shape[1] = p;
-    const stride = try tensorStride(2, allocator, shape);
+    const stride = try tensorStride(allocator, shape);
     errdefer allocator.free(stride);
     const length = tensorLength(shape);
     const tensor_array = try allocator.alloc(T.ScalarType, length);

@@ -49,7 +49,9 @@ pub fn constant(allocator: *Allocator, literal: var) !ConstantType(@TypeOf(liter
     const info = arrayInfo(@TypeOf(literal));
     const T = CpuTensor(info.ScalarType);
     const shape = try tensorShape(info.rank, allocator, literal);
-    const stride = try tensorStride(info.rank, allocator, shape);
+    errdefer allocator.free(shape);
+    const stride = try tensorStride(allocator, shape);
+    errdefer allocator.free(stride);
     if (info.rank == 0) {
         return T{
             .shape = shape,
