@@ -6,12 +6,8 @@ const expectEqual = @import("../testing.zig").expectEqual;
 
 fn absoluteScalar(comptime T: type, x: T) error{Overflow}!T {
     return switch (T) {
-        f64 => std.math.absFloat(x),
-        f32 => std.math.absFloat(x),
-        f16 => std.math.absFloat(x),
-        i64 => try std.math.absInt(x),
-        i32 => try std.math.absInt(x),
-        i8 => try std.math.absInt(x),
+        f64, f32, f16 => std.math.absFloat(x),
+        i64, i32, i8 => try std.math.absInt(x),
         else => @compileError("ScalarType not supported"),
     };
 }
