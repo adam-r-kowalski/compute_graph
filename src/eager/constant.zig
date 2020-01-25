@@ -13,12 +13,12 @@ fn ConstantType(comptime T: type) type {
     return CpuTensor(arrayInfo(T).ScalarType);
 }
 
-fn transferMemory(comptime ScalarType: type, array: []ScalarType, literal: var, index: *usize) void {
+fn transferMemory(comptime T: type, array: []T, literal: var, index: *usize) void {
     switch (@typeInfo(@TypeOf(literal))) {
         .Pointer, .Array => {
             var i: usize = 0;
             while (i < literal.len) : (i += 1)
-                transferMemory(ScalarType, array, literal[i], index);
+                transferMemory(T, array, literal[i], index);
         },
         else => {
             array[index.*] = literal;

@@ -9,6 +9,7 @@ const mean_backward = @import("../eager/mean.zig").mean_backward;
 const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
+const EagerBackwardContext = @import("../eager/backward.zig").Context;
 
 const Mean = struct {
     operation: Operation,
@@ -22,12 +23,12 @@ fn inputs(operation: *const Operation) []const Node {
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
-        .f64 => |tensor| .{ .f64 = try eager.mean(context.allocator, tensor) },
-        .f32 => |tensor| .{ .f32 = try eager.mean(context.allocator, tensor) },
-        .f16 => |tensor| .{ .f16 = try eager.mean(context.allocator, tensor) },
-        .i64 => |tensor| .{ .f64 = try eager.mean(context.allocator, tensor) },
-        .i32 => |tensor| .{ .f32 = try eager.mean(context.allocator, tensor) },
-        .i8 => |tensor| .{ .f16 = try eager.mean(context.allocator, tensor) },
+        .f64 => |tensor| .{ .f64 = try eager.mean(f64, context.allocator, tensor) },
+        .f32 => |tensor| .{ .f32 = try eager.mean(f32, context.allocator, tensor) },
+        .f16 => |tensor| .{ .f16 = try eager.mean(f16, context.allocator, tensor) },
+        .i64 => |tensor| .{ .f64 = try eager.mean(i64, context.allocator, tensor) },
+        .i32 => |tensor| .{ .f32 = try eager.mean(i32, context.allocator, tensor) },
+        .i8 => |tensor| .{ .f16 = try eager.mean(i8, context.allocator, tensor) },
     };
 }
 
@@ -36,7 +37,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     errdefer context.allocator.free(values);
     switch (context.gradient_input) {
         .f64 => |gradient_input| {
-            const gradients = try mean_backward(.{
+            const gradients = try mean_backward(f64, EagerBackwardContext(f64){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
@@ -44,7 +45,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f64 = gradients[0] };
         },
         .f32 => |gradient_input| {
-            const gradients = try mean_backward(.{
+            const gradients = try mean_backward(f32, EagerBackwardContext(f32){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
@@ -52,7 +53,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f32 = gradients[0] };
         },
         .f16 => |gradient_input| {
-            const gradients = try mean_backward(.{
+            const gradients = try mean_backward(f16, EagerBackwardContext(f16){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
@@ -95,7 +96,7 @@ test "mean scalar" {
     defer session.deinit();
     const actual = try session.run(y);
     const expected = try eager.constant(&arena.allocator, @as(f64, -5));
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "mean matrix" {
@@ -116,7 +117,7 @@ test "mean matrix" {
     defer session.deinit();
     const actual = try session.run(z);
     const expected = try eager.constant(&arena.allocator, @as(f64, 8));
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "mean matrix i32" {
@@ -137,7 +138,7 @@ test "mean matrix i32" {
     defer session.deinit();
     const actual = try session.run(z);
     const expected = try eager.constant(&arena.allocator, @as(f32, 8));
-    expectEqual(actual.f32, expected);
+    expectEqual(f32, actual.f32, expected);
 }
 
 test "gradient mean" {
@@ -162,5 +163,5 @@ test "gradient mean" {
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
     });
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }

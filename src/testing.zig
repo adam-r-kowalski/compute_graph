@@ -1,9 +1,8 @@
 const std = @import("std");
-const cpu_tensor = @std("cpu_tensor.zig");
+const cpu_tensor = @import("eager/cpu_tensor.zig");
 const CpuTensor = cpu_tensor.CpuTensor;
 
-pub fn expectEqual(x: var, y: @TypeOf(x)) void {
-    const T = @TypeOf(x).ScalarType;
+pub fn expectEqual(comptime T: type, x: CpuTensor(T), y: CpuTensor(T)) void {
     std.testing.expect(std.mem.eql(usize, x.shape, y.shape));
     std.testing.expect(std.mem.eql(usize, x.stride, y.stride));
     switch (x.storage) {

@@ -30,7 +30,7 @@ test "linear index" {
     std.testing.expectEqual(linear_index(stride, &[_]usize{ 1, 2 }), 5);
 }
 
-pub fn matrix_multiply(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x) {
+pub fn matrix_multiply(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     if (x.shape[1] != y.shape[0])
         return error.ShapeMismatch;
     const x_array = x.storage.array;
@@ -38,7 +38,6 @@ pub fn matrix_multiply(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x)
     const m = x.shape[0];
     const n = x.shape[1];
     const p = y.shape[1];
-    const T = @TypeOf(x);
     const shape = try allocator.alloc(usize, 2);
     errdefer allocator.free(shape);
     shape[0] = m;
@@ -46,9 +45,9 @@ pub fn matrix_multiply(allocator: *Allocator, x: var, y: @TypeOf(x)) !@TypeOf(x)
     const stride = try tensorStride(allocator, shape);
     errdefer allocator.free(stride);
     const length = tensorLength(shape);
-    const tensor_array = try allocator.alloc(T.ScalarType, length);
+    const tensor_array = try allocator.alloc(T, length);
     errdefer allocator.free(new_array);
-    const tensor = T{
+    const tensor = CpuTensor(T){
         .shape = shape,
         .stride = stride,
         .storage = .{ .array = tensor_array },
@@ -82,11 +81,11 @@ test "matrix_multiply" {
         .{ 1, -2, 3 },
         .{ -4, 5, -6 },
     });
-    const actual = try matrix_multiply(&arena.allocator, x, y);
+    const actual = try matrix_multiply(i32, &arena.allocator, x, y);
     const expected = try constant(&arena.allocator, [_][3]i32{
         .{ 9, -12, 15 },
         .{ 19, -26, 33 },
         .{ 29, -40, 51 },
     });
-    expectEqual(actual, expected);
+    expectEqual(i32, actual, expected);
 }

@@ -22,12 +22,12 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     const x = context.values[0];
     const y = context.values[1];
     return switch (x) {
-        .f64 => |tensor| .{ .f64 = try eager.add(context.allocator, tensor, y.f64) },
-        .f32 => |tensor| .{ .f32 = try eager.add(context.allocator, tensor, y.f32) },
-        .f16 => |tensor| .{ .f16 = try eager.add(context.allocator, tensor, y.f16) },
-        .i64 => |tensor| .{ .i64 = try eager.add(context.allocator, tensor, y.i64) },
-        .i32 => |tensor| .{ .i32 = try eager.add(context.allocator, tensor, y.i32) },
-        .i8 => |tensor| .{ .i8 = try eager.add(context.allocator, tensor, y.i8) },
+        .f64 => |tensor| .{ .f64 = try eager.add(f64, context.allocator, tensor, y.f64) },
+        .f32 => |tensor| .{ .f32 = try eager.add(f32, context.allocator, tensor, y.f32) },
+        .f16 => |tensor| .{ .f16 = try eager.add(f16, context.allocator, tensor, y.f16) },
+        .i64 => |tensor| .{ .i64 = try eager.add(i64, context.allocator, tensor, y.i64) },
+        .i32 => |tensor| .{ .i32 = try eager.add(i32, context.allocator, tensor, y.i32) },
+        .i8 => |tensor| .{ .i8 = try eager.add(i8, context.allocator, tensor, y.i8) },
     };
 }
 
@@ -61,7 +61,7 @@ test "add scalar" {
     defer session.deinit();
     const actual = try session.run(z);
     const expected = try eager.constant(&arena.allocator, @as(f64, 15));
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "add matrix" {
@@ -86,7 +86,7 @@ test "add matrix" {
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "add matrix i32" {
@@ -111,5 +111,5 @@ test "add matrix i32" {
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(actual.i32, expected);
+    expectEqual(i32, actual.i32, expected);
 }

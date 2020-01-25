@@ -242,5 +242,5 @@ test "session run" {
     defer session.deinit();
     const actual = try session.run(loss);
     const expected = try eager.constant(&arena.allocator, @as(f64, 26));
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }

@@ -22,12 +22,12 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     const x = context.values[0];
     const y = context.values[1];
     return switch (x) {
-        .f64 => |tensor| .{ .f64 = try eager.matrix_multiply(context.allocator, tensor, y.f64) },
-        .f32 => |tensor| .{ .f32 = try eager.matrix_multiply(context.allocator, tensor, y.f32) },
-        .f16 => |tensor| .{ .f16 = try eager.matrix_multiply(context.allocator, tensor, y.f16) },
-        .i64 => |tensor| .{ .i64 = try eager.matrix_multiply(context.allocator, tensor, y.i64) },
-        .i32 => |tensor| .{ .i32 = try eager.matrix_multiply(context.allocator, tensor, y.i32) },
-        .i8 => |tensor| .{ .i8 = try eager.matrix_multiply(context.allocator, tensor, y.i8) },
+        .f64 => |tensor| .{ .f64 = try eager.matrix_multiply(f64, context.allocator, tensor, y.f64) },
+        .f32 => |tensor| .{ .f32 = try eager.matrix_multiply(f32, context.allocator, tensor, y.f32) },
+        .f16 => |tensor| .{ .f16 = try eager.matrix_multiply(f16, context.allocator, tensor, y.f16) },
+        .i64 => |tensor| .{ .i64 = try eager.matrix_multiply(i64, context.allocator, tensor, y.i64) },
+        .i32 => |tensor| .{ .i32 = try eager.matrix_multiply(i32, context.allocator, tensor, y.i32) },
+        .i8 => |tensor| .{ .i8 = try eager.matrix_multiply(i8, context.allocator, tensor, y.i8) },
     };
 }
 
@@ -73,7 +73,7 @@ test "matrix_multiply identity" {
         .{2},
         .{3},
     });
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "matrix_multiply flip" {
@@ -103,7 +103,7 @@ test "matrix_multiply flip" {
         .{-2},
         .{3},
     });
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "matrix_multiply flip" {
@@ -135,5 +135,5 @@ test "matrix_multiply flip" {
         .{ 53, 102 },
         .{ 35, 69 },
     });
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }

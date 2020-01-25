@@ -20,12 +20,12 @@ fn inputs(operation: *const Operation) []const Node {
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
-        .f64 => |tensor| .{ .f64 = try eager.absolute(context.allocator, tensor) },
-        .f32 => |tensor| .{ .f32 = try eager.absolute(context.allocator, tensor) },
-        .f16 => |tensor| .{ .f16 = try eager.absolute(context.allocator, tensor) },
-        .i64 => |tensor| .{ .i64 = try eager.absolute(context.allocator, tensor) },
-        .i32 => |tensor| .{ .i32 = try eager.absolute(context.allocator, tensor) },
-        .i8 => |tensor| .{ .i8 = try eager.absolute(context.allocator, tensor) },
+        .f64 => |tensor| .{ .f64 = try eager.absolute(f64, context.allocator, tensor) },
+        .f32 => |tensor| .{ .f32 = try eager.absolute(f32, context.allocator, tensor) },
+        .f16 => |tensor| .{ .f16 = try eager.absolute(f16, context.allocator, tensor) },
+        .i64 => |tensor| .{ .i64 = try eager.absolute(i64, context.allocator, tensor) },
+        .i32 => |tensor| .{ .i32 = try eager.absolute(i32, context.allocator, tensor) },
+        .i8 => |tensor| .{ .i8 = try eager.absolute(i8, context.allocator, tensor) },
     };
 }
 
@@ -58,7 +58,7 @@ test "absolute scalar" {
     defer session.deinit();
     const actual = try session.run(y);
     const expected = try eager.constant(&arena.allocator, @as(f64, 5));
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "absolute matrix" {
@@ -83,7 +83,7 @@ test "absolute matrix" {
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expectEqual(actual.f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "absolute matrix i32" {
@@ -108,5 +108,5 @@ test "absolute matrix i32" {
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expectEqual(actual.i32, expected);
+    expectEqual(i32, actual.i32, expected);
 }
