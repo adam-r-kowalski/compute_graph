@@ -2,7 +2,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
-const Node = @import("node.zig").Node;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
 const expectEqual = @import("../testing.zig").expectEqual;
@@ -10,11 +9,11 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 
 const Subtract = struct {
     operation: Operation,
-    nodes: [2]Node,
+    inputs: [2]Tensor,
 };
 
-fn inputs(operation: *const Operation) []const Node {
-    return &@fieldParentPtr(Subtract, "operation", operation).nodes;
+fn inputs(operation: *const Operation) []const Tensor {
+    return &@fieldParentPtr(Subtract, "operation", operation).inputs;
 }
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
@@ -31,7 +30,7 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     };
 }
 
-pub fn subtract(graph: *Graph, x: var, y: @TypeOf(x)) !@TypeOf(x) {
+pub fn subtract(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     var subtract_operation = try graph.arena.allocator.create(Subtract);
     subtract_operation.* = .{
         .operation = .{
@@ -39,11 +38,10 @@ pub fn subtract(graph: *Graph, x: var, y: @TypeOf(x)) !@TypeOf(x) {
             .forward = forward,
             .backward = null,
         },
-        .nodes = .{ x.node, y.node },
+        .inputs = .{ x, y },
     };
     try graph.operations.append(&subtract_operation.operation);
-    const node = Node{ .operation = graph.operations.len - 1 };
-    return @TypeOf(x){ .node = node };
+    return Tensor{ .operation = graph.operations.len - 1 };
 }
 
 test "subtract scalar" {

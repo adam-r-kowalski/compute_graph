@@ -2,7 +2,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
-const Node = @import("node.zig").Node;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
 const mean_backward = @import("../eager/mean.zig").mean_backward;
@@ -13,11 +12,11 @@ const EagerBackwardContext = @import("../eager/backward.zig").Context;
 
 const Mean = struct {
     operation: Operation,
-    nodes: [1]Node,
+    inputs: [1]Tensor,
 };
 
-fn inputs(operation: *const Operation) []const Node {
-    return &@fieldParentPtr(Mean, "operation", operation).nodes;
+fn inputs(operation: *const Operation) []const Tensor {
+    return &@fieldParentPtr(Mean, "operation", operation).inputs;
 }
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
@@ -67,7 +66,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
-pub fn mean(graph: *Graph, x: var) !@TypeOf(x) {
+pub fn mean(graph: *Graph, x: Tensor) !Tensor {
     var mean_operation = try graph.arena.allocator.create(Mean);
     mean_operation.* = .{
         .operation = .{
@@ -75,11 +74,10 @@ pub fn mean(graph: *Graph, x: var) !@TypeOf(x) {
             .forward = forward,
             .backward = backward,
         },
-        .nodes = .{x.node},
+        .inputs = .{x},
     };
     try graph.operations.append(&mean_operation.operation);
-    const node = Node{ .operation = graph.operations.len - 1 };
-    return @TypeOf(x){ .node = node };
+    return Tensor{ .operation = graph.operations.len - 1 };
 }
 
 test "mean scalar" {

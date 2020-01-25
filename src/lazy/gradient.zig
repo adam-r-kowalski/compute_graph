@@ -1,17 +1,16 @@
 const std = @import("std");
 const Graph = @import("graph.zig").Graph;
-const Node = @import("node.zig").Node;
+const Tensor = @import("tensor.zig").Tensor;
 
 pub const Gradient = struct {
-    of: Node,
-    with_respect_to: Node,
+    of: Tensor,
+    with_respect_to: Tensor,
 };
 
-pub fn gradient(graph: *Graph, of: var, with_respect_to: var) !@TypeOf(with_respect_to) {
+pub fn gradient(graph: *Graph, of: Tensor, with_respect_to: Tensor) !Tensor {
     try graph.gradients.append(.{
-        .of = of.node,
-        .with_respect_to = with_respect_to.node,
+        .of = of,
+        .with_respect_to = with_respect_to,
     });
-    const node = Node{ .gradient = graph.gradients.len - 1 };
-    return @TypeOf(with_respect_to){ .node = node };
+    return Tensor{ .gradient = graph.gradients.len - 1 };
 }

@@ -2,7 +2,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
-const Node = @import("node.zig").Node;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
 const CpuTensorUnion = eager.CpuTensorUnion;
@@ -10,11 +9,11 @@ const expectEqual = @import("../testing.zig").expectEqual;
 
 const Absolute = struct {
     operation: Operation,
-    nodes: [1]Node,
+    inputs: [1]Tensor,
 };
 
-fn inputs(operation: *const Operation) []const Node {
-    return &@fieldParentPtr(Absolute, "operation", operation).nodes;
+fn inputs(operation: *const Operation) []const Tensor {
+    return &@fieldParentPtr(Absolute, "operation", operation).inputs;
 }
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
@@ -29,7 +28,7 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     };
 }
 
-pub fn absolute(graph: *Graph, x: var) !@TypeOf(x) {
+pub fn absolute(graph: *Graph, x: Tensor) !Tensor {
     var absolute_operation = try graph.arena.allocator.create(Absolute);
     absolute_operation.* = .{
         .operation = .{
@@ -37,11 +36,10 @@ pub fn absolute(graph: *Graph, x: var) !@TypeOf(x) {
             .forward = forward,
             .backward = null,
         },
-        .nodes = .{x.node},
+        .inputs = .{x},
     };
     try graph.operations.append(&absolute_operation.operation);
-    const node = Node{ .operation = graph.operations.len - 1 };
-    return @TypeOf(x){ .node = node };
+    return Tensor{ .operation = graph.operations.len - 1 };
 }
 
 test "absolute scalar" {

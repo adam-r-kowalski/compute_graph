@@ -1,6 +1,6 @@
 const Allocator = @import("std").mem.Allocator;
-const Node = @import("node.zig").Node;
 const CpuTensorUnion = @import("../eager.zig").CpuTensorUnion;
+const Tensor = @import("tensor.zig").Tensor;
 
 pub const Operation = struct {
     pub const ForwardError = error{
@@ -31,7 +31,7 @@ pub const Operation = struct {
     pub const ForwardResult = ForwardError!CpuTensorUnion;
     pub const BackwardResult = BackwardError![]const CpuTensorUnion;
 
-    inputs: fn (self: *const Operation) []const Node,
+    inputs: fn (self: *const Operation) []const Tensor,
     forward: fn (context: ForwardContext) ForwardResult,
     backward: ?fn (context: BackwardContext) BackwardResult,
 };

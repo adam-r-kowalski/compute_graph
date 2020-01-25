@@ -1,5 +1,4 @@
 const std = @import("std");
-const Node = @import("node.zig").Node;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const eager = @import("../eager.zig");
@@ -7,16 +6,10 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const arrayInfo = @import("../util/array_info.zig").arrayInfo;
 const expectEqual = @import("../testing.zig").expectEqual;
 
-fn TensorType(comptime T: type) type {
-    const info = arrayInfo(T);
-    return Tensor(info.ScalarType, info.rank);
-}
-
-pub fn constant(graph: *Graph, literal: var) !TensorType(@TypeOf(literal)) {
+pub fn constant(graph: *Graph, literal: var) !Tensor {
     const tensor = try eager.constant(&graph.arena.allocator, literal);
     try graph.constants.append(CpuTensorUnion.init(tensor));
-    const node = Node{ .constant = graph.constants.len - 1 };
-    return TensorType(@TypeOf(literal)){ .node = node };
+    return Tensor{ .constant = graph.constants.len - 1 };
 }
 
 test "constant scalar" {

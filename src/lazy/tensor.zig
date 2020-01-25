@@ -1,7 +1,5 @@
-const Node = @import("node.zig").Node;
-
-pub fn Tensor(comptime ScalarType: type, comptime rank: u64) type {
-    return struct {
-        node: Node,
-    };
-}
+pub const Tensor = union(enum) {
+    constant: u64,
+    operation: u64,
+    gradient: u64,
+};

@@ -1,5 +1,4 @@
 const std = @import("std");
-const Node = @import("node.zig").Node;
 const gradient = @import("gradient.zig").gradient;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
@@ -8,37 +7,37 @@ const expectEqual = @import("../testing.zig").expectEqual;
 const CpuTensorUnion = eager.CpuTensorUnion;
 
 const ExecutionOrder = struct {
-    const Nodes = std.ArrayList(Node);
-    const Visited = std.AutoHashMap(Node, void);
+    const Tensors = std.ArrayList(Tensor);
+    const Visited = std.AutoHashMap(Tensor, void);
     const Error = error{OutOfMemory};
 
-    fn recurse(nodes: *Nodes, visited: *Visited, graph: *const Graph, node: Node) Error!void {
-        switch (node) {
+    fn recurse(tensors: *Tensors, visited: *Visited, graph: *const Graph, tensor: Tensor) Error!void {
+        switch (tensor) {
             .operation => |o| {
                 const operation = graph.operations.at(o);
                 for (operation.inputs(operation)) |input|
                     if (!visited.contains(input))
-                        try recurse(nodes, visited, graph, input);
+                        try recurse(tensors, visited, graph, input);
             },
             .gradient => |g| {
                 const of = graph.gradients.at(g).of;
                 if (!visited.contains(of))
-                    try recurse(nodes, visited, graph, of);
+                    try recurse(tensors, visited, graph, of);
             },
             else => {},
         }
-        try visited.putNoClobber(node, undefined);
-        try nodes.append(node);
+        try visited.putNoClobber(tensor, undefined);
+        try tensors.append(tensor);
     }
 };
 
-fn executionOrder(session: Session, tensor: var) ![]const Node {
-    var nodes = ExecutionOrder.Nodes.init(&session.arena.allocator);
-    errdefer nodes.deinit();
+fn executionOrder(session: Session, tensor: Tensor) ![]const Tensor {
+    var tensors = ExecutionOrder.Tensors.init(&session.arena.allocator);
+    errdefer tensors.deinit();
     var visited = ExecutionOrder.Visited.init(session.arena.child_allocator);
     defer visited.deinit();
-    try ExecutionOrder.recurse(&nodes, &visited, session.graph, tensor.node);
-    return nodes.toSlice();
+    try ExecutionOrder.recurse(&tensors, &visited, session.graph, tensor);
+    return tensors.toSlice();
 }
 
 test "execution order" {
@@ -60,13 +59,13 @@ test "execution order" {
     defer session.deinit();
     const execution_order = try executionOrder(session, loss);
     std.testing.expectEqual(execution_order.len, 7);
-    std.testing.expectEqual(execution_order[0], y.node);
-    std.testing.expectEqual(execution_order[1], m.node);
-    std.testing.expectEqual(execution_order[2], x.node);
-    std.testing.expectEqual(execution_order[3], h.node);
-    std.testing.expectEqual(execution_order[4], b.node);
-    std.testing.expectEqual(execution_order[5], y_hat.node);
-    std.testing.expectEqual(execution_order[6], loss.node);
+    std.testing.expectEqual(execution_order[0], y);
+    std.testing.expectEqual(execution_order[1], m);
+    std.testing.expectEqual(execution_order[2], x);
+    std.testing.expectEqual(execution_order[3], h);
+    std.testing.expectEqual(execution_order[4], b);
+    std.testing.expectEqual(execution_order[5], y_hat);
+    std.testing.expectEqual(execution_order[6], loss);
 }
 
 test "execution order gradient" {
@@ -84,12 +83,12 @@ test "execution order gradient" {
     defer session.deinit();
     const execution_order = try executionOrder(session, c);
     std.testing.expectEqual(execution_order.len, 3);
-    std.testing.expectEqual(execution_order[0], a.node);
-    std.testing.expectEqual(execution_order[1], b.node);
-    std.testing.expectEqual(execution_order[2], c.node);
+    std.testing.expectEqual(execution_order[0], a);
+    std.testing.expectEqual(execution_order[1], b);
+    std.testing.expectEqual(execution_order[2], c);
 }
 
-test "execution order repeated nodes" {
+test "execution order repeated tensors" {
     const constant = @import("constant.zig").constant;
     const add = @import("add.zig").add;
     const allocator = std.heap.page_allocator;
@@ -103,10 +102,10 @@ test "execution order repeated nodes" {
     defer session.deinit();
     const execution_order = try executionOrder(session, d);
     std.testing.expectEqual(execution_order.len, 4);
-    std.testing.expectEqual(execution_order[0], a.node);
-    std.testing.expectEqual(execution_order[1], b.node);
-    std.testing.expectEqual(execution_order[2], c.node);
-    std.testing.expectEqual(execution_order[3], d.node);
+    std.testing.expectEqual(execution_order[0], a);
+    std.testing.expectEqual(execution_order[1], b);
+    std.testing.expectEqual(execution_order[2], c);
+    std.testing.expectEqual(execution_order[3], d);
 }
 
 fn getValue(map: var, key: var) !CpuTensorUnion {
@@ -133,19 +132,19 @@ pub const Session = struct {
         child_allocator.destroy(self.arena);
     }
 
-    pub fn run(self: Session, tensor: var) !CpuTensorUnion {
+    pub fn run(self: Session, tensor: Tensor) !CpuTensorUnion {
         const allocator = self.arena.child_allocator;
         const graph = self.graph;
-        var cache = std.AutoHashMap(Node, CpuTensorUnion).init(allocator);
+        var cache = std.AutoHashMap(Tensor, CpuTensorUnion).init(allocator);
         defer cache.deinit();
         var i: usize = 0;
-        const nodes = try executionOrder(self, tensor);
-        while (i < nodes.len) {
-            const node = nodes[i];
-            switch (node) {
+        const tensors = try executionOrder(self, tensor);
+        while (i < tensors.len) {
+            const current_tensor = tensors[i];
+            switch (current_tensor) {
                 .constant => |c| {
                     const value = graph.constants.at(c);
-                    try cache.putNoClobber(node, value);
+                    try cache.putNoClobber(current_tensor, value);
                 },
                 .operation => |o| {
                     const op = graph.operations.at(o);
@@ -160,10 +159,10 @@ pub const Session = struct {
                         .allocator = &self.arena.allocator,
                         .values = values.toSlice(),
                     });
-                    try cache.putNoClobber(node, result);
+                    try cache.putNoClobber(current_tensor, result);
                 },
                 .gradient => |g| {
-                    var gradient_cache = std.AutoHashMap(Node, CpuTensorUnion).init(allocator);
+                    var gradient_cache = std.AutoHashMap(Tensor, CpuTensorUnion).init(allocator);
                     defer gradient_cache.deinit();
                     const gradient_operation = graph.gradients.at(g);
 
@@ -192,12 +191,12 @@ pub const Session = struct {
                     }
 
                     const value = try getValue(gradient_cache, gradient_operation.with_respect_to);
-                    try cache.putNoClobber(node, value);
+                    try cache.putNoClobber(current_tensor, value);
                 },
             }
             i += 1;
         }
-        return try getValue(cache, tensor.node);
+        return try getValue(cache, tensor);
     }
 };
 
