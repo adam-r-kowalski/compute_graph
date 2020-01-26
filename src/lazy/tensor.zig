@@ -1,5 +1,10 @@
+pub const GradientHandle = struct {
+    gradient: usize,
+    index: usize,
+};
+
 pub const Tensor = union(enum) {
-    constant: u64,
-    operation: u64,
-    gradient: u64,
+    constant: usize,
+    operation: usize,
+    gradient_handle: GradientHandle,
 };

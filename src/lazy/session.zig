@@ -19,8 +19,8 @@ const ExecutionOrder = struct {
                     if (!visited.contains(input))
                         try recurse(tensors, visited, graph, input);
             },
-            .gradient => |g| {
-                const of = graph.gradients.at(g).of;
+            .gradient_handle => |g| {
+                const of = graph.gradients.at(g.gradient).of;
                 if (!visited.contains(of))
                     try recurse(tensors, visited, graph, of);
             },
@@ -161,10 +161,10 @@ pub const Session = struct {
                     });
                     try cache.putNoClobber(current_tensor, result);
                 },
-                .gradient => |g| {
+                .gradient_handle => |g| {
                     var gradient_cache = std.AutoHashMap(Tensor, CpuTensorUnion).init(allocator);
                     defer gradient_cache.deinit();
-                    const gradient_operation = graph.gradients.at(g);
+                    const gradient_operation = graph.gradients.at(g.gradient);
 
                     const of = gradient_operation.of;
                     const one = try eager.constant(allocator, @as(f64, 1));
