@@ -113,7 +113,7 @@ test "add backward rank 0" {
     const actual = try add_backward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
-        .forward_inputs = &[_]CpuTensor(f64){x, y},
+        .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
     const expected = try constant(&arena.allocator, @as(f64, 1));
     expectEqual(f64, actual[0], expected);
@@ -125,13 +125,13 @@ test "add backward rank 1" {
     defer arena.deinit();
     const x = try constant(&arena.allocator, [_]f64{ 1, 2, 3, 4, 5 });
     const y = try constant(&arena.allocator, [_]f64{ 6, 7, 8, 9, 10 });
-    const gradient_input = try constant(&arena.allocator,  [_]f64{ 2, 4, 6, 8, 10 });
+    const gradient_input = try constant(&arena.allocator, [_]f64{ 2, 4, 6, 8, 10 });
     const actual = try add_backward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
-        .forward_inputs = &[_]CpuTensor(f64){x, y},
+        .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
-    const expected = try constant(&arena.allocator,  [_]f64{ 2, 4, 6, 8, 10 });
+    const expected = try constant(&arena.allocator, [_]f64{ 2, 4, 6, 8, 10 });
     expectEqual(f64, actual[0], expected);
     expectEqual(f64, actual[1], expected);
 }
@@ -154,7 +154,7 @@ test "add backward rank 2" {
     const actual = try add_backward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
-        .forward_inputs = &[_]CpuTensor(f64){x, y},
+        .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
     const expected = try constant(&arena.allocator, [_][2]f64{
         .{ 2, 4 },

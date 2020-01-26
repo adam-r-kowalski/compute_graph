@@ -78,14 +78,14 @@ test "execution order gradient" {
     defer graph.deinit();
     const a = try constant(&graph, @as(f64, 5));
     const b = try mean(&graph, a);
-    const c = try gradient(&graph, b, a);
+    const c = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const execution_order = try executionOrder(session, c);
+    const execution_order = try executionOrder(session, c[0]);
     std.testing.expectEqual(execution_order.len, 3);
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], b);
-    std.testing.expectEqual(execution_order[2], c);
+    std.testing.expectEqual(execution_order[2], c[0]);
 }
 
 test "execution order repeated tensors" {
@@ -187,10 +187,10 @@ pub const Session = struct {
                             .gradient_input = gradient_input,
                             .forward_inputs = forward_inputs.toSlice(),
                         });
-                        try gradient_cache.putNoClobber(gradient_operation.with_respect_to, gradients[0]);
+                        try gradient_cache.putNoClobber(gradient_operation.with_respect_to[0], gradients[0]);
                     }
 
-                    const value = try getValue(gradient_cache, gradient_operation.with_respect_to);
+                    const value = try getValue(gradient_cache, gradient_operation.with_respect_to[0]);
                     try cache.putNoClobber(current_tensor, value);
                 },
             }

@@ -153,10 +153,10 @@ test "gradient mean" {
         .{ 3, 4 },
     });
     const b = try mean(&graph, a);
-    const c = try gradient(&graph, b, a);
+    const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(c);
+    const actual = try session.run(gradients[0]);
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },

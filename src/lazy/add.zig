@@ -111,3 +111,34 @@ test "add matrix i32" {
     });
     expectEqual(i32, actual.i32, expected);
 }
+
+test "gradient add" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const b = try constant(&graph, [_][2]f64{
+        .{ 5, 6 },
+        .{ 7, 8 },
+    });
+    const c = try add(&graph, a, b);
+    const d = try mean(&graph, c);
+    const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients[0]);
+    // const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    //     .{ 0.25, 0.25 },
+    //     .{ 0.25, 0.25 },
+    // });
+    // expectEqual(f64, actual.f64, expected);
+}
