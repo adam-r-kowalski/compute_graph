@@ -4,8 +4,11 @@ const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
+const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
+const addBackward = @import("../eager/add.zig").addBackward;
+const EagerBackwardContext = @import("../eager/backward.zig").Context;
 
 const Add = struct {
     operation: Operation,
@@ -30,13 +33,60 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     };
 }
 
+fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
+    const values = try context.allocator.alloc(CpuTensorUnion, 2);
+    errdefer context.allocator.free(values);
+    switch (context.gradient_input) {
+        .f64 => |gradient_input| {
+            const gradients = try addBackward(f64, EagerBackwardContext(f64){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f64){
+                    context.forward_inputs[0].f64,
+                    context.forward_inputs[1].f64,
+                },
+            });
+            values[0] = .{ .f64 = gradients[0] };
+            values[1] = .{ .f64 = gradients[1] };
+        },
+        .f32 => |gradient_input| {
+            const gradients = try addBackward(f32, EagerBackwardContext(f32){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f32){
+                    context.forward_inputs[0].f32,
+                    context.forward_inputs[1].f32,
+                },
+            });
+            values[0] = .{ .f32 = gradients[0] };
+            values[1] = .{ .f32 = gradients[1] };
+        },
+        .f16 => |gradient_input| {
+            const gradients = try addBackward(f16, EagerBackwardContext(f16){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f16){
+                    context.forward_inputs[0].f16,
+                    context.forward_inputs[1].f16,
+                },
+            });
+            values[0] = .{ .f16 = gradients[0] };
+            values[1] = .{ .f16 = gradients[1] };
+        },
+        .i64, .i32, .i8 => {
+            return error.CannotDifferentiateIntegral;
+        },
+    }
+    return values;
+}
+
 pub fn add(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     var add_operation = try graph.arena.allocator.create(Add);
     add_operation.* = .{
         .operation = .{
             .inputs = inputs,
             .forward = forward,
-            .backward = null,
+            .backward = backward,
         },
         .inputs = .{ x, y },
     };

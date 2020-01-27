@@ -180,7 +180,7 @@ test "fill matrix" {
     expectEqual(f64, actual, expected);
 }
 
-pub fn mean_backward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
+pub fn meanBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 1);
     const input = context.forward_inputs[0];
     const outputs = try context.allocator.alloc(CpuTensor(T), 1);
@@ -196,7 +196,7 @@ test "mean backward rank 0" {
     defer arena.deinit();
     const forward_input = try constant(&arena.allocator, @as(f64, 4));
     const gradient_input = try constant(&arena.allocator, @as(f64, 1));
-    const actual = try mean_backward(f64, backward.Context(f64){
+    const actual = try meanBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -210,7 +210,7 @@ test "mean backward rank 1" {
     defer arena.deinit();
     const forward_input = try constant(&arena.allocator, [_]f64{ 1, 2, 3, 4, 5 });
     const gradient_input = try constant(&arena.allocator, @as(f64, 1));
-    const actual = try mean_backward(f64, backward.Context(f64){
+    const actual = try meanBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -227,7 +227,7 @@ test "mean backward rank 2" {
         .{ 3, 4 },
     });
     const gradient_input = try constant(&arena.allocator, @as(f64, 1));
-    const actual = try mean_backward(f64, backward.Context(f64){
+    const actual = try meanBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},

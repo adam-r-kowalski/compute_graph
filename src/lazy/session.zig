@@ -113,6 +113,13 @@ fn getValue(map: var, key: var) !CpuTensorUnion {
     return error.KeyNotFound;
 }
 
+fn indexOf(needle: Tensor, haystack: []const Tensor) !usize {
+    var i = haystack.len - 1;
+    while (i > 0) : (i -= 1) if (std.meta.eql(haystack[i], needle))
+        return i;
+    return error.NotFound;
+}
+
 pub const Session = struct {
     arena: *std.heap.ArenaAllocator,
     graph: *const Graph,
@@ -170,24 +177,34 @@ pub const Session = struct {
                     const one = try eager.constant(allocator, @as(f64, 1));
                     try gradient_cache.putNoClobber(of, CpuTensorUnion.init(one));
 
-                    const op = graph.operations.at(of.operation);
-                    var forward_inputs = std.ArrayList(CpuTensorUnion).init(allocator);
-                    defer forward_inputs.deinit();
-                    for (op.inputs(op)) |input| {
-                        const value = try getValue(cache, input);
-                        try forward_inputs.append(value);
-                    }
+                    var j = try indexOf(of, tensors);
+                    while (j > 0) : (j -= 1) {
+                        const current = tensors[j];
+                        switch (current) {
+                            .operation => |operation| {
+                                const op = graph.operations.at(operation);
+                                var forward_inputs = std.ArrayList(CpuTensorUnion).init(allocator);
+                                defer forward_inputs.deinit();
+                                for (op.inputs(op)) |input| {
+                                    const value = try getValue(cache, input);
+                                    try forward_inputs.append(value);
+                                }
 
-                    const gradient_input = try getValue(gradient_cache, of);
+                                const gradient_input = try getValue(gradient_cache, current);
 
-                    if (op.backward) |backward| {
-                        const gradients = try backward(.{
-                            .op = op,
-                            .allocator = &self.arena.allocator,
-                            .gradient_input = gradient_input,
-                            .forward_inputs = forward_inputs.toSlice(),
-                        });
-                        try gradient_cache.putNoClobber(gradient_operation.with_respect_to[0], gradients[0]);
+                                if (op.backward) |backward| {
+                                    const gradients = try backward(.{
+                                        .op = op,
+                                        .allocator = &self.arena.allocator,
+                                        .gradient_input = gradient_input,
+                                        .forward_inputs = forward_inputs.toSlice(),
+                                    });
+                                    for (op.inputs(op)) |input, k|
+                                        try gradient_cache.putNoClobber(input, gradients[k]);
+                                } else return error.BackwardNotImplemented;
+                            },
+                            else => {},
+                        }
                     }
 
                     const value = try getValue(gradient_cache, gradient_operation.with_respect_to[0]);

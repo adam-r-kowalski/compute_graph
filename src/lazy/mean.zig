@@ -4,7 +4,7 @@ const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
-const mean_backward = @import("../eager/mean.zig").mean_backward;
+const meanBackward = @import("../eager/mean.zig").meanBackward;
 const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
@@ -36,7 +36,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     errdefer context.allocator.free(values);
     switch (context.gradient_input) {
         .f64 => |gradient_input| {
-            const gradients = try mean_backward(f64, EagerBackwardContext(f64){
+            const gradients = try meanBackward(f64, EagerBackwardContext(f64){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
@@ -44,7 +44,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f64 = gradients[0] };
         },
         .f32 => |gradient_input| {
-            const gradients = try mean_backward(f32, EagerBackwardContext(f32){
+            const gradients = try meanBackward(f32, EagerBackwardContext(f32){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
@@ -52,7 +52,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f32 = gradients[0] };
         },
         .f16 => |gradient_input| {
-            const gradients = try mean_backward(f16, EagerBackwardContext(f16){
+            const gradients = try meanBackward(f16, EagerBackwardContext(f16){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
