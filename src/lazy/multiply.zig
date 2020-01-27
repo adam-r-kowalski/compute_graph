@@ -57,9 +57,9 @@ test "multiply scalar" {
     const z = try multiply(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, @as(f64, 50));
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "multiply matrix" {
@@ -78,13 +78,13 @@ test "multiply matrix" {
     const z = try multiply(&graph, x, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 1, 4 },
         .{ 9, 16 },
         .{ 25, 36 },
     });
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "multiply matrix i32" {
@@ -103,11 +103,11 @@ test "multiply matrix i32" {
     const z = try multiply(&graph, x, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ 1, 4 },
         .{ 9, 16 },
         .{ 25, 36 },
     });
-    expectEqual(i32, actual.i32, expected);
+    expectEqual(i32, actual[0].i32, expected);
 }

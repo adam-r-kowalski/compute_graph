@@ -54,9 +54,9 @@ test "absolute scalar" {
     const y = try absolute(&graph, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(y);
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(&arena.allocator, @as(f64, 5));
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "absolute matrix" {
@@ -75,13 +75,13 @@ test "absolute matrix" {
     const z = try absolute(&graph, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "absolute matrix i32" {
@@ -100,11 +100,11 @@ test "absolute matrix i32" {
     const z = try absolute(&graph, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expectEqual(i32, actual.i32, expected);
+    expectEqual(i32, actual[0].i32, expected);
 }

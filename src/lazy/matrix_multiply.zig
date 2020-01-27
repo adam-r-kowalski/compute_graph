@@ -65,13 +65,13 @@ test "matrix_multiply identity" {
     const z = try matrix_multiply(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][1]f64{
         .{1},
         .{2},
         .{3},
     });
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "matrix_multiply flip" {
@@ -95,13 +95,13 @@ test "matrix_multiply flip" {
     const z = try matrix_multiply(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][1]f64{
         .{1},
         .{-2},
         .{3},
     });
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "matrix_multiply flip" {
@@ -126,12 +126,12 @@ test "matrix_multiply flip" {
     const z = try matrix_multiply(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 18, 41 },
         .{ 27, 65 },
         .{ 53, 102 },
         .{ 35, 69 },
     });
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }

@@ -57,9 +57,9 @@ test "subtract scalar" {
     const z = try subtract(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, @as(f64, -5));
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "subtract matrix" {
@@ -83,13 +83,13 @@ test "subtract matrix" {
     const z = try subtract(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "subtract matrix i32" {
@@ -113,11 +113,11 @@ test "subtract matrix i32" {
     const z = try subtract(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(i32, actual.i32, expected);
+    expectEqual(i32, actual[0].i32, expected);
 }

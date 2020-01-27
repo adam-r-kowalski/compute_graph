@@ -107,9 +107,9 @@ test "add scalar" {
     const z = try add(&graph, x, y);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, @as(f64, 15));
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "add matrix" {
@@ -128,13 +128,13 @@ test "add matrix" {
     const z = try add(&graph, x, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "add matrix i32" {
@@ -153,13 +153,13 @@ test "add matrix i32" {
     const z = try add(&graph, x, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(z);
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(i32, actual.i32, expected);
+    expectEqual(i32, actual[0].i32, expected);
 }
 
 test "gradient add" {
@@ -185,10 +185,10 @@ test "gradient add" {
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(gradients[0]);
+    const actual = try session.run(&[_]Tensor{gradients[0]});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
     });
-    expectEqual(f64, actual.f64, expected);
+    expectEqual(f64, actual[0].f64, expected);
 }
