@@ -186,9 +186,9 @@ test "gradient add" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(gradients[0]);
-    // const expected = try eager.constant(&arena.allocator, [_][2]f64{
-    //     .{ 0.25, 0.25 },
-    //     .{ 0.25, 0.25 },
-    // });
-    // expectEqual(f64, actual.f64, expected);
+    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    expectEqual(f64, actual.f64, expected);
 }
