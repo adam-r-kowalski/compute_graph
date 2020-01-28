@@ -17,13 +17,13 @@ pub const Operation = struct {
     };
 
     pub const ForwardContext = struct {
-        op: *const Operation,
+        operation: *const Operation,
         allocator: *Allocator,
         values: []const CpuTensorUnion,
     };
 
     pub const BackwardContext = struct {
-        op: *const Operation,
+        operation: *const Operation,
         allocator: *Allocator,
         gradient_input: CpuTensorUnion,
         forward_inputs: []const CpuTensorUnion,

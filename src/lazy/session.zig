@@ -110,8 +110,11 @@ test "execution order repeated tensors" {
     std.testing.expectEqual(execution_order[3], d);
 }
 
-fn getValue(map: std.AutoHashMap(Tensor, CpuTensorUnion), key: Tensor) !CpuTensorUnion {
-    if (map.getValue(key)) |value| return value;
+const Cache = std.AutoHashMap(Tensor, CpuTensorUnion);
+const GradientCaches = std.AutoHashMap(usize, Cache);
+
+fn getValue(cache: Cache, key: Tensor) !CpuTensorUnion {
+    if (cache.getValue(key)) |value| return value;
     return error.KeyNotFound;
 }
 
@@ -121,9 +124,6 @@ fn indexOf(needle: Tensor, haystack: []const Tensor) !usize {
         return i;
     return error.NotFound;
 }
-
-const Cache = std.AutoHashMap(Tensor, CpuTensorUnion);
-const GradientCaches = std.AutoHashMap(usize, Cache);
 
 fn runConstant(session: Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
     const constant = session.graph.constants.at(index);
@@ -137,7 +137,7 @@ fn runOperation(session: Session, cache: *Cache, index: usize, current_tensor: T
     defer session.arena.child_allocator.free(values);
     for (inputs) |input, i| values[i] = try getValue(cache.*, input);
     const result = try operation.forward(.{
-        .op = operation,
+        .operation = operation,
         .allocator = &session.arena.allocator,
         .values = values,
     });
@@ -184,7 +184,7 @@ fn runGradient(context: GradientContext) !void {
                     const gradient_input = try getValue(gradient_cache, current);
                     if (operation.backward) |backward| {
                         const gradients = try backward(.{
-                            .op = operation,
+                            .operation = operation,
                             .allocator = allocator,
                             .gradient_input = gradient_input,
                             .forward_inputs = forward_inputs,
