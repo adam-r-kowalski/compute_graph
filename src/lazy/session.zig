@@ -144,7 +144,7 @@ fn runOperation(session: Session, cache: *Cache, index: usize, current_tensor: T
     try cache.putNoClobber(current_tensor, result);
 }
 
-const GradientContext = struct{
+const GradientContext = struct {
     session: Session,
     cache: *Cache,
     gradient_caches: *GradientCaches,
@@ -165,13 +165,11 @@ fn runGradient(context: GradientContext) !void {
         const gradient_operation = context.session.graph.gradients.at(context.gradient_handle.gradient);
 
         const of = gradient_operation.of;
-        const one = blk: {
-            switch (try getValue(context.cache.*, of)) {
-                .f64 => break :blk CpuTensorUnion.init(try eager.constant(allocator, @as(f64, 1))),
-                .f32 => break :blk CpuTensorUnion.init(try eager.constant(allocator, @as(f32, 1))),
-                .f16 => break :blk CpuTensorUnion.init(try eager.constant(allocator, @as(f16, 1))),
-                else => return error.CannotDifferentiateIntegral,
-            }
+        const one = switch (try getValue(context.cache.*, of)) {
+            .f64 => CpuTensorUnion.init(try eager.constant(allocator, @as(f64, 1))),
+            .f32 => CpuTensorUnion.init(try eager.constant(allocator, @as(f32, 1))),
+            .f16 => CpuTensorUnion.init(try eager.constant(allocator, @as(f16, 1))),
+            else => return error.CannotDifferentiateIntegral,
         };
 
         try gradient_cache.putNoClobber(of, one);
