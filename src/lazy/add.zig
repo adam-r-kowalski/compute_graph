@@ -185,10 +185,11 @@ test "gradient add" {
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(&[_]Tensor{gradients[0]});
+    const actual = try session.run(gradients);
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
     });
     expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual[1].f64, expected);
 }

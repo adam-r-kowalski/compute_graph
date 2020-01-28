@@ -36,7 +36,8 @@ fn executionOrder(session: Session, tensors: []const Tensor) ![]const Tensor {
     errdefer execution_order.deinit();
     var visited = ExecutionOrder.Visited.init(session.arena.child_allocator);
     defer visited.deinit();
-    try ExecutionOrder.recurse(&execution_order, &visited, session.graph, tensors[0]);
+    for (tensors) |tensor|
+        try ExecutionOrder.recurse(&execution_order, &visited, session.graph, tensor);
     return execution_order.toSlice();
 }
 
@@ -145,7 +146,6 @@ pub const Session = struct {
         var cache = std.AutoHashMap(Tensor, CpuTensorUnion).init(allocator);
         defer cache.deinit();
         var i: usize = 0;
-        const tensor = tensors[0];
         const execution_order = try executionOrder(self, tensors);
         while (i < execution_order.len) {
             const current_tensor = execution_order[i];
@@ -175,7 +175,10 @@ pub const Session = struct {
                     const gradient_operation = graph.gradients.at(g.gradient);
 
                     const of = gradient_operation.of;
+
+                    // TODO(Adam) this should be based on the type of the gradient of tensor
                     const one = try eager.constant(allocator, @as(f64, 1));
+
                     try gradient_cache.putNoClobber(of, CpuTensorUnion.init(one));
 
                     var j = try indexOf(of, execution_order);
@@ -216,7 +219,8 @@ pub const Session = struct {
         }
         const outputs = try self.arena.allocator.alloc(CpuTensorUnion, tensors.len);
         errdefer self.arena.allocator.free(outputs);
-        outputs[0] = try getValue(cache, tensor);
+        for (tensors) |tensor, e|
+            outputs[e] = try getValue(cache, tensor);
         return outputs;
     }
 };
