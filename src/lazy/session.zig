@@ -14,14 +14,14 @@ const ExecutionOrder = struct {
 
     fn recurse(tensors: *Tensors, visited: *Visited, graph: *const Graph, tensor: Tensor) Error!void {
         switch (tensor) {
-            .operation => |o| {
-                const operation = graph.operations.at(o);
+            .operation => |index| {
+                const operation = graph.operations.at(index);
                 for (operation.inputs(operation)) |input|
                     if (!visited.contains(input))
                         try recurse(tensors, visited, graph, input);
             },
-            .gradient_handle => |g| {
-                const of = graph.gradients.at(g.gradient).of;
+            .gradient_handle => |gradient_handle| {
+                const of = graph.gradients.at(gradient_handle.gradient).of;
                 if (!visited.contains(of))
                     try recurse(tensors, visited, graph, of);
             },
@@ -163,7 +163,6 @@ fn runGradient(context: GradientContext) !void {
         var gradient_cache = Cache.init(allocator);
         errdefer gradient_cache.deinit();
         const gradient_operation = context.session.graph.gradients.at(context.gradient_handle.gradient);
-
         const of = gradient_operation.of;
         const one = switch (try getValue(context.cache.*, of)) {
             .f64 => CpuTensorUnion.init(try eager.constant(allocator, @as(f64, 1))),
@@ -171,39 +170,31 @@ fn runGradient(context: GradientContext) !void {
             .f16 => CpuTensorUnion.init(try eager.constant(allocator, @as(f16, 1))),
             else => return error.CannotDifferentiateIntegral,
         };
-
         try gradient_cache.putNoClobber(of, one);
-
         var i = try indexOf(of, context.execution_order);
         while (i > 0) : (i -= 1) {
             const current = context.execution_order[i];
             switch (current) {
                 .operation => |index| {
                     const operation = context.session.graph.operations.at(index);
-                    var forward_inputs = std.ArrayList(CpuTensorUnion).init(allocator);
-                    defer forward_inputs.deinit();
-                    for (operation.inputs(operation)) |input| {
-                        const value = try getValue(context.cache.*, input);
-                        try forward_inputs.append(value);
-                    }
-
+                    const inputs = operation.inputs(operation);
+                    var forward_inputs = try allocator.alloc(CpuTensorUnion, inputs.len);
+                    defer allocator.free(forward_inputs);
+                    for (inputs) |input, j| forward_inputs[j] = try getValue(context.cache.*, input);
                     const gradient_input = try getValue(gradient_cache, current);
-
                     if (operation.backward) |backward| {
                         const gradients = try backward(.{
                             .op = operation,
                             .allocator = allocator,
                             .gradient_input = gradient_input,
-                            .forward_inputs = forward_inputs.toSlice(),
+                            .forward_inputs = forward_inputs,
                         });
-                        for (operation.inputs(operation)) |input, k|
-                            try gradient_cache.putNoClobber(input, gradients[k]);
+                        for (inputs) |input, j| try gradient_cache.putNoClobber(input, gradients[j]);
                     } else return error.BackwardNotImplemented;
                 },
                 else => {},
             }
         }
-
         const value = try getValue(gradient_cache, gradient_operation.with_respect_to[context.gradient_handle.index]);
         try context.cache.putNoClobber(context.current_tensor, value);
         try context.gradient_caches.putNoClobber(context.gradient_handle.gradient, gradient_cache);
