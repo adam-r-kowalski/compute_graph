@@ -11,8 +11,9 @@ pub const Operation = struct {
 
     pub const BackwardError = error{
         OutOfMemory,
-        CannotDifferentiateIntegral,
+        ShapeMismatch,
         Overflow,
+        CannotDifferentiateIntegral,
     };
 
     pub const ForwardContext = struct {

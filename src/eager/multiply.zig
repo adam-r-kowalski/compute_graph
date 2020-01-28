@@ -95,7 +95,7 @@ test "multiply rank 3" {
     expectEqual(i8, actual, expected);
 }
 
-pub fn multiply_backward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
+pub fn multiplyBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 2);
     const x = context.forward_inputs[0];
     const y = context.forward_inputs[1];
@@ -112,7 +112,7 @@ test "multiply backward rank 0" {
     const x = try constant(&arena.allocator, @as(f64, 4));
     const y = try constant(&arena.allocator, @as(f64, 10));
     const gradient_input = try constant(&arena.allocator, @as(f64, 2));
-    const actual = try multiply_backward(f64, backward.Context(f64){
+    const actual = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
@@ -129,7 +129,7 @@ test "multiply backward rank 1" {
     const x = try constant(&arena.allocator, [_]f64{ 1, 2, 3, 4, 5 });
     const y = try constant(&arena.allocator, [_]f64{ 6, 7, 8, 9, 10 });
     const gradient_input = try constant(&arena.allocator, [_]f64{ 2, 4, 6, 8, 10 });
-    const actual = try multiply_backward(f64, backward.Context(f64){
+    const actual = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
@@ -159,7 +159,7 @@ test "multiply backward rank 2" {
         .{ 2, 4 },
         .{ 6, 8 },
     });
-    const actual = try multiply_backward(f64, backward.Context(f64){
+    const actual = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },

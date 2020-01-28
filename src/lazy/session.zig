@@ -109,7 +109,7 @@ test "execution order repeated tensors" {
     std.testing.expectEqual(execution_order[3], d);
 }
 
-fn getValue(map: var, key: var) !CpuTensorUnion {
+fn getValue(map: std.AutoHashMap(Tensor, CpuTensorUnion), key: Tensor) !CpuTensorUnion {
     if (map.getValue(key)) |value| return value;
     return error.KeyNotFound;
 }
@@ -145,6 +145,8 @@ pub const Session = struct {
         const graph = self.graph;
         var cache = std.AutoHashMap(Tensor, CpuTensorUnion).init(allocator);
         defer cache.deinit();
+        var gradient_caches = std.AutoHashMap(usize, std.AutoHashMap(Tensor, CpuTensorUnion)).init(allocator);
+        defer gradient_caches.deinit();
         var i: usize = 0;
         const execution_order = try executionOrder(self, tensors);
         while (i < execution_order.len) {
@@ -170,49 +172,61 @@ pub const Session = struct {
                     try cache.putNoClobber(current_tensor, result);
                 },
                 .gradient_handle => |g| {
-                    var gradient_cache = std.AutoHashMap(Tensor, CpuTensorUnion).init(allocator);
-                    defer gradient_cache.deinit();
-                    const gradient_operation = graph.gradients.at(g.gradient);
+                    if (gradient_caches.getValue(g.gradient)) |gradient_cache| {
+                        const gradient_operation = graph.gradients.at(g.gradient);
+                        const value = try getValue(gradient_cache, gradient_operation.with_respect_to[g.index]);
+                        try cache.putNoClobber(current_tensor, value);
+                    } else {
+                        var gradient_cache = std.AutoHashMap(Tensor, CpuTensorUnion).init(allocator);
+                        errdefer gradient_cache.deinit();
+                        const gradient_operation = graph.gradients.at(g.gradient);
 
-                    const of = gradient_operation.of;
+                        const of = gradient_operation.of;
+                        const one = blk: {
+                            switch (try getValue(cache, of)) {
+                                .f64 => break :blk CpuTensorUnion.init(try eager.constant(allocator, @as(f64, 1))),
+                                .f32 => break :blk CpuTensorUnion.init(try eager.constant(allocator, @as(f32, 1))),
+                                .f16 => break :blk CpuTensorUnion.init(try eager.constant(allocator, @as(f16, 1))),
+                                else => return error.CannotDifferentiateIntegral,
+                            }
+                        };
 
-                    // TODO(Adam) this should be based on the type of the gradient of tensor
-                    const one = try eager.constant(allocator, @as(f64, 1));
+                        try gradient_cache.putNoClobber(of, one);
 
-                    try gradient_cache.putNoClobber(of, CpuTensorUnion.init(one));
+                        var j = try indexOf(of, execution_order);
+                        while (j > 0) : (j -= 1) {
+                            const current = execution_order[j];
+                            switch (current) {
+                                .operation => |operation| {
+                                    const op = graph.operations.at(operation);
+                                    var forward_inputs = std.ArrayList(CpuTensorUnion).init(allocator);
+                                    defer forward_inputs.deinit();
+                                    for (op.inputs(op)) |input| {
+                                        const value = try getValue(cache, input);
+                                        try forward_inputs.append(value);
+                                    }
 
-                    var j = try indexOf(of, execution_order);
-                    while (j > 0) : (j -= 1) {
-                        const current = execution_order[j];
-                        switch (current) {
-                            .operation => |operation| {
-                                const op = graph.operations.at(operation);
-                                var forward_inputs = std.ArrayList(CpuTensorUnion).init(allocator);
-                                defer forward_inputs.deinit();
-                                for (op.inputs(op)) |input| {
-                                    const value = try getValue(cache, input);
-                                    try forward_inputs.append(value);
-                                }
+                                    const gradient_input = try getValue(gradient_cache, current);
 
-                                const gradient_input = try getValue(gradient_cache, current);
-
-                                if (op.backward) |backward| {
-                                    const gradients = try backward(.{
-                                        .op = op,
-                                        .allocator = &self.arena.allocator,
-                                        .gradient_input = gradient_input,
-                                        .forward_inputs = forward_inputs.toSlice(),
-                                    });
-                                    for (op.inputs(op)) |input, k|
-                                        try gradient_cache.putNoClobber(input, gradients[k]);
-                                } else return error.BackwardNotImplemented;
-                            },
-                            else => {},
+                                    if (op.backward) |backward| {
+                                        const gradients = try backward(.{
+                                            .op = op,
+                                            .allocator = &self.arena.allocator,
+                                            .gradient_input = gradient_input,
+                                            .forward_inputs = forward_inputs.toSlice(),
+                                        });
+                                        for (op.inputs(op)) |input, k|
+                                            try gradient_cache.putNoClobber(input, gradients[k]);
+                                    } else return error.BackwardNotImplemented;
+                                },
+                                else => {},
+                            }
                         }
-                    }
 
-                    const value = try getValue(gradient_cache, gradient_operation.with_respect_to[0]);
-                    try cache.putNoClobber(current_tensor, value);
+                        const value = try getValue(gradient_cache, gradient_operation.with_respect_to[g.index]);
+                        try cache.putNoClobber(current_tensor, value);
+                        try gradient_caches.putNoClobber(g.gradient, gradient_cache);
+                    }
                 },
             }
             i += 1;
