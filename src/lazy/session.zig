@@ -252,7 +252,7 @@ pub const Session = struct {
 test "session run" {
     const constant = @import("constant.zig").constant;
     const add = @import("add.zig").add;
-    const matrix_multiply = @import("matrix_multiply.zig").matrix_multiply;
+    const matrixMultiply = @import("matrix_multiply.zig").matrixMultiply;
     const subtract = @import("subtract.zig").subtract;
     const absolute = @import("absolute.zig").absolute;
     const mean = @import("mean.zig").mean;
@@ -271,7 +271,7 @@ test "session run" {
         .{2},
         .{3},
     });
-    const h = try matrix_multiply(&graph, m, x);
+    const h = try matrixMultiply(&graph, m, x);
     const b = try constant(&graph, [_][1]i64{
         .{3},
         .{7},
