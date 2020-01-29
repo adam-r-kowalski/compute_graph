@@ -5,7 +5,10 @@ const Tensor = @import("tensor.zig").Tensor;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
 const expectEqual = @import("../testing.zig").expectEqual;
+const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
+const subtractBackward = @import("../eager/subtract.zig").subtractBackward;
+const EagerBackwardContext = @import("../eager/backward.zig").Context;
 
 const Subtract = struct {
     operation: Operation,
@@ -30,13 +33,60 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     };
 }
 
+fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
+    const values = try context.allocator.alloc(CpuTensorUnion, 2);
+    errdefer context.allocator.free(values);
+    switch (context.gradient_input) {
+        .f64 => |gradient_input| {
+            const gradients = try subtractBackward(f64, EagerBackwardContext(f64){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f64){
+                    context.forward_inputs[0].f64,
+                    context.forward_inputs[1].f64,
+                },
+            });
+            values[0] = .{ .f64 = gradients[0] };
+            values[1] = .{ .f64 = gradients[1] };
+        },
+        .f32 => |gradient_input| {
+            const gradients = try subtractBackward(f32, EagerBackwardContext(f32){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f32){
+                    context.forward_inputs[0].f32,
+                    context.forward_inputs[1].f32,
+                },
+            });
+            values[0] = .{ .f32 = gradients[0] };
+            values[1] = .{ .f32 = gradients[1] };
+        },
+        .f16 => |gradient_input| {
+            const gradients = try subtractBackward(f16, EagerBackwardContext(f16){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f16){
+                    context.forward_inputs[0].f16,
+                    context.forward_inputs[1].f16,
+                },
+            });
+            values[0] = .{ .f16 = gradients[0] };
+            values[1] = .{ .f16 = gradients[1] };
+        },
+        .i64, .i32, .i8 => {
+            return error.CannotDifferentiateIntegral;
+        },
+    }
+    return values;
+}
+
 pub fn subtract(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     var subtract_operation = try graph.arena.allocator.create(Subtract);
     subtract_operation.* = .{
         .operation = .{
             .inputs = inputs,
             .forward = forward,
-            .backward = null,
+            .backward = backward,
         },
         .inputs = .{ x, y },
     };
@@ -120,4 +170,40 @@ test "subtract matrix i32" {
         .{ -10, 12 },
     });
     expectEqual(i32, actual[0].i32, expected);
+}
+
+test "gradient subtract" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const b = try constant(&graph, [_][2]f64{
+        .{ 5, 6 },
+        .{ 7, 8 },
+    });
+    const c = try subtract(&graph, a, b);
+    const d = try mean(&graph, c);
+    const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients);
+    const expected_a_gradient = try eager.constant(&arena.allocator, [_][2]f64{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    const expected_b_gradient = try eager.constant(&arena.allocator, [_][2]f64{
+        .{ -0.25, -0.25 },
+        .{ -0.25, -0.25 },
+    });
+    expectEqual(f64, actual[0].f64, expected_a_gradient);
+    expectEqual(f64, actual[1].f64, expected_b_gradient);
 }
