@@ -111,8 +111,8 @@ fn transpose(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !Cpu
         }
     }
     return CpuTensor(T){
-        .shape=shape,
-        .stride=stride,
+        .shape = shape,
+        .stride = stride,
         .storage = .{ .array = array },
     };
 }
@@ -154,8 +154,8 @@ test "matrix multiply backward" {
         .{ 4, 5, 6 },
     });
     const y = try constant(&arena.allocator, [_][2]f64{
-        .{  7,  8 },
-        .{  9, 10 },
+        .{ 7, 8 },
+        .{ 9, 10 },
         .{ 11, 12 },
     });
     const gradient_input = try constant(&arena.allocator, [_][2]f64{

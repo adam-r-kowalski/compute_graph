@@ -200,8 +200,8 @@ test "gradient matrix multiply" {
         .{ 4, 5, 6 },
     });
     const b = try constant(&graph, [_][2]f64{
-        .{  7,  8 },
-        .{  9, 10 },
+        .{ 7, 8 },
+        .{ 9, 10 },
         .{ 11, 12 },
     });
     const c = try matrixMultiply(&graph, a, b);

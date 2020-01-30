@@ -4,8 +4,11 @@ const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
+const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
+const absoluteBackward = @import("../eager/absolute.zig").absoluteBackward;
+const EagerBackwardContext = @import("../eager/backward.zig").Context;
 
 const Absolute = struct {
     operation: Operation,
@@ -28,13 +31,48 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     };
 }
 
+fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
+    const values = try context.allocator.alloc(CpuTensorUnion, 1);
+    errdefer context.allocator.free(values);
+    switch (context.gradient_input) {
+        .f64 => |gradient_input| {
+            const gradients = try absoluteBackward(f64, EagerBackwardContext(f64){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
+            });
+            values[0] = .{ .f64 = gradients[0] };
+        },
+        .f32 => |gradient_input| {
+            const gradients = try absoluteBackward(f32, EagerBackwardContext(f32){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
+            });
+            values[0] = .{ .f32 = gradients[0] };
+        },
+        .f16 => |gradient_input| {
+            const gradients = try absoluteBackward(f16, EagerBackwardContext(f16){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
+            });
+            values[0] = .{ .f16 = gradients[0] };
+        },
+        .i64, .i32, .i8 => {
+            return error.CannotDifferentiateIntegral;
+        },
+    }
+    return values;
+}
+
 pub fn absolute(graph: *Graph, x: Tensor) !Tensor {
     var absolute_operation = try graph.arena.allocator.create(Absolute);
     absolute_operation.* = .{
         .operation = .{
             .inputs = inputs,
             .forward = forward,
-            .backward = null,
+            .backward = backward,
         },
         .inputs = .{x},
     };
@@ -107,4 +145,31 @@ test "absolute matrix i32" {
         .{ 5, 6 },
     });
     expectEqual(i32, actual[0].i32, expected);
+}
+
+test "gradient absolute" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][2]f64{
+        .{ 0, -2 },
+        .{ 3, -4 },
+    });
+    const b = try absolute(&graph, a);
+    const c = try mean(&graph, b);
+    const gradients = try gradient(&graph, c, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients);
+    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+        .{ 0, -0.25 },
+        .{ 0.25, -0.25 },
+    });
+    expectEqual(f64, actual[0].f64, expected);
 }
