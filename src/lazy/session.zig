@@ -261,24 +261,24 @@ test "session run" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const m = try constant(&graph, [_][3]i64{
+    const m = try constant(&graph, [_][3]f64{
         .{ 0, 7, 3 },
         .{ 4, 5, 6 },
         .{ -10, -2, 0 },
     });
-    const x = try constant(&graph, [_][1]i64{
+    const x = try constant(&graph, [_][1]f64{
         .{1},
         .{2},
         .{3},
     });
     const h = try matrixMultiply(&graph, m, x);
-    const b = try constant(&graph, [_][1]i64{
+    const b = try constant(&graph, [_][1]f64{
         .{3},
         .{7},
         .{5},
     });
     const y_hat = try add(&graph, h, b);
-    const y = try constant(&graph, [_][1]i64{
+    const y = try constant(&graph, [_][1]f64{
         .{1},
         .{4},
         .{9},
@@ -286,9 +286,22 @@ test "session run" {
     const delta = try subtract(&graph, y, y_hat);
     const magnitude = try absolute(&graph, delta);
     const loss = try mean(&graph, magnitude);
+    const gradients = try gradient(&graph, loss, &[_]Tensor{ m, b });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(&[_]Tensor{loss});
-    const expected = try eager.constant(&arena.allocator, @as(f64, 26));
-    expectEqual(f64, actual[0].f64, expected);
+    const actual = try session.run(&[_]Tensor{ loss, gradients[0], gradients[1] });
+    const expected_loss = try eager.constant(&arena.allocator, @as(f64, 26));
+    const expected_m_gradient = try eager.constant(&arena.allocator, [_][3]f64{
+        .{ 1 / 3., 2 / 3., 1 },
+        .{ 1 / 3., 2 / 3., 1 },
+        .{ -1 / 3., -2 / 3., -1 },
+    });
+    const expected_b_gradient = try eager.constant(&arena.allocator, [_][1]f64{
+        .{1 / 3.},
+        .{1 / 3.},
+        .{-1 / 3.},
+    });
+    expectEqual(f64, actual[0].f64, expected_loss);
+    expectEqual(f64, actual[1].f64, expected_m_gradient);
+    expectEqual(f64, actual[2].f64, expected_b_gradient);
 }
