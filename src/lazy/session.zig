@@ -25,6 +25,10 @@ const ExecutionOrder = struct {
                 if (!visited.contains(of))
                     try recurse(tensors, visited, graph, of);
             },
+            .variable => |index| {
+                const variable = graph.variables.at(index);
+                try recurse(tensors, visited, graph, variable.current_value);
+            },
             else => {},
         }
         try visited.putNoClobber(tensor, undefined);
@@ -88,6 +92,24 @@ test "execution order gradient" {
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], b);
     std.testing.expectEqual(execution_order[2], c[0]);
+}
+
+test "execution order variable" {
+    const constant = @import("constant.zig").constant;
+    const variable = @import("variable.zig").variable;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, @as(f64, 5));
+    const b = try variable(&graph, a);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const execution_order = try executionOrder(session, &[_]Tensor{b});
+    std.testing.expectEqual(execution_order.len, 2);
+    std.testing.expectEqual(execution_order[0], a);
+    std.testing.expectEqual(execution_order[1], b);
 }
 
 test "execution order repeated tensors" {
@@ -201,6 +223,12 @@ fn runGradient(context: GradientContext) !void {
     }
 }
 
+fn runVariable(session: Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
+    const variable = session.graph.variables.at(index);
+    const current_value = try getValue(cache.*, variable.current_value);
+    try cache.putNoClobber(current_tensor, current_value);
+}
+
 pub const Session = struct {
     arena: *std.heap.ArenaAllocator,
     graph: *const Graph,
@@ -240,6 +268,7 @@ pub const Session = struct {
                     .gradient_handle = gradient_handle,
                     .current_tensor = current_tensor,
                 }),
+                .variable => |index| try runVariable(self, &cache, index, current_tensor),
             }
         }
         const outputs = try self.arena.allocator.alloc(CpuTensorUnion, tensors.len);
@@ -304,4 +333,27 @@ test "session run" {
     expectEqual(f64, actual[0].f64, expected_loss);
     expectEqual(f64, actual[1].f64, expected_m_gradient);
     expectEqual(f64, actual[2].f64, expected_b_gradient);
+}
+
+test "variable" {
+    const constant = @import("constant.zig").constant;
+    const variable = @import("variable.zig").variable;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const b = try variable(&graph, a);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{b});
+    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    expectEqual(f64, actual[0].f64, expected);
 }

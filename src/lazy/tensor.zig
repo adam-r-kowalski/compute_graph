@@ -7,4 +7,5 @@ pub const Tensor = union(enum) {
     constant: usize,
     operation: usize,
     gradient_handle: GradientHandle,
+    variable: usize,
 };
