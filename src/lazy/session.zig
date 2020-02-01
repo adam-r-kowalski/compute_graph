@@ -7,6 +7,7 @@ const eager = @import("../eager.zig");
 const expectEqual = @import("../testing.zig").expectEqual;
 const CpuTensorUnion = eager.CpuTensorUnion;
 
+// TODO(Adam): execution order has issue if both variable and assign op are scheduled
 const ExecutionOrder = struct {
     const Tensors = std.ArrayList(Tensor);
     const Visited = std.AutoHashMap(Tensor, void);
@@ -28,6 +29,11 @@ const ExecutionOrder = struct {
             .variable => |index| {
                 const variable = graph.variables.at(index);
                 try recurse(tensors, visited, graph, variable.current_value);
+            },
+            .assign => |index| {
+                const assign = graph.assigns.at(index);
+                try recurse(tensors, visited, graph, assign.variable);
+                try recurse(tensors, visited, graph, assign.value);
             },
             else => {},
         }
@@ -110,6 +116,29 @@ test "execution order variable" {
     std.testing.expectEqual(execution_order.len, 2);
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], b);
+}
+
+test "execution order assign" {
+    const constant = @import("constant.zig").constant;
+    const variable = @import("variable.zig").variable;
+    const assign = @import("assign.zig").assign;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, @as(f64, 5));
+    const b = try constant(&graph, @as(f64, 10));
+    const c = try variable(&graph, a);
+    const d = try assign(&graph, c, b);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const execution_order = try executionOrder(session, &[_]Tensor{d});
+    std.testing.expectEqual(execution_order.len, 4);
+    std.testing.expectEqual(execution_order[0], a);
+    std.testing.expectEqual(execution_order[1], c);
+    std.testing.expectEqual(execution_order[2], b);
+    std.testing.expectEqual(execution_order[3], d);
 }
 
 test "execution order repeated tensors" {
@@ -229,6 +258,14 @@ fn runVariable(session: Session, cache: *Cache, index: usize, current_tensor: Te
     try cache.putNoClobber(current_tensor, current_value);
 }
 
+fn runAssign(session: Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
+    const assign = session.graph.assigns.at(index);
+    const value = try getValue(cache.*, assign.value);
+    // TODO(Adam): assignment should override variable with value
+    try cache.putNoClobber(current_tensor, value);
+}
+
+// TODO(Adam): variables should persist between runs
 pub const Session = struct {
     arena: *std.heap.ArenaAllocator,
     graph: *const Graph,
@@ -269,6 +306,7 @@ pub const Session = struct {
                     .current_tensor = current_tensor,
                 }),
                 .variable => |index| try runVariable(self, &cache, index, current_tensor),
+                .assign => |index| try runAssign(self, &cache, index, current_tensor),
             }
         }
         const outputs = try self.arena.allocator.alloc(CpuTensorUnion, tensors.len);

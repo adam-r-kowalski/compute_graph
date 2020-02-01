@@ -8,4 +8,5 @@ pub const Tensor = union(enum) {
     operation: usize,
     gradient_handle: GradientHandle,
     variable: usize,
+    assign: usize,
 };

@@ -1,4 +1,5 @@
 const std = @import("std");
+// TODO(Adam): Clean up circular dependency
 const Graph = @import("graph.zig").Graph;
 const tensor = @import("tensor.zig");
 const Tensor = tensor.Tensor;

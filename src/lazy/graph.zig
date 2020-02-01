@@ -1,8 +1,12 @@
 const std = @import("std");
 const Operation = @import("operation.zig").Operation;
 const CpuTensorUnion = @import("../eager.zig").CpuTensorUnion;
+// TODO(Adam): Clean up circular dependency
 const Gradient = @import("gradient.zig").Gradient;
+// TODO(Adam): Clean up circular dependency
 const Variable = @import("variable.zig").Variable;
+// TODO(Adam): Clean up circular dependency
+const Assign = @import("assign.zig").Assign;
 
 pub const Graph = struct {
     arena: *std.heap.ArenaAllocator,
@@ -10,6 +14,7 @@ pub const Graph = struct {
     operations: std.ArrayList(*const Operation),
     gradients: std.ArrayList(Gradient),
     variables: std.ArrayList(Variable),
+    assigns: std.ArrayList(Assign),
 
     pub fn init(allocator: *std.mem.Allocator) !Graph {
         const arena = try allocator.create(std.heap.ArenaAllocator);
@@ -20,6 +25,7 @@ pub const Graph = struct {
             .operations = std.ArrayList(*const Operation).init(&arena.allocator),
             .gradients = std.ArrayList(Gradient).init(&arena.allocator),
             .variables = std.ArrayList(Variable).init(&arena.allocator),
+            .assigns = std.ArrayList(Assign).init(&arena.allocator),
         };
     }
 
