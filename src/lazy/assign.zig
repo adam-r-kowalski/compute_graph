@@ -41,10 +41,7 @@ test "assign" {
     const e = try assign(&graph, b, d);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    // TODO(Adam):
-    // Running assign op and variable should not error
-    // try session.run(&[_]Tensor{e, b});
-    const actual1 = try session.run(&[_]Tensor{e});
+    const actual1 = try session.run(&[_]Tensor{ e, b });
     const expected1 = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 2, 3 },
         .{ 4, 5 },
@@ -55,5 +52,6 @@ test "assign" {
         .{ 5, 6 },
     });
     expectEqual(f64, actual1[0].f64, expected1);
+    expectEqual(f64, actual1[1].f64, expected1);
     // expectEqual(f64, actual2[0].f64, expected2);
 }
