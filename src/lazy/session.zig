@@ -7,7 +7,6 @@ const eager = @import("../eager.zig");
 const expectEqual = @import("../testing.zig").expectEqual;
 const CpuTensorUnion = eager.CpuTensorUnion;
 
-// TODO(Adam): execution order has issue if both variable and assign op are scheduled
 const ExecutionOrder = struct {
     const Tensors = std.ArrayList(Tensor);
     const Visited = std.AutoHashMap(Tensor, void);
@@ -28,12 +27,15 @@ const ExecutionOrder = struct {
             },
             .variable => |index| {
                 const variable = graph.variables.at(index);
-                try recurse(tensors, visited, graph, variable.current_value);
+                if (!visited.contains(variable.current_value))
+                    try recurse(tensors, visited, graph, variable.current_value);
             },
             .assign => |index| {
                 const assign = graph.assigns.at(index);
-                try recurse(tensors, visited, graph, assign.variable);
-                try recurse(tensors, visited, graph, assign.value);
+                if (!visited.contains(assign.variable))
+                    try recurse(tensors, visited, graph, assign.variable);
+                if (!visited.contains(assign.value))
+                    try recurse(tensors, visited, graph, assign.value);
             },
             else => {},
         }
@@ -48,7 +50,8 @@ fn executionOrder(session: Session, tensors: []const Tensor) ![]const Tensor {
     var visited = ExecutionOrder.Visited.init(session.arena.child_allocator);
     defer visited.deinit();
     for (tensors) |tensor|
-        try ExecutionOrder.recurse(&execution_order, &visited, session.graph, tensor);
+        if (!visited.contains(tensor))
+            try ExecutionOrder.recurse(&execution_order, &visited, session.graph, tensor);
     return execution_order.toSlice();
 }
 
@@ -133,7 +136,7 @@ test "execution order assign" {
     const d = try assign(&graph, c, b);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const execution_order = try executionOrder(session, &[_]Tensor{d});
+    const execution_order = try executionOrder(session, &[_]Tensor{ d, c });
     std.testing.expectEqual(execution_order.len, 4);
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], c);
