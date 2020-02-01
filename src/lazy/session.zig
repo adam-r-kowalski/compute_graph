@@ -264,8 +264,8 @@ fn runVariable(session: Session, cache: *Cache, index: usize, current_tensor: Te
 fn runAssign(session: Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
     const assign = session.graph.assigns.at(index);
     const value = try getValue(cache.*, assign.value);
-    // TODO(Adam): assignment should override variable with value
     try cache.putNoClobber(current_tensor, value);
+    _ = try cache.put(assign.variable, value);
 }
 
 // TODO(Adam): variables should persist between runs
