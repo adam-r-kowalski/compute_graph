@@ -46,12 +46,13 @@ test "assign" {
         .{ 2, 3 },
         .{ 4, 5 },
     });
-    const actual2 = try session.run(&[_]Tensor{e});
+    const actual2 = try session.run(&[_]Tensor{ e, b });
     const expected2 = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 3, 4 },
         .{ 5, 6 },
     });
     expectEqual(f64, actual1[0].f64, expected1);
     expectEqual(f64, actual1[1].f64, expected1);
-    // expectEqual(f64, actual2[0].f64, expected2);
+    expectEqual(f64, actual2[0].f64, expected2);
+    expectEqual(f64, actual2[1].f64, expected2);
 }
