@@ -256,22 +256,27 @@ fn runGradient(context: GradientContext) !void {
 }
 
 fn runVariable(session: Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
-    const variable = session.graph.variables.at(index);
-    const current_value = try getValue(cache.*, variable.current_value);
-    try cache.putNoClobber(current_tensor, current_value);
+    if (session.variableCache.getValue(current_tensor)) |current_value| {
+        try cache.putNoClobber(current_tensor, current_value);
+    } else {
+        const variable = session.graph.variables.at(index);
+        const current_value = try getValue(cache.*, variable.current_value);
+        try cache.putNoClobber(current_tensor, current_value);
+    }
 }
 
-fn runAssign(session: Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
+fn runAssign(session: *Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
     const assign = session.graph.assigns.at(index);
     const value = try getValue(cache.*, assign.value);
     try cache.putNoClobber(current_tensor, value);
     _ = try cache.put(assign.variable, value);
+    _ = try session.variableCache.put(assign.variable, value);
 }
 
-// TODO(Adam): variables should persist between runs
 pub const Session = struct {
     arena: *std.heap.ArenaAllocator,
     graph: *const Graph,
+    variableCache: Cache,
 
     pub fn init(allocator: *std.mem.Allocator, graph: *const Graph) !Session {
         const arena = try allocator.create(std.heap.ArenaAllocator);
@@ -279,6 +284,7 @@ pub const Session = struct {
         return Session{
             .arena = arena,
             .graph = graph,
+            .variableCache = Cache.init(&arena.allocator),
         };
     }
 
@@ -288,27 +294,27 @@ pub const Session = struct {
         child_allocator.destroy(self.arena);
     }
 
-    pub fn run(self: Session, tensors: []const Tensor) ![]CpuTensorUnion {
-        const allocator = self.arena.child_allocator;
+    pub fn run(self: *Session, tensors: []const Tensor) ![]CpuTensorUnion {
+        const allocator = &self.arena.allocator;
         const graph = self.graph;
         var cache = Cache.init(allocator);
         defer cache.deinit();
         var gradient_caches = GradientCaches.init(allocator);
         defer gradient_caches.deinit();
-        const execution_order = try executionOrder(self, tensors);
+        const execution_order = try executionOrder(self.*, tensors);
         for (execution_order) |current_tensor| {
             switch (current_tensor) {
-                .constant => |index| try runConstant(self, &cache, index, current_tensor),
-                .operation => |index| try runOperation(self, &cache, index, current_tensor),
+                .constant => |index| try runConstant(self.*, &cache, index, current_tensor),
+                .operation => |index| try runOperation(self.*, &cache, index, current_tensor),
                 .gradient_handle => |gradient_handle| try runGradient(.{
-                    .session = self,
+                    .session = self.*,
                     .cache = &cache,
                     .gradient_caches = &gradient_caches,
                     .execution_order = execution_order,
                     .gradient_handle = gradient_handle,
                     .current_tensor = current_tensor,
                 }),
-                .variable => |index| try runVariable(self, &cache, index, current_tensor),
+                .variable => |index| try runVariable(self.*, &cache, index, current_tensor),
                 .assign => |index| try runAssign(self, &cache, index, current_tensor),
             }
         }
