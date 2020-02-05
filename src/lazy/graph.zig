@@ -7,6 +7,8 @@ const Gradient = @import("gradient.zig").Gradient;
 const Variable = @import("variable.zig").Variable;
 // TODO(Adam): Clean up circular dependency
 const Assign = @import("assign.zig").Assign;
+// TODO(Adam): Clean up circular dependency
+const Placeholder = @import("placeholder.zig").Placeholder;
 
 pub const Graph = struct {
     arena: *std.heap.ArenaAllocator,
@@ -15,6 +17,7 @@ pub const Graph = struct {
     gradients: std.ArrayList(Gradient),
     variables: std.ArrayList(Variable),
     assigns: std.ArrayList(Assign),
+    placeholders: std.ArrayList(Placeholder),
 
     pub fn init(allocator: *std.mem.Allocator) !Graph {
         const arena = try allocator.create(std.heap.ArenaAllocator);
@@ -26,6 +29,7 @@ pub const Graph = struct {
             .gradients = std.ArrayList(Gradient).init(&arena.allocator),
             .variables = std.ArrayList(Variable).init(&arena.allocator),
             .assigns = std.ArrayList(Assign).init(&arena.allocator),
+            .placeholders = std.ArrayList(Placeholder).init(&arena.allocator),
         };
     }
 
