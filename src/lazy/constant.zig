@@ -22,7 +22,7 @@ test "constant scalar" {
     const x = try constant(&graph, @as(f64, 5));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(&[_]Tensor{x});
+    const actual = try session.run(.{ .tensors = &[_]Tensor{x} });
     const expected = try eager.constant(&arena.allocator, @as(f64, 5));
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -41,7 +41,7 @@ test "constant array" {
     });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(&[_]Tensor{x});
+    const actual = try session.run(.{ .tensors = &[_]Tensor{x} });
     const expected = try eager.constant(&arena.allocator, [_][2]f32{
         .{ 1, 2 },
         .{ 3, 4 },
