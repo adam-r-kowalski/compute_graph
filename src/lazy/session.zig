@@ -294,14 +294,21 @@ pub const Session = struct {
         child_allocator.destroy(self.arena);
     }
 
-    pub fn run(self: *Session, tensors: []const Tensor) ![]CpuTensorUnion {
+    const Context = struct {
+        const Environment = std.AutoHashMap(Tensor, Tensor);
+
+        tensors: []const Tensor,
+        environment: Environment = Environment.init(std.heap.page_allocator),
+    };
+
+    pub fn run(self: *Session, context: Context) ![]CpuTensorUnion {
         const allocator = &self.arena.allocator;
         const graph = self.graph;
         var cache = Cache.init(allocator);
         defer cache.deinit();
         var gradient_caches = GradientCaches.init(allocator);
         defer gradient_caches.deinit();
-        const execution_order = try executionOrder(self.*, tensors);
+        const execution_order = try executionOrder(self.*, context.tensors);
         for (execution_order) |current_tensor| {
             switch (current_tensor) {
                 .constant => |index| try runConstant(self.*, &cache, index, current_tensor),
@@ -318,9 +325,9 @@ pub const Session = struct {
                 .assign => |index| try runAssign(self, &cache, index, current_tensor),
             }
         }
-        const outputs = try self.arena.allocator.alloc(CpuTensorUnion, tensors.len);
+        const outputs = try self.arena.allocator.alloc(CpuTensorUnion, context.tensors.len);
         errdefer self.arena.allocator.free(outputs);
-        for (tensors) |tensor, index| outputs[index] = try getValue(cache, tensor);
+        for (context.tensors) |tensor, index| outputs[index] = try getValue(cache, tensor);
         return outputs;
     }
 };
@@ -365,7 +372,7 @@ test "session run" {
     const gradients = try gradient(&graph, loss, &[_]Tensor{ m, b });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(&[_]Tensor{ loss, gradients[0], gradients[1] });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{ loss, gradients[0], gradients[1] } });
     const expected_loss = try eager.constant(&arena.allocator, @as(f64, 26));
     const expected_m_gradient = try eager.constant(&arena.allocator, [_][3]f64{
         .{ 1 / 3., 2 / 3., 1 },
@@ -397,7 +404,7 @@ test "variable" {
     const b = try variable(&graph, a);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(&[_]Tensor{b});
+    const actual = try session.run(.{ .tensors = &[_]Tensor{b} });
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
