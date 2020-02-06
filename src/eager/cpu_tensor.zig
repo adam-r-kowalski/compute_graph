@@ -10,15 +10,7 @@ pub fn CpuStorage(comptime ScalarType: type) type {
     };
 }
 
-fn printTensor(
-    context: var,
-    comptime Errors: type,
-    output: fn (@TypeOf(context), []const u8) Errors!void,
-    comptime T: type,
-    depth: usize,
-    shape: []const usize,
-    array: []const T
-) Errors!void {
+fn printTensor(context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void, comptime T: type, depth: usize, shape: []const usize, array: []const T) Errors!void {
     if (shape.len == 0)
         return;
     blk: {
@@ -31,7 +23,7 @@ fn printTensor(
         const len = shape[0];
         var i: usize = 0;
         while (i < len) : (i += 1) {
-            if (i < len-1) {
+            if (i < len - 1) {
                 try std.fmt.format(context, Errors, output, "{}, ", .{array[i]});
             } else {
                 try std.fmt.format(context, Errors, output, "{}", .{array[i]});
@@ -60,15 +52,10 @@ pub fn CpuTensor(comptime T: type) type {
 
         pub const ScalarType = T;
 
-        pub fn format(
-            self: @This(),
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            context: var,
-            comptime Errors: type,
-            output: fn (@TypeOf(context), []const u8) Errors!void
-        ) Errors!void {
-            try std.fmt.format(context, Errors, output, "CpuTensor({}", .{@typeName(T),});
+        pub fn format(self: @This(), comptime fmt: []const u8, options: std.fmt.FormatOptions, context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void) Errors!void {
+            try std.fmt.format(context, Errors, output, "CpuTensor({}", .{
+                @typeName(T),
+            });
             switch (self.storage) {
                 .scalar => |scalar| {
                     try std.fmt.format(context, Errors, output, ")\n{}", .{scalar});
@@ -86,7 +73,7 @@ pub fn CpuTensor(comptime T: type) type {
                     }
                     try std.fmt.format(context, Errors, output, "])\n", .{});
                     try printTensor(context, Errors, output, T, 0, self.shape, array);
-                }
+                },
             }
         }
     };

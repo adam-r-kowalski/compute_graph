@@ -87,16 +87,22 @@ test "linear regression" {
     const b = try variable(&graph, try constant(&graph, @as(f64, 6)));
 
     const x = try placeholder(&graph, &[_]usize{});
-    const x1 = try constant(&graph, @as(f64, 1));
-    const x2 = try constant(&graph, @as(f64, 2));
-    const x3 = try constant(&graph, @as(f64, 3));
-    const x4 = try constant(&graph, @as(f64, 4));
+    const xs = [_]Tensor{
+        try constant(&graph, @as(f64, 0)),
+        try constant(&graph, @as(f64, 1)),
+        try constant(&graph, @as(f64, 2)),
+        try constant(&graph, @as(f64, 3)),
+        try constant(&graph, @as(f64, 4)),
+    };
 
     const y = try placeholder(&graph, &[_]usize{});
-    const y1 = try constant(&graph, @as(f64, 3));
-    const y2 = try constant(&graph, @as(f64, 5));
-    const y3 = try constant(&graph, @as(f64, 7));
-    const y4 = try constant(&graph, @as(f64, 9));
+    const ys = [_]Tensor{
+        try constant(&graph, @as(f64, 1)),
+        try constant(&graph, @as(f64, 3)),
+        try constant(&graph, @as(f64, 5)),
+        try constant(&graph, @as(f64, 7)),
+        try constant(&graph, @as(f64, 9)),
+    };
 
     const y_hat = try add(&graph, try multiply(&graph, m, x), b);
     const loss = try absolute(&graph, try subtract(&graph, y, y_hat));
@@ -109,62 +115,38 @@ test "linear regression" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
 
-    var environment1 = Environment.init(&session.arena.allocator);
-    try environment1.putNoClobber(x, x1);
-    try environment1.putNoClobber(y, y1);
-
-    var environment2 = Environment.init(&session.arena.allocator);
-    try environment2.putNoClobber(x, x2);
-    try environment2.putNoClobber(y, y2);
-
-    var environment3 = Environment.init(&session.arena.allocator);
-    try environment3.putNoClobber(x, x3);
-    try environment3.putNoClobber(y, y3);
-
-    var environment4 = Environment.init(&session.arena.allocator);
-    try environment4.putNoClobber(x, x4);
-    try environment4.putNoClobber(y, y4);
+    var environments = try session.arena.allocator.alloc(Environment, xs.len);
+    for (environments) |*environment, i| {
+        environment.* = Environment.init(&session.arena.allocator);
+        try environment.putNoClobber(x, xs[i]);
+        try environment.putNoClobber(y, ys[i]);
+    }
 
     const actual = try session.run(.{
         .tensors = &[_]Tensor{loss},
-        .environment = environment1,
+        .environment = environments[2],
     });
     const actual_loss = actual[0];
-    expectEqual(f64, actual_loss.f64, try eager.constant(&arena.allocator, @as(f64, 11)));
+    expectEqual(f64, actual_loss.f64, try eager.constant(&arena.allocator, @as(f64, 17)));
 
     var i: usize = 0;
+    var j: usize = 0;
     while (i < 1000) : (i += 1) {
-        if (i % 4 == 0) {
-            _ = try session.run(.{
-                .tensors = &[_]Tensor{ improve_m, improve_b },
-                .environment = environment4,
-            });
-        } else if (i % 3 == 0) {
-            _ = try session.run(.{
-                .tensors = &[_]Tensor{ improve_m, improve_b },
-                .environment = environment3,
-            });
-        } else if (i % 2 == 0) {
-            _ = try session.run(.{
-                .tensors = &[_]Tensor{ improve_m, improve_b },
-                .environment = environment2,
-            });
-        } else {
-            _ = try session.run(.{
-                .tensors = &[_]Tensor{ improve_m, improve_b },
-                .environment = environment1,
-            });
-        }
+        _ = try session.run(.{
+            .tensors = &[_]Tensor{ improve_m, improve_b },
+            .environment = environments[j],
+        });
+        j = (j + 1) % environments.len;
     }
 
     const actual1 = try session.run(.{
         .tensors = &[_]Tensor{ loss, m, b },
-        .environment = environment1,
+        .environment = environments[0],
     });
     const actual_loss1 = actual1[0];
     const actual_m1 = actual1[1];
     const actual_b1 = actual1[2];
-    expectEqual(f64, actual_loss1.f64, try eager.constant(&arena.allocator, @as(f64, 2.9999999999895444e-02)));
-    expectEqual(f64, actual_m1.f64, try eager.constant(&arena.allocator, @as(f64, 1.9700000000000204)));
-    expectEqual(f64, actual_b1.f64, try eager.constant(&arena.allocator, @as(f64, 1.0000000000000844)));
+    expectEqual(f64, actual_m1.f64, try eager.constant(&arena.allocator, @as(f64, 2.02)));
+    expectEqual(f64, actual_b1.f64, try eager.constant(&arena.allocator, @as(f64, 1.02)));
+    expectEqual(f64, actual_loss1.f64, try eager.constant(&arena.allocator, @as(f64, 0.02)));
 }
