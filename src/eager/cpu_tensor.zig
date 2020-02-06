@@ -10,6 +10,48 @@ pub fn CpuStorage(comptime ScalarType: type) type {
     };
 }
 
+fn printTensor(
+    context: var,
+    comptime Errors: type,
+    output: fn (@TypeOf(context), []const u8) Errors!void,
+    comptime T: type,
+    depth: usize,
+    shape: []const usize,
+    array: []const T
+) Errors!void {
+    if (shape.len == 0)
+        return;
+    blk: {
+        var i: usize = 0;
+        while (i < depth * 2) : (i += 1)
+            try std.fmt.format(context, Errors, output, " ", .{});
+    }
+    try std.fmt.format(context, Errors, output, "[", .{});
+    if (shape.len == 1) {
+        const len = shape[0];
+        var i: usize = 0;
+        while (i < len) : (i += 1) {
+            if (i < len-1) {
+                try std.fmt.format(context, Errors, output, "{}, ", .{array[i]});
+            } else {
+                try std.fmt.format(context, Errors, output, "{}", .{array[i]});
+            }
+        }
+    } else {
+        try std.fmt.format(context, Errors, output, "\n", .{});
+        try printTensor(context, Errors, output, T, depth + 1, shape[1..], array);
+        try printTensor(context, Errors, output, T, depth + 1, shape[1..], array[shape[0]..]);
+    }
+    if (shape.len > 1) {
+        var i: usize = 0;
+        while (i < depth * 2) : (i += 1)
+            try std.fmt.format(context, Errors, output, " ", .{});
+    }
+    try std.fmt.format(context, Errors, output, "]", .{});
+    if (depth != 0)
+        try std.fmt.format(context, Errors, output, ",\n", .{});
+}
+
 pub fn CpuTensor(comptime T: type) type {
     return struct {
         shape: []const usize,
@@ -17,6 +59,36 @@ pub fn CpuTensor(comptime T: type) type {
         storage: CpuStorage(T),
 
         pub const ScalarType = T;
+
+        pub fn format(
+            self: @This(),
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            context: var,
+            comptime Errors: type,
+            output: fn (@TypeOf(context), []const u8) Errors!void
+        ) Errors!void {
+            try std.fmt.format(context, Errors, output, "CpuTensor({}", .{@typeName(T),});
+            switch (self.storage) {
+                .scalar => |scalar| {
+                    try std.fmt.format(context, Errors, output, ")\n{}", .{scalar});
+                },
+                .array => |array| {
+                    try std.fmt.format(context, Errors, output, ", [", .{});
+                    var i: usize = 0;
+                    const len = self.shape.len;
+                    while (i < len) : (i += 1) {
+                        if (i < len - 1) {
+                            try std.fmt.format(context, Errors, output, "{}x", .{self.shape[i]});
+                        } else {
+                            try std.fmt.format(context, Errors, output, "{}", .{self.shape[i]});
+                        }
+                    }
+                    try std.fmt.format(context, Errors, output, "])\n", .{});
+                    try printTensor(context, Errors, output, T, 0, self.shape, array);
+                }
+            }
+        }
     };
 }
 

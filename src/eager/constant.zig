@@ -77,6 +77,7 @@ test "constant rank 0" {
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{}));
     expectEqual(tensor.storage.scalar, 5);
+    std.debug.warn("\n\n{}\n\n", .{tensor});
 }
 
 test "constant rank 1" {
@@ -86,6 +87,7 @@ test "constant rank 1" {
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{3}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{1}));
     expect(std.mem.eql(f64, tensor.storage.array, &[_]f64{ 1, 2, 3 }));
+    std.debug.warn("\n\n{}\n\n", .{tensor});
 }
 
 test "constant rank 2" {
@@ -98,6 +100,7 @@ test "constant rank 2" {
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 2, 3 }));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 3, 1 }));
     expect(std.mem.eql(i32, tensor.storage.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
+    std.debug.warn("\n\n{}\n\n", .{tensor});
 }
 
 test "constant rank 3" {
@@ -122,4 +125,5 @@ test "constant rank 3" {
     expect(std.mem.eql(f16, tensor.storage.array, &[_]f16{
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     }));
+    std.debug.warn("\n\n{}\n\n", .{tensor});
 }

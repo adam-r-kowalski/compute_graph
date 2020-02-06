@@ -165,6 +165,6 @@ test "linear regression" {
     const actual_m1 = actual1[1];
     const actual_b1 = actual1[2];
     expectEqual(f64, actual_loss1.f64, try eager.constant(&arena.allocator, @as(f64, 2.9999999999895444e-02)));
-    expectEqual(f64, actual_m1.f64, try eager.constant(&arena.allocator, @as(f64, 1.9700000000000204e+00)));
-    expectEqual(f64, actual_b1.f64, try eager.constant(&arena.allocator, @as(f64, 1.0000000000000844e+00)));
+    expectEqual(f64, actual_m1.f64, try eager.constant(&arena.allocator, @as(f64, 1.9700000000000204)));
+    expectEqual(f64, actual_b1.f64, try eager.constant(&arena.allocator, @as(f64, 1.0000000000000844)));
 }
