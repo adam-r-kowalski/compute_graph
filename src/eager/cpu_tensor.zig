@@ -16,7 +16,7 @@ fn printIndent(context: var, comptime Errors: type, output: fn (@TypeOf(context)
         try std.fmt.format(context, Errors, output, " ", .{});
 }
 
-fn printTensor(context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void, comptime T: type, depth: usize, shape: []const usize, stride: []const usize, array: []const T) Errors!void {
+fn printTensor(context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void, comptime T: type, depth: usize, shape: []const usize, stride: []const usize, array: []const T, comma: bool) Errors!void {
     if (shape.len == 0)
         return;
     try printIndent(context, Errors, output, depth);
@@ -41,14 +41,21 @@ fn printTensor(context: var, comptime Errors: type, output: fn (@TypeOf(context)
         while (i < len) : (i += 1) {
             const start = i * stride[0];
             const end = start + stride[0];
-            try printTensor(context, Errors, output, T, depth + 1, shape[1..], stride[1..], array[start..end]);
+            if (i < len - 1) {
+                try printTensor(context, Errors, output, T, depth + 1, shape[1..], stride[1..], array[start..end], true);
+            } else {
+                try printTensor(context, Errors, output, T, depth + 1, shape[1..], stride[1..], array[start..end], false);
+            }
         }
     }
     if (shape.len > 1)
         try printIndent(context, Errors, output, depth);
     try std.fmt.format(context, Errors, output, "}}", .{});
-    if (depth != 0)
-        try std.fmt.format(context, Errors, output, ",\n", .{});
+    if (depth != 0) {
+        if (comma)
+            try std.fmt.format(context, Errors, output, ",", .{});
+        try std.fmt.format(context, Errors, output, "\n", .{});
+    }
 }
 
 pub fn CpuTensor(comptime T: type) type {
@@ -71,7 +78,7 @@ pub fn CpuTensor(comptime T: type) type {
                     while (i < len) : (i += 1)
                         try std.fmt.format(context, Errors, output, "[{}]", .{self.shape[i]});
                     try std.fmt.format(context, Errors, output, "{}", .{@typeName(T)});
-                    try printTensor(context, Errors, output, T, 0, self.shape, self.stride, array);
+                    try printTensor(context, Errors, output, T, 0, self.shape, self.stride, array, true);
                 },
             }
             try std.fmt.format(context, Errors, output, ")", .{});
