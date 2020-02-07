@@ -41,11 +41,7 @@ fn printTensor(context: var, comptime Errors: type, output: fn (@TypeOf(context)
         while (i < len) : (i += 1) {
             const start = i * stride[0];
             const end = start + stride[0];
-            if (i < len - 1) {
-                try printTensor(context, Errors, output, T, depth + 1, shape[1..], stride[1..], array[start..end], true);
-            } else {
-                try printTensor(context, Errors, output, T, depth + 1, shape[1..], stride[1..], array[start..end], false);
-            }
+            try printTensor(context, Errors, output, T, depth + 1, shape[1..], stride[1..], array[start..end], i < len - 1);
         }
     }
     if (shape.len > 1)
