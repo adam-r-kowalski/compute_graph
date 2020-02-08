@@ -101,6 +101,17 @@ pub const CpuTensorUnion = union(enum) {
             else => @compileError("ScalarType not supported"),
         };
     }
+
+    pub fn format(self: @This(), comptime fmt: []const u8, options: std.fmt.FormatOptions, context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void) Errors!void {
+        switch (self) {
+            .f64 => |tensor| try std.fmt.format(context, Errors, output, "{}", .{tensor}),
+            .f32 => |tensor| try std.fmt.format(context, Errors, output, "{}", .{tensor}),
+            .f16 => |tensor| try std.fmt.format(context, Errors, output, "{}", .{tensor}),
+            .i64 => |tensor| try std.fmt.format(context, Errors, output, "{}", .{tensor}),
+            .i32 => |tensor| try std.fmt.format(context, Errors, output, "{}", .{tensor}),
+            .i8 => |tensor| try std.fmt.format(context, Errors, output, "{}", .{tensor}),
+        }
+    }
 };
 
 pub fn tensorStride(allocator: *Allocator, shape: []const usize) ![]usize {

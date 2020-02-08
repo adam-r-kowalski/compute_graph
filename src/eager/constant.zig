@@ -245,3 +245,41 @@ test "constant rank 4" {
         \\})
     ));
 }
+
+test "CpuTensorUnion formatted printing" {
+    const CpuTensorUnion = cpu_tensor.CpuTensorUnion;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(&arena.allocator, &[_][2][3]f16{
+        .{
+            .{ 1, 2, 3 },
+            .{ 4, 5, 6 },
+        },
+        .{
+            .{ 7, 8, 9 },
+            .{ 10, 11, 12 },
+        },
+        .{
+            .{ 13, 14, 15 },
+            .{ 16, 17, 18 },
+        },
+    });
+    const tensor_union = CpuTensorUnion.init(tensor);
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor_union});
+    expect(std.mem.eql(u8, actual,
+        \\CpuTensor([3][2][3]f16{
+        \\  .{
+        \\    .{ 1.0e+00, 2.0e+00, 3.0e+00 },
+        \\    .{ 4.0e+00, 5.0e+00, 6.0e+00 }
+        \\  },
+        \\  .{
+        \\    .{ 7.0e+00, 8.0e+00, 9.0e+00 },
+        \\    .{ 1.0e+01, 1.1e+01, 1.2e+01 }
+        \\  },
+        \\  .{
+        \\    .{ 1.3e+01, 1.4e+01, 1.5e+01 },
+        \\    .{ 1.6e+01, 1.7e+01, 1.8e+01 }
+        \\  }
+        \\})
+    ));
+}
