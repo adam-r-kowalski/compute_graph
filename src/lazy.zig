@@ -4,6 +4,7 @@ pub const absolute = @import("lazy/absolute.zig").absolute;
 pub const add = @import("lazy/add.zig").add;
 pub const assign = @import("lazy/assign.zig").assign;
 pub const constant = @import("lazy/constant.zig").constant;
+pub const exponentiate = @import("lazy/exponentiate.zig").exponentiate;
 pub const gradient = @import("lazy/gradient.zig").gradient;
 pub const multiply = @import("lazy/multiply.zig").multiply;
 pub const matrixMultiply = @import("lazy/matrix_multiply.zig").matrixMultiply;

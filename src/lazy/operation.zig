@@ -7,6 +7,7 @@ pub const Operation = struct {
         OutOfMemory,
         ShapeMismatch,
         Overflow,
+        OperationNotDefinedForScalarType,
     };
 
     pub const BackwardError = error{
@@ -14,6 +15,7 @@ pub const Operation = struct {
         ShapeMismatch,
         Overflow,
         CannotDifferentiateIntegral,
+        OperationNotDefinedForScalarType,
     };
 
     pub const ForwardContext = struct {
