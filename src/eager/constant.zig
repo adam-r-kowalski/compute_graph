@@ -77,6 +77,8 @@ test "constant rank 0" {
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{}));
     expectEqual(tensor.storage.scalar, 5);
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor});
+    expect(std.mem.eql(u8, actual, "CpuTensor(@as(f16, 5.0e+00))"));
 }
 
 test "constant rank 1" {
@@ -86,6 +88,8 @@ test "constant rank 1" {
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{3}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{1}));
     expect(std.mem.eql(f64, tensor.storage.array, &[_]f64{ 1, 2, 3 }));
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor});
+    expect(std.mem.eql(u8, actual, "CpuTensor([3]f64{ 1.0e+00, 2.0e+00, 3.0e+00 })"));
 }
 
 test "constant rank 2" {
@@ -98,6 +102,13 @@ test "constant rank 2" {
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 2, 3 }));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 3, 1 }));
     expect(std.mem.eql(i32, tensor.storage.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor});
+    expect(std.mem.eql(u8, actual,
+        \\CpuTensor([2][3]i32{
+        \\  .{ 1, 2, 3 },
+        \\  .{ 4, 5, 6 }
+        \\})
+    ));
 }
 
 test "constant rank 3" {
@@ -122,4 +133,153 @@ test "constant rank 3" {
     expect(std.mem.eql(f16, tensor.storage.array, &[_]f16{
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     }));
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor});
+    expect(std.mem.eql(u8, actual,
+        \\CpuTensor([3][2][3]f16{
+        \\  .{
+        \\    .{ 1.0e+00, 2.0e+00, 3.0e+00 },
+        \\    .{ 4.0e+00, 5.0e+00, 6.0e+00 }
+        \\  },
+        \\  .{
+        \\    .{ 7.0e+00, 8.0e+00, 9.0e+00 },
+        \\    .{ 1.0e+01, 1.1e+01, 1.2e+01 }
+        \\  },
+        \\  .{
+        \\    .{ 1.3e+01, 1.4e+01, 1.5e+01 },
+        \\    .{ 1.6e+01, 1.7e+01, 1.8e+01 }
+        \\  }
+        \\})
+    ));
+}
+
+test "constant rank 4" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(&arena.allocator, &[_][2][3][4]i32{
+        .{
+            .{
+                .{ 1, 2, 3, 4 },
+                .{ 5, 6, 7, 8 },
+                .{ 9, 10, 11, 12 },
+            },
+            .{
+                .{ 13, 14, 15, 16 },
+                .{ 17, 18, 19, 20 },
+                .{ 21, 22, 23, 24 },
+            },
+        },
+        .{
+            .{
+                .{ 25, 26, 27, 28 },
+                .{ 29, 30, 31, 32 },
+                .{ 33, 34, 35, 36 },
+            },
+            .{
+                .{ 37, 38, 39, 40 },
+                .{ 41, 42, 43, 44 },
+                .{ 45, 46, 47, 48 },
+            },
+        },
+        .{
+            .{
+                .{ 49, 50, 51, 52 },
+                .{ 53, 54, 55, 56 },
+                .{ 57, 58, 59, 60 },
+            },
+            .{
+                .{ 61, 62, 63, 64 },
+                .{ 65, 66, 67, 68 },
+                .{ 69, 70, 71, 72 },
+            },
+        },
+    });
+    expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 3, 2, 3, 4 }));
+    expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 24, 12, 4, 1 }));
+    expect(std.mem.eql(i32, tensor.storage.array, &[_]i32{
+        1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+        13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+        37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+        49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
+        61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72,
+    }));
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor});
+    expect(std.mem.eql(u8, actual,
+        \\CpuTensor([3][2][3][4]i32{
+        \\  .{
+        \\    .{
+        \\      .{ 1, 2, 3, 4 },
+        \\      .{ 5, 6, 7, 8 },
+        \\      .{ 9, 10, 11, 12 }
+        \\    },
+        \\    .{
+        \\      .{ 13, 14, 15, 16 },
+        \\      .{ 17, 18, 19, 20 },
+        \\      .{ 21, 22, 23, 24 }
+        \\    }
+        \\  },
+        \\  .{
+        \\    .{
+        \\      .{ 25, 26, 27, 28 },
+        \\      .{ 29, 30, 31, 32 },
+        \\      .{ 33, 34, 35, 36 }
+        \\    },
+        \\    .{
+        \\      .{ 37, 38, 39, 40 },
+        \\      .{ 41, 42, 43, 44 },
+        \\      .{ 45, 46, 47, 48 }
+        \\    }
+        \\  },
+        \\  .{
+        \\    .{
+        \\      .{ 49, 50, 51, 52 },
+        \\      .{ 53, 54, 55, 56 },
+        \\      .{ 57, 58, 59, 60 }
+        \\    },
+        \\    .{
+        \\      .{ 61, 62, 63, 64 },
+        \\      .{ 65, 66, 67, 68 },
+        \\      .{ 69, 70, 71, 72 }
+        \\    }
+        \\  }
+        \\})
+    ));
+}
+
+test "CpuTensorUnion formatted printing" {
+    const CpuTensorUnion = cpu_tensor.CpuTensorUnion;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(&arena.allocator, &[_][2][3]f16{
+        .{
+            .{ 1, 2, 3 },
+            .{ 4, 5, 6 },
+        },
+        .{
+            .{ 7, 8, 9 },
+            .{ 10, 11, 12 },
+        },
+        .{
+            .{ 13, 14, 15 },
+            .{ 16, 17, 18 },
+        },
+    });
+    const tensor_union = CpuTensorUnion.init(tensor);
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor_union});
+    expect(std.mem.eql(u8, actual,
+        \\CpuTensor([3][2][3]f16{
+        \\  .{
+        \\    .{ 1.0e+00, 2.0e+00, 3.0e+00 },
+        \\    .{ 4.0e+00, 5.0e+00, 6.0e+00 }
+        \\  },
+        \\  .{
+        \\    .{ 7.0e+00, 8.0e+00, 9.0e+00 },
+        \\    .{ 1.0e+01, 1.1e+01, 1.2e+01 }
+        \\  },
+        \\  .{
+        \\    .{ 1.3e+01, 1.4e+01, 1.5e+01 },
+        \\    .{ 1.6e+01, 1.7e+01, 1.8e+01 }
+        \\  }
+        \\})
+    ));
 }
