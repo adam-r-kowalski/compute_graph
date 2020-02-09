@@ -130,7 +130,6 @@ test "gradient exponentiate" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = gradients });
-    std.debug.warn("{}", .{actual[0]});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0.679, 1.847 },
         .{ 5.021, 13.649 },
