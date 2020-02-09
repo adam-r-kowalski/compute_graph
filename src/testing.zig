@@ -19,8 +19,8 @@ pub fn expectEqual(comptime T: type, actual: CpuTensor(T), expected: CpuTensor(T
     switch (expected.storage) {
         .scalar => |scalar| compareScalar(T, scalar, actual.storage.scalar),
         .array => |array| {
-            const expected_array = expected.storage.array;
-            for (array) |e, i| compareScalar(T, e, expected_array[i]);
+            const actual_array = actual.storage.array;
+            for (array) |e, i| compareScalar(T, e, actual_array[i]);
         },
     }
 }

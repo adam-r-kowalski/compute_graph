@@ -7,24 +7,27 @@ const eager = @import("../eager.zig");
 const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
-const exponentiateBackward = @import("../eager/exponentiate.zig").exponentiateBackward;
+const negateBackward = @import("../eager/negate.zig").negateBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
 
-const Exponentiate = struct {
+const Negate = struct {
     operation: Operation,
     inputs: [1]Tensor,
 };
 
 fn inputs(operation: *const Operation) []const Tensor {
-    return &@fieldParentPtr(Exponentiate, "operation", operation).inputs;
+    return &@fieldParentPtr(Negate, "operation", operation).inputs;
 }
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
-        .f64 => |tensor| .{ .f64 = try eager.exponentiate(f64, context.allocator, tensor) },
-        .f32 => |tensor| .{ .f32 = try eager.exponentiate(f32, context.allocator, tensor) },
-        else => return error.OperationNotDefinedForScalarType,
+        .f64 => |tensor| .{ .f64 = try eager.negate(f64, context.allocator, tensor) },
+        .f32 => |tensor| .{ .f32 = try eager.negate(f32, context.allocator, tensor) },
+        .f16 => |tensor| .{ .f16 = try eager.negate(f16, context.allocator, tensor) },
+        .i64 => |tensor| .{ .i64 = try eager.negate(i64, context.allocator, tensor) },
+        .i32 => |tensor| .{ .i32 = try eager.negate(i32, context.allocator, tensor) },
+        .i8 => |tensor| .{ .i8 = try eager.negate(i8, context.allocator, tensor) },
     };
 }
 
@@ -33,7 +36,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     errdefer context.allocator.free(values);
     switch (context.gradient_input) {
         .f64 => |gradient_input| {
-            const gradients = try exponentiateBackward(f64, EagerBackwardContext(f64){
+            const gradients = try negateBackward(f64, EagerBackwardContext(f64){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
@@ -41,22 +44,31 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f64 = gradients[0] };
         },
         .f32 => |gradient_input| {
-            const gradients = try exponentiateBackward(f32, EagerBackwardContext(f32){
+            const gradients = try negateBackward(f32, EagerBackwardContext(f32){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
             });
             values[0] = .{ .f32 = gradients[0] };
         },
-        .f16 => return error.OperationNotDefinedForScalarType,
-        .i64, .i32, .i8 => return error.CannotDifferentiateIntegral,
+        .f16 => |gradient_input| {
+            const gradients = try negateBackward(f16, EagerBackwardContext(f16){
+                .allocator = context.allocator,
+                .gradient_input = gradient_input,
+                .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
+            });
+            values[0] = .{ .f16 = gradients[0] };
+        },
+        .i64, .i32, .i8 => {
+            return error.CannotDifferentiateIntegral;
+        },
     }
     return values;
 }
 
-pub fn exponentiate(graph: *Graph, x: Tensor) !Tensor {
-    var exponentiate_operation = try graph.arena.allocator.create(Exponentiate);
-    exponentiate_operation.* = .{
+pub fn negate(graph: *Graph, x: Tensor) !Tensor {
+    var negate_operation = try graph.arena.allocator.create(Negate);
+    negate_operation.* = .{
         .operation = .{
             .inputs = inputs,
             .forward = forward,
@@ -64,11 +76,11 @@ pub fn exponentiate(graph: *Graph, x: Tensor) !Tensor {
         },
         .inputs = .{x},
     };
-    try graph.operations.append(&exponentiate_operation.operation);
+    try graph.operations.append(&negate_operation.operation);
     return Tensor{ .operation = graph.operations.len - 1 };
 }
 
-test "exponentiate scalar" {
+test "negate scalar" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
@@ -77,15 +89,15 @@ test "exponentiate scalar" {
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, -5));
-    const y = try exponentiate(&graph, x);
+    const y = try negate(&graph, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
-    const expected = try eager.constant(&arena.allocator, @as(f64, 0.00673));
+    const expected = try eager.constant(&arena.allocator, @as(f64, 5));
     expectEqual(f64, actual[0].f64, expected);
 }
 
-test "exponentiate matrix" {
+test "negate matrix" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
@@ -98,19 +110,44 @@ test "exponentiate matrix" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const z = try exponentiate(&graph, x);
+    const z = try negate(&graph, x);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
-        .{ 2.7182, 0.1353 },
-        .{ 20.0855, 0.0183 },
-        .{ 0.00673, 403.4287 },
+        .{ -1, 2 },
+        .{ -3, 4 },
+        .{ 5, -6 },
     });
     expectEqual(f64, actual[0].f64, expected);
 }
 
-test "gradient exponentiate" {
+test "negate matrix i32" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, [_][2]i32{
+        .{ 1, -2 },
+        .{ 3, -4 },
+        .{ -5, 6 },
+    });
+    const z = try negate(&graph, x);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const expected = try eager.constant(&arena.allocator, [_][2]i32{
+        .{ -1, 2 },
+        .{ -3, 4 },
+        .{ 5, -6 },
+    });
+    expectEqual(i32, actual[0].i32, expected);
+}
+
+test "gradient negate" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const gradient = @import("gradient.zig").gradient;
@@ -121,18 +158,18 @@ test "gradient exponentiate" {
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const a = try constant(&graph, [_][2]f64{
-        .{ 1, 2 },
-        .{ 3, 4 },
+        .{ 0, -2 },
+        .{ 3, -4 },
     });
-    const b = try exponentiate(&graph, a);
+    const b = try negate(&graph, a);
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
-        .{ 0.6795, 1.8472 },
-        .{ 5.0213, 13.6495 },
+        .{ -0.25, -0.25 },
+        .{ -0.25, -0.25 },
     });
     expectEqual(f64, actual[0].f64, expected);
 }
