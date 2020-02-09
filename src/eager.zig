@@ -6,6 +6,7 @@ pub const multiply = @import("eager/multiply.zig").multiply;
 pub const matrixMultiply = @import("eager/matrix_multiply.zig").matrixMultiply;
 pub const mean = @import("eager/mean.zig").mean;
 pub const subtract = @import("eager/subtract.zig").subtract;
+pub const onesLike = @import("eager/ones_like.zig").onesLike;
 const cpu_tensor = @import("eager/cpu_tensor.zig");
 pub const CpuTensor = cpu_tensor.CpuTensor;
 pub const CpuTensorUnion = cpu_tensor.CpuTensorUnion;
