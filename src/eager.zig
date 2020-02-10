@@ -2,6 +2,7 @@ pub const absolute = @import("eager/absolute.zig").absolute;
 pub const add = @import("eager/add.zig").add;
 pub const constant = @import("eager/constant.zig").constant;
 pub const exponentiate = @import("eager/exponentiate.zig").exponentiate;
+pub const divide = @import("eager/divide.zig").divide;
 pub const multiply = @import("eager/multiply.zig").multiply;
 pub const matrixMultiply = @import("eager/matrix_multiply.zig").matrixMultiply;
 pub const mean = @import("eager/mean.zig").mean;
