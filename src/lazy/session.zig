@@ -290,7 +290,7 @@ fn runGradient(context: GradientContext) !void {
                             .forward_inputs = forward_inputs,
                         });
                         for (inputs) |input, j| try gradient_cache.putNoClobber(input, gradients[j]);
-                    } else return error.BackwardNotImplemented;
+                    }
                 },
                 else => {},
             }
