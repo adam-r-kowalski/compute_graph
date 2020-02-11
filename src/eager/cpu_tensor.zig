@@ -10,13 +10,28 @@ pub fn CpuStorage(comptime ScalarType: type) type {
     };
 }
 
-fn printIndent(context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void, depth: usize) Errors!void {
+fn printIndent(
+    context: var,
+    comptime Errors: type,
+    comptime output: fn (@TypeOf(context), []const u8) Errors!void,
+    depth: usize,
+) Errors!void {
     var i: usize = 0;
     while (i < depth * 2) : (i += 1)
         try std.fmt.format(context, Errors, output, " ", .{});
 }
 
-fn printTensor(context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void, comptime T: type, depth: usize, shape: []const usize, stride: []const usize, array: []const T, comma: bool) Errors!void {
+fn printTensor(
+    context: var,
+    comptime Errors: type,
+    comptime output: fn (@TypeOf(context), []const u8) Errors!void,
+    comptime T: type,
+    depth: usize,
+    shape: []const usize,
+    stride: []const usize,
+    array: []const T,
+    comma: bool,
+) Errors!void {
     if (shape.len == 0)
         return;
     try printIndent(context, Errors, output, depth);
@@ -62,7 +77,14 @@ pub fn CpuTensor(comptime T: type) type {
 
         pub const ScalarType = T;
 
-        pub fn format(self: @This(), comptime fmt: []const u8, options: std.fmt.FormatOptions, context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void) Errors!void {
+        pub fn format(
+            self: @This(),
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            context: var,
+            comptime Errors: type,
+            comptime output: fn (@TypeOf(context), []const u8) Errors!void,
+        ) Errors!void {
             try std.fmt.format(context, Errors, output, "CpuTensor(", .{});
             switch (self.storage) {
                 .scalar => |scalar| {
@@ -102,7 +124,14 @@ pub const CpuTensorUnion = union(enum) {
         };
     }
 
-    pub fn format(self: @This(), comptime fmt: []const u8, options: std.fmt.FormatOptions, context: var, comptime Errors: type, output: fn (@TypeOf(context), []const u8) Errors!void) Errors!void {
+    pub fn format(
+        self: @This(),
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        context: var,
+        comptime Errors: type,
+        comptime output: fn (@TypeOf(context), []const u8) Errors!void,
+    ) Errors!void {
         switch (self) {
             .f64 => |tensor| try std.fmt.format(context, Errors, output, "{}", .{tensor}),
             .f32 => |tensor| try std.fmt.format(context, Errors, output, "{}", .{tensor}),

@@ -457,3 +457,40 @@ test "variable" {
     });
     expectEqual(f64, actual[0].f64, expected);
 }
+
+test "duplicate" {
+    const constant = @import("constant.zig").constant;
+    const add = @import("add.zig").add;
+    const multiply = @import("multiply.zig").multiply;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const b = try constant(&graph, [_][2]f64{
+        .{ 5, 6 },
+        .{ 7, 8 },
+    });
+    const c = try constant(&graph, [_][2]f64{
+        .{ 9, 10 },
+        .{ 11, 12 },
+    });
+    const d = try multiply(&graph, a, b);
+    const e = try multiply(&graph, a, c);
+    const f = try add(&graph, d, e);
+    const g = try mean(&graph, f);
+    const gradients = try gradient(&graph, g, &[_]Tensor{g});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = gradients });
+    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    expectEqual(f64, actual[0].f64, expected);
+}
