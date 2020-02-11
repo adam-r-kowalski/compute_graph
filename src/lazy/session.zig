@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const gradient = @import("gradient.zig").gradient;
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
@@ -253,6 +254,15 @@ const GradientContext = struct {
     current_tensor: Tensor,
 };
 
+pub fn accumulateGradients(allocator: *Allocator, stored: CpuTensorUnion, incoming: CpuTensorUnion) !CpuTensorUnion {
+    return switch (stored) {
+        .f64 => |tensor| CpuTensorUnion.init(try eager.add(f64, allocator, tensor, incoming.f64)),
+        .f32 => |tensor| CpuTensorUnion.init(try eager.add(f32, allocator, tensor, incoming.f32)),
+        .f16 => |tensor| CpuTensorUnion.init(try eager.add(f16, allocator, tensor, incoming.f16)),
+        else => return error.CannotDifferentiateIntegral,
+    };
+}
+
 fn runGradient(context: GradientContext) !void {
     if (context.gradient_caches.getValue(context.gradient_handle.gradient)) |gradient_cache| {
         const gradient_operation = context.session.graph.gradients.at(context.gradient_handle.gradient);
@@ -289,7 +299,14 @@ fn runGradient(context: GradientContext) !void {
                             .gradient_input = gradient_input,
                             .forward_inputs = forward_inputs,
                         });
-                        for (inputs) |input, j| try gradient_cache.putNoClobber(input, gradients[j]);
+                        for (inputs) |input, j| {
+                            const result = try gradient_cache.getOrPut(input);
+                            if (!result.found_existing) {
+                                result.kv.value = gradients[j];
+                            } else {
+                                result.kv.value = try accumulateGradients(allocator, result.kv.value, gradients[j]);
+                            }
+                        }
                     }
                 },
                 else => {},
@@ -484,13 +501,13 @@ test "duplicate" {
     const e = try multiply(&graph, a, c);
     const f = try add(&graph, d, e);
     const g = try mean(&graph, f);
-    const gradients = try gradient(&graph, g, &[_]Tensor{g});
+    const gradients = try gradient(&graph, g, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
-        .{ 1, 2 },
-        .{ 3, 4 },
+        .{ 3.5, 4 },
+        .{ 4.5, 5 },
     });
     expectEqual(f64, actual[0].f64, expected);
 }
