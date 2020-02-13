@@ -25,7 +25,7 @@ pub fn gradient(graph: *Graph, of: Tensor, with_respect_to: []const Tensor) ![]T
                 .index = i,
             },
         },
-        .shape = &[_]usize{},
+        .shape = with_respect_to[i].shape,
     };
     return gradients;
 }

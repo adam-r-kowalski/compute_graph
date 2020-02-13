@@ -44,7 +44,7 @@ pub fn onesLike(graph: *Graph, x: Tensor) !Tensor {
     try graph.operations.append(&onesLike_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
-        .shape = &[_]usize{},
+        .shape = x.shape,
     };
 }
 
@@ -58,6 +58,7 @@ test "onesLike scalar" {
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, -5));
     const y = try onesLike(&graph, x);
+    std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
@@ -78,10 +79,11 @@ test "onesLike matrix" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const z = try onesLike(&graph, x);
+    const y = try onesLike(&graph, x);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 1, 1 },
         .{ 1, 1 },
@@ -103,10 +105,11 @@ test "onesLike matrix i32" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const z = try onesLike(&graph, x);
+    const y = try onesLike(&graph, x);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ 1, 1 },
         .{ 1, 1 },

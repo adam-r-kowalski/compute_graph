@@ -93,6 +93,7 @@ test "mean scalar" {
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, -5));
     const y = try mean(&graph, x);
+    std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
@@ -113,10 +114,11 @@ test "mean matrix" {
         .{ 7, 8 },
         .{ 10, 8 },
     });
-    const z = try mean(&graph, x);
+    const y = try mean(&graph, x);
+    std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, @as(f64, 8));
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -134,10 +136,11 @@ test "mean matrix i32" {
         .{ 7, 8 },
         .{ 10, 8 },
     });
-    const z = try mean(&graph, x);
+    const y = try mean(&graph, x);
+    std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, @as(f32, 8));
     expectEqual(f32, actual[0].f32, expected);
 }
@@ -156,6 +159,7 @@ test "gradient mean" {
         .{ 3, 4 },
     });
     const b = try mean(&graph, a);
+    std.testing.expectEqual(b.shape, &[_]usize{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();

@@ -81,6 +81,8 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 }
 
 pub fn multiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
+    if (!std.mem.eql(usize, x.shape, y.shape))
+        return error.ShapeMismatch;
     var multiply_operation = try graph.arena.allocator.create(Multiply);
     multiply_operation.* = .{
         .operation = .{
@@ -93,7 +95,7 @@ pub fn multiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     try graph.operations.append(&multiply_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
-        .shape = &[_]usize{},
+        .shape = x.shape,
     };
 }
 
@@ -108,6 +110,7 @@ test "multiply scalar" {
     const x = try constant(&graph, @as(f64, 5));
     const y = try constant(&graph, @as(f64, 10));
     const z = try multiply(&graph, x, y);
+    std.testing.expectEqual(z.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -129,6 +132,7 @@ test "multiply matrix" {
         .{ -5, 6 },
     });
     const z = try multiply(&graph, x, x);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -154,6 +158,7 @@ test "multiply matrix i32" {
         .{ -5, 6 },
     });
     const z = try multiply(&graph, x, x);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -184,6 +189,7 @@ test "gradient multiply" {
         .{ 7, 8 },
     });
     const c = try multiply(&graph, a, b);
+    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);

@@ -79,7 +79,7 @@ pub fn absolute(graph: *Graph, x: Tensor) !Tensor {
     try graph.operations.append(&absolute_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
-        .shape = &[_]usize{},
+        .shape = x.shape,
     };
 }
 
@@ -93,6 +93,7 @@ test "absolute scalar" {
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, -5));
     const y = try absolute(&graph, x);
+    std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
@@ -113,10 +114,11 @@ test "absolute matrix" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const z = try absolute(&graph, x);
+    const y = try absolute(&graph, x);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -138,10 +140,11 @@ test "absolute matrix i32" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const z = try absolute(&graph, x);
+    const y = try absolute(&graph, x);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -165,8 +168,10 @@ test "gradient absolute" {
         .{ 3, -4 },
     });
     const b = try absolute(&graph, a);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
+    std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = gradients });

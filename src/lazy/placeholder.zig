@@ -18,7 +18,7 @@ pub fn placeholder(graph: *Graph, shape: []const usize) !Tensor {
     });
     return Tensor{
         .tensorType = .{ .placeholder = graph.placeholders.len - 1 },
-        .shape = &[_]usize{},
+        .shape = shape,
     };
 }
 
@@ -39,6 +39,7 @@ test "placeholder" {
         .{ 7, 8 },
     });
     const c = try placeholder(&graph, &[_]usize{ 2, 2 });
+    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
 

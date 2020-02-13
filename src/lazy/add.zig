@@ -192,6 +192,8 @@ test "gradient add" {
     std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{ 2, 2 }));
+    std.testing.expect(std.mem.eql(usize, gradients[1].shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = gradients });
