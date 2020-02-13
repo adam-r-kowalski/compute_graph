@@ -11,6 +11,7 @@ pub fn constant(graph: *Graph, literal: var) !Tensor {
     try graph.constants.append(CpuTensorUnion.init(tensor));
     return Tensor{
         .tensorType = .{ .constant = graph.constants.len - 1 },
+        .shape = &[_]usize{},
     };
 }
 

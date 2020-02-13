@@ -17,6 +17,7 @@ pub fn assign(graph: *Graph, variable: Tensor, value: Tensor) !Tensor {
     });
     return Tensor{
         .tensorType = .{ .assign = graph.assigns.len - 1 },
+        .shape = &[_]usize{},
     };
 }
 

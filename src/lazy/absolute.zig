@@ -79,6 +79,7 @@ pub fn absolute(graph: *Graph, x: Tensor) !Tensor {
     try graph.operations.append(&absolute_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
+        .shape = &[_]usize{},
     };
 }
 

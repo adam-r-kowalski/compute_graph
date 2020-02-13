@@ -14,4 +14,5 @@ const TensorType = union(enum) {
 
 pub const Tensor = struct {
     tensorType: TensorType,
+    shape: []const usize,
 };

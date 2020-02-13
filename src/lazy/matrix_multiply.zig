@@ -92,6 +92,7 @@ pub fn matrixMultiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     try graph.operations.append(&matrixMultiply_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
+        .shape = &[_]usize{},
     };
 }
 

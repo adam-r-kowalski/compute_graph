@@ -93,6 +93,7 @@ pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     try graph.operations.append(&divide_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
+        .shape = &[_]usize{},
     };
 }
 

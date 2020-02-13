@@ -44,6 +44,7 @@ pub fn onesLike(graph: *Graph, x: Tensor) !Tensor {
     try graph.operations.append(&onesLike_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
+        .shape = &[_]usize{},
     };
 }
 
