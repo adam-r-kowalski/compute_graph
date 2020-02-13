@@ -91,7 +91,9 @@ pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
         .inputs = .{ x, y },
     };
     try graph.operations.append(&divide_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+    };
 }
 
 test "divide scalar" {

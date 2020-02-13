@@ -91,7 +91,9 @@ pub fn subtract(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
         .inputs = .{ x, y },
     };
     try graph.operations.append(&subtract_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+    };
 }
 
 test "subtract scalar" {

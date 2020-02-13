@@ -9,7 +9,9 @@ const expectEqual = @import("../testing.zig").expectEqual;
 pub fn constant(graph: *Graph, literal: var) !Tensor {
     const tensor = try eager.constant(&graph.arena.allocator, literal);
     try graph.constants.append(CpuTensorUnion.init(tensor));
-    return Tensor{ .constant = graph.constants.len - 1 };
+    return Tensor{
+        .tensorType = .{ .constant = graph.constants.len - 1 },
+    };
 }
 
 test "constant scalar" {

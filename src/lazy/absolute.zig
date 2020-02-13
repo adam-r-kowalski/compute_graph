@@ -77,7 +77,9 @@ pub fn absolute(graph: *Graph, x: Tensor) !Tensor {
         .inputs = .{x},
     };
     try graph.operations.append(&absolute_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+    };
 }
 
 test "absolute scalar" {

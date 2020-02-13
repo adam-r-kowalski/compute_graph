@@ -65,7 +65,9 @@ pub fn exponentiate(graph: *Graph, x: Tensor) !Tensor {
         .inputs = .{x},
     };
     try graph.operations.append(&exponentiate_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+    };
 }
 
 test "exponentiate scalar" {

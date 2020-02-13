@@ -30,7 +30,7 @@ const ExecutionOrder = struct {
     };
 
     fn recurse(execution_order: *Tensors, visited: *Visited, graph: *const Graph, environment: Environment, tensor: Tensor) Error!void {
-        switch (tensor) {
+        switch (tensor.tensorType) {
             .operation => |index| {
                 const operation = graph.operations.at(index);
                 for (operation.inputs(operation)) |input|
@@ -284,7 +284,7 @@ fn runGradient(context: GradientContext) !void {
         var i = try indexOf(of, context.execution_order);
         while (i > 0) : (i -= 1) {
             const current = context.execution_order[i];
-            switch (current) {
+            switch (current.tensorType) {
                 .operation => |index| {
                     const operation = context.session.graph.operations.at(index);
                     const inputs = operation.inputs(operation);
@@ -372,7 +372,7 @@ pub const Session = struct {
         defer gradient_caches.deinit();
         const execution_order = try executionOrder(self.*, context);
         for (execution_order) |current_tensor| {
-            switch (current_tensor) {
+            switch (current_tensor.tensorType) {
                 .constant => |index| try runConstant(self.*, &cache, index, current_tensor),
                 .operation => |index| try runOperation(self.*, &cache, index, current_tensor),
                 .gradient_handle => |gradient_handle| try runGradient(.{

@@ -16,7 +16,9 @@ pub fn placeholder(graph: *Graph, shape: []const usize) !Tensor {
     try graph.placeholders.append(Placeholder{
         .shape = shape,
     });
-    return Tensor{ .placeholder = graph.placeholders.len - 1 };
+    return Tensor{
+        .tensorType = .{ .placeholder = graph.placeholders.len - 1 },
+    };
 }
 
 test "placeholder" {

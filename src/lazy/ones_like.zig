@@ -42,7 +42,9 @@ pub fn onesLike(graph: *Graph, x: Tensor) !Tensor {
         .inputs = .{x},
     };
     try graph.operations.append(&onesLike_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+    };
 }
 
 test "onesLike scalar" {

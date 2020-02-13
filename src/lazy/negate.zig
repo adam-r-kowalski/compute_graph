@@ -77,7 +77,9 @@ pub fn negate(graph: *Graph, x: Tensor) !Tensor {
         .inputs = .{x},
     };
     try graph.operations.append(&negate_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+    };
 }
 
 test "negate scalar" {
