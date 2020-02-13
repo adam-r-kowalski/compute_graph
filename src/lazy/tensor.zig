@@ -3,11 +3,16 @@ pub const GradientHandle = struct {
     index: usize,
 };
 
-pub const Tensor = union(enum) {
+const TensorType = union(enum) {
     constant: usize,
     operation: usize,
     gradient_handle: GradientHandle,
     variable: usize,
     assign: usize,
     placeholder: usize,
+};
+
+pub const Tensor = struct {
+    tensorType: TensorType,
+    shape: []const usize,
 };

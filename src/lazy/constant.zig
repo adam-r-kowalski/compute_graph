@@ -9,7 +9,10 @@ const expectEqual = @import("../testing.zig").expectEqual;
 pub fn constant(graph: *Graph, literal: var) !Tensor {
     const tensor = try eager.constant(&graph.arena.allocator, literal);
     try graph.constants.append(CpuTensorUnion.init(tensor));
-    return Tensor{ .constant = graph.constants.len - 1 };
+    return Tensor{
+        .tensorType = .{ .constant = graph.constants.len - 1 },
+        .shape = tensor.shape,
+    };
 }
 
 test "constant scalar" {
@@ -20,6 +23,7 @@ test "constant scalar" {
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, 5));
+    std.testing.expectEqual(x.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{x} });
@@ -39,6 +43,7 @@ test "constant array" {
         .{ 3, 4 },
         .{ 5, 6 },
     });
+    std.testing.expect(std.mem.eql(usize, x.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{x} });

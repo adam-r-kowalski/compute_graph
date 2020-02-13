@@ -11,11 +11,16 @@ pub const Assign = struct {
 };
 
 pub fn assign(graph: *Graph, variable: Tensor, value: Tensor) !Tensor {
+    if (!std.mem.eql(usize, variable.shape, value.shape))
+        return error.ShapeMismatch;
     try graph.assigns.append(Assign{
         .variable = variable,
         .value = value,
     });
-    return Tensor{ .assign = graph.assigns.len - 1 };
+    return Tensor{
+        .tensorType = .{ .assign = graph.assigns.len - 1 },
+        .shape = variable.shape,
+    };
 }
 
 test "assign" {
@@ -33,12 +38,14 @@ test "assign" {
         .{ 3, 4 },
     });
     const b = try variable(&graph, a);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
     const c = try constant(&graph, [_][2]f64{
         .{ 1, 1 },
         .{ 1, 1 },
     });
     const d = try add(&graph, b, c);
     const e = try assign(&graph, b, d);
+    std.testing.expect(std.mem.eql(usize, e.shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
 

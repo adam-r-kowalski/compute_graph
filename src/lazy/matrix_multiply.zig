@@ -80,6 +80,11 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 }
 
 pub fn matrixMultiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
+    if (x.shape.len != 2 or y.shape.len != 2 or x.shape[1] != y.shape[0])
+        return error.ShapeMismatch;
+    var shape = try graph.arena.allocator.alloc(usize, 2);
+    shape[0] = x.shape[0];
+    shape[1] = y.shape[1];
     var matrixMultiply_operation = try graph.arena.allocator.create(MatrixMultiply);
     matrixMultiply_operation.* = .{
         .operation = .{
@@ -90,7 +95,10 @@ pub fn matrixMultiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
         .inputs = .{ x, y },
     };
     try graph.operations.append(&matrixMultiply_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+        .shape = shape,
+    };
 }
 
 test "matrixMultiply identity" {
@@ -112,6 +120,7 @@ test "matrixMultiply identity" {
         .{3},
     });
     const z = try matrixMultiply(&graph, x, y);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -142,6 +151,7 @@ test "matrixMultiply flip" {
         .{3},
     });
     const z = try matrixMultiply(&graph, x, y);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -173,6 +183,7 @@ test "matrixMultiply flip" {
         .{ 3, 9 },
     });
     const z = try matrixMultiply(&graph, x, y);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 4, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -205,6 +216,7 @@ test "gradient matrix multiply" {
         .{ 11, 12 },
     });
     const c = try matrixMultiply(&graph, a, b);
+    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);
@@ -221,4 +233,27 @@ test "gradient matrix multiply" {
     });
     expectEqual(f64, actual[0].f64, expected_a_gradient);
     expectEqual(f64, actual[1].f64, expected_b_gradient);
+}
+
+test "matrixMultiply shape mismatch" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, [_][3]f64{
+        .{ 1, 2, 3 },
+        .{ 4, 2, 5 },
+        .{ 6, 5, 3 },
+    });
+    const y = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 4, 6 },
+    });
+    _ = matrixMultiply(&graph, x, y) catch |err| switch (err) {
+        error.ShapeMismatch => {},
+        else => unreachable,
+    };
 }

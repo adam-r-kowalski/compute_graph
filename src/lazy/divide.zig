@@ -81,6 +81,8 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 }
 
 pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
+    if (!std.mem.eql(usize, x.shape, y.shape))
+        return error.ShapeMismatch;
     var divide_operation = try graph.arena.allocator.create(Divide);
     divide_operation.* = .{
         .operation = .{
@@ -91,7 +93,10 @@ pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
         .inputs = .{ x, y },
     };
     try graph.operations.append(&divide_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+        .shape = x.shape,
+    };
 }
 
 test "divide scalar" {
@@ -105,6 +110,7 @@ test "divide scalar" {
     const x = try constant(&graph, @as(f64, 5));
     const y = try constant(&graph, @as(f64, 10));
     const z = try divide(&graph, x, y);
+    std.testing.expectEqual(z.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -131,6 +137,7 @@ test "divide matrix" {
         .{ -2, 1 },
     });
     const z = try divide(&graph, x, y);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -161,6 +168,7 @@ test "divide matrix" {
         .{ -2, 1 },
     });
     const z = try divide(&graph, x, y);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -191,6 +199,7 @@ test "gradient divide" {
         .{ 10, 11, 12 },
     });
     const c = try divide(&graph, a, b);
+    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 3 }));
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);

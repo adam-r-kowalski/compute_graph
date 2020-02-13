@@ -8,5 +8,8 @@ pub const Variable = struct {
 
 pub fn variable(graph: *Graph, initial_value: Tensor) !Tensor {
     try graph.variables.append(Variable{ .current_value = initial_value });
-    return Tensor{ .variable = graph.variables.len - 1 };
+    return Tensor{
+        .tensorType = .{ .variable = graph.variables.len - 1 },
+        .shape = initial_value.shape,
+    };
 }

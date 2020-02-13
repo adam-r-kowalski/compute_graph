@@ -19,10 +19,13 @@ pub fn gradient(graph: *Graph, of: Tensor, with_respect_to: []const Tensor) ![]T
     var i: usize = 0;
     while (i < gradients.len) : (i += 1)
         gradients[i] = Tensor{
-        .gradient_handle = GradientHandle{
-            .gradient = graph.gradients.len - 1,
-            .index = i,
+        .tensorType = .{
+            .gradient_handle = GradientHandle{
+                .gradient = graph.gradients.len - 1,
+                .index = i,
+            },
         },
+        .shape = with_respect_to[i].shape,
     };
     return gradients;
 }

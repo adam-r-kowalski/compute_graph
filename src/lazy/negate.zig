@@ -77,7 +77,10 @@ pub fn negate(graph: *Graph, x: Tensor) !Tensor {
         .inputs = .{x},
     };
     try graph.operations.append(&negate_operation.operation);
-    return Tensor{ .operation = graph.operations.len - 1 };
+    return Tensor{
+        .tensorType = .{ .operation = graph.operations.len - 1 },
+        .shape = x.shape,
+    };
 }
 
 test "negate scalar" {
@@ -90,6 +93,7 @@ test "negate scalar" {
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, -5));
     const y = try negate(&graph, x);
+    std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
@@ -110,10 +114,11 @@ test "negate matrix" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const z = try negate(&graph, x);
+    const y = try negate(&graph, x);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ -1, 2 },
         .{ -3, 4 },
@@ -135,10 +140,11 @@ test "negate matrix i32" {
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const z = try negate(&graph, x);
+    const y = try negate(&graph, x);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ -1, 2 },
         .{ -3, 4 },
@@ -162,6 +168,7 @@ test "gradient negate" {
         .{ 3, -4 },
     });
     const b = try negate(&graph, a);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
