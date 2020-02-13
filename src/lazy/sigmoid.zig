@@ -13,8 +13,7 @@ pub fn sigmoid(graph: *Graph, x: Tensor) !Tensor {
     const b = try negate(graph, x);
     const c = try exponentiate(graph, b);
     const d = try add(graph, a, c);
-    const e = try onesLike(graph, x);
-    return try divide(graph, e, d);
+    return try divide(graph, a, d);
 }
 
 test "sigmoid scalar" {
