@@ -10,6 +10,6 @@ pub fn variable(graph: *Graph, initial_value: Tensor) !Tensor {
     try graph.variables.append(Variable{ .current_value = initial_value });
     return Tensor{
         .tensorType = .{ .variable = graph.variables.len - 1 },
-        .shape = &[_]usize{},
+        .shape = initial_value.shape,
     };
 }
