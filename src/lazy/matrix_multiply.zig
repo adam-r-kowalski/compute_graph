@@ -82,6 +82,8 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 pub fn matrixMultiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     if (x.shape.len != 2 or y.shape.len != 2 or x.shape[1] != y.shape[0])
         return error.ShapeMismatch;
+    if (x.scalarType != y.scalarType)
+        return error.ScalarTypeMismatch;
     var shape = try graph.arena.allocator.alloc(usize, 2);
     shape[0] = x.shape[0];
     shape[1] = y.shape[1];
@@ -98,6 +100,7 @@ pub fn matrixMultiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = shape,
+        .scalarType = x.scalarType,
     };
 }
 

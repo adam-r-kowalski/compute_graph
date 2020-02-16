@@ -83,6 +83,8 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 pub fn subtract(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     if (!std.mem.eql(usize, x.shape, y.shape))
         return error.ShapeMismatch;
+    if (x.scalarType != y.scalarType)
+        return error.ScalarTypeMismatch;
     var subtract_operation = try graph.arena.allocator.create(Subtract);
     subtract_operation.* = .{
         .operation = .{
@@ -96,6 +98,7 @@ pub fn subtract(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = x.shape,
+        .scalarType = x.scalarType,
     };
 }
 

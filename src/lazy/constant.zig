@@ -1,17 +1,32 @@
 const std = @import("std");
 const Graph = @import("graph.zig").Graph;
-const Tensor = @import("tensor.zig").Tensor;
+const tensor = @import("tensor.zig");
+const Tensor = tensor.Tensor;
+const ScalarType = tensor.ScalarType;
 const eager = @import("../eager.zig");
 const CpuTensorUnion = eager.CpuTensorUnion;
 const arrayInfo = @import("../util/array_info.zig").arrayInfo;
 const expectEqual = @import("../testing.zig").expectEqual;
 
+fn tensorScalarType(comptime T: type) ScalarType {
+    return switch(T) {
+        f64 => .f64,
+        f32 => .f32,
+        f16 => .f16,
+        i64 => .i64,
+        i32 => .i32,
+        i8 => .i8,
+        else => @compileError("ScalarType not supported"),
+    };
+}
+
 pub fn constant(graph: *Graph, literal: var) !Tensor {
-    const tensor = try eager.constant(&graph.arena.allocator, literal);
-    try graph.constants.append(CpuTensorUnion.init(tensor));
+    const eager_tensor = try eager.constant(&graph.arena.allocator, literal);
+    try graph.constants.append(CpuTensorUnion.init(eager_tensor));
     return Tensor{
         .tensorType = .{ .constant = graph.constants.len - 1 },
-        .shape = tensor.shape,
+        .shape = eager_tensor.shape,
+        .scalarType = tensorScalarType(@TypeOf(eager_tensor).ScalarType),
     };
 }
 

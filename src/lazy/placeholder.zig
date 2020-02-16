@@ -1,7 +1,9 @@
 const std = @import("std");
 // TODO(Adam): Clean up circular dependency
 const Graph = @import("graph.zig").Graph;
-const Tensor = @import("tensor.zig").Tensor;
+const tensor = @import("tensor.zig");
+const Tensor = tensor.Tensor;
+const ScalarType = tensor.ScalarType;
 const Session = @import("session.zig").Session;
 const Environment = @import("session.zig").Environment;
 const expectEqual = @import("../testing.zig").expectEqual;
@@ -10,7 +12,7 @@ pub const Placeholder = struct {
     shape: []const usize,
 };
 
-pub fn placeholder(graph: *Graph, shape: []const usize) !Tensor {
+pub fn placeholder(graph: *Graph, shape: []const usize, scalarType: ScalarType) !Tensor {
     var placeholder_shape = try graph.arena.allocator.alloc(usize, shape.len);
     std.mem.copy(usize, placeholder_shape, shape);
     try graph.placeholders.append(Placeholder{
@@ -19,6 +21,7 @@ pub fn placeholder(graph: *Graph, shape: []const usize) !Tensor {
     return Tensor{
         .tensorType = .{ .placeholder = graph.placeholders.len - 1 },
         .shape = shape,
+        .scalarType = scalarType,
     };
 }
 
@@ -38,7 +41,7 @@ test "placeholder" {
         .{ 5, 6 },
         .{ 7, 8 },
     });
-    const c = try placeholder(&graph, &[_]usize{ 2, 2 });
+    const c = try placeholder(&graph, &[_]usize{ 2, 2 }, .f64);
     std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();

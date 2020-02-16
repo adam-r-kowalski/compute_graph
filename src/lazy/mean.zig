@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Graph = @import("graph.zig").Graph;
-const Tensor = @import("tensor.zig").Tensor;
+const tensor = @import("tensor.zig");
+const Tensor = tensor.Tensor;
+const ScalarType = tensor.ScalarType;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
 const meanBackward = @import("../eager/mean.zig").meanBackward;
@@ -22,12 +24,12 @@ fn inputs(operation: *const Operation) []const Tensor {
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
-        .f64 => |tensor| .{ .f64 = try eager.mean(f64, context.allocator, tensor) },
-        .f32 => |tensor| .{ .f32 = try eager.mean(f32, context.allocator, tensor) },
-        .f16 => |tensor| .{ .f16 = try eager.mean(f16, context.allocator, tensor) },
-        .i64 => |tensor| .{ .f64 = try eager.mean(i64, context.allocator, tensor) },
-        .i32 => |tensor| .{ .f32 = try eager.mean(i32, context.allocator, tensor) },
-        .i8 => |tensor| .{ .f16 = try eager.mean(i8, context.allocator, tensor) },
+        .f64 => |t| .{ .f64 = try eager.mean(f64, context.allocator, t) },
+        .f32 => |t| .{ .f32 = try eager.mean(f32, context.allocator, t) },
+        .f16 => |t| .{ .f16 = try eager.mean(f16, context.allocator, t) },
+        .i64 => |t| .{ .f64 = try eager.mean(i64, context.allocator, t) },
+        .i32 => |t| .{ .f32 = try eager.mean(i32, context.allocator, t) },
+        .i8 => |t| .{ .f16 = try eager.mean(i8, context.allocator, t) },
     };
 }
 
@@ -66,6 +68,17 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
+fn tensorScalarType(scalarType: ScalarType) ScalarType {
+    return switch(scalarType) {
+        .f64 => .f64,
+        .f32 => .f32,
+        .f16 => .f16,
+        .i64 => .f64,
+        .i32 => .f32,
+        .i8 => .f16,
+    };
+}
+
 pub fn mean(graph: *Graph, x: Tensor) !Tensor {
     var mean_operation = try graph.arena.allocator.create(Mean);
     mean_operation.* = .{
@@ -80,6 +93,7 @@ pub fn mean(graph: *Graph, x: Tensor) !Tensor {
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = &[_]usize{},
+        .scalarType = tensorScalarType(x.scalarType),
     };
 }
 
