@@ -1,4 +1,5 @@
 const std = @import("std");
+const expect = std.testing.expect;
 const Graph = @import("graph.zig").Graph;
 const tensor = @import("tensor.zig");
 const Tensor = tensor.Tensor;
@@ -39,6 +40,8 @@ test "constant scalar" {
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, 5));
     std.testing.expectEqual(x.shape, &[_]usize{});
+    const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
+    expect(std.mem.eql(u8, actualString, "Tensor(f64)"));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{x} });
@@ -59,6 +62,8 @@ test "constant array" {
         .{ 5, 6 },
     });
     std.testing.expect(std.mem.eql(usize, x.shape, &[_]usize{ 3, 2 }));
+    const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
+    expect(std.mem.eql(u8, actualString, "Tensor([3][2]f32)"));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{x} });

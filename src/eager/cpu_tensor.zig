@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const expectEqual = std.testing.expectEqual;
+const tensorScalarType = @import("../lazy/tensor.zig").ScalarType;
 
 pub fn CpuStorage(comptime ScalarType: type) type {
     return union(enum) {
@@ -104,7 +105,7 @@ pub fn CpuTensor(comptime T: type) type {
     };
 }
 
-pub const CpuTensorUnion = union(enum) {
+pub const CpuTensorUnion = union(tensorScalarType) {
     f64: CpuTensor(f64),
     f32: CpuTensor(f32),
     f16: CpuTensor(f16),
