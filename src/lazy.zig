@@ -15,6 +15,7 @@ pub const placeholder = @import("lazy/placeholder.zig").placeholder;
 pub const onesLike = @import("lazy/ones_like.zig").onesLike;
 pub const Session = @import("lazy/session.zig").Session;
 pub const subtract = @import("lazy/subtract.zig").subtract;
+pub const sine = @import("lazy/sine.zig").sine;
 pub const sigmoid = @import("lazy/sigmoid.zig").sigmoid;
 pub const Tensor = @import("lazy/tensor.zig").Tensor;
 
