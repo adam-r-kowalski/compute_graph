@@ -10,6 +10,7 @@ pub const mean = @import("eager/mean.zig").mean;
 pub const negate = @import("eager/negate.zig").negate;
 pub const subtract = @import("eager/subtract.zig").subtract;
 pub const sine = @import("eager/sine.zig").sine;
+pub const sum = @import("eager/sum.zig").sum;
 pub const onesLike = @import("eager/ones_like.zig").onesLike;
 const cpu_tensor = @import("eager/cpu_tensor.zig");
 pub const CpuTensor = cpu_tensor.CpuTensor;
