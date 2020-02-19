@@ -83,6 +83,8 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     if (!std.mem.eql(usize, x.shape, y.shape))
         return error.ShapeMismatch;
+    if (x.scalarType != y.scalarType)
+        return error.ScalarTypeMismatch;
     var divide_operation = try graph.arena.allocator.create(Divide);
     divide_operation.* = .{
         .operation = .{
@@ -96,6 +98,7 @@ pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = x.shape,
+        .scalarType = x.scalarType,
     };
 }
 
@@ -111,6 +114,7 @@ test "divide scalar" {
     const y = try constant(&graph, @as(f64, 10));
     const z = try divide(&graph, x, y);
     std.testing.expectEqual(z.shape, &[_]usize{});
+    std.testing.expectEqual(z.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -137,6 +141,7 @@ test "divide matrix" {
         .{ -2, 1 },
     });
     const z = try divide(&graph, x, y);
+    std.testing.expectEqual(z.scalarType, .f64);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -149,7 +154,7 @@ test "divide matrix" {
     expectEqual(f64, actual[0].f64, expected);
 }
 
-test "divide matrix" {
+test "divide matrix i32" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
@@ -169,6 +174,7 @@ test "divide matrix" {
     });
     const z = try divide(&graph, x, y);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
+    std.testing.expectEqual(z.scalarType, .i32);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -200,6 +206,7 @@ test "gradient divide" {
     });
     const c = try divide(&graph, a, b);
     std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 3 }));
+    std.testing.expectEqual(c.scalarType, .f64);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);

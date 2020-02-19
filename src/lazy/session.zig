@@ -194,7 +194,7 @@ test "execution order placeholder" {
     defer graph.deinit();
     const a = try constant(&graph, @as(f64, 3));
     const b = try constant(&graph, @as(f64, 5));
-    const c = try placeholder(&graph, &[_]usize{});
+    const c = try placeholder(&graph, &[_]usize{}, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
 

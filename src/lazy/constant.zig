@@ -1,17 +1,33 @@
 const std = @import("std");
+const expect = std.testing.expect;
 const Graph = @import("graph.zig").Graph;
-const Tensor = @import("tensor.zig").Tensor;
+const tensor = @import("tensor.zig");
+const Tensor = tensor.Tensor;
+const ScalarType = tensor.ScalarType;
 const eager = @import("../eager.zig");
 const CpuTensorUnion = eager.CpuTensorUnion;
 const arrayInfo = @import("../util/array_info.zig").arrayInfo;
 const expectEqual = @import("../testing.zig").expectEqual;
 
+fn tensorScalarType(comptime T: type) ScalarType {
+    return switch (T) {
+        f64 => .f64,
+        f32 => .f32,
+        f16 => .f16,
+        i64 => .i64,
+        i32 => .i32,
+        i8 => .i8,
+        else => @compileError("ScalarType not supported"),
+    };
+}
+
 pub fn constant(graph: *Graph, literal: var) !Tensor {
-    const tensor = try eager.constant(&graph.arena.allocator, literal);
-    try graph.constants.append(CpuTensorUnion.init(tensor));
+    const eager_tensor = try eager.constant(&graph.arena.allocator, literal);
+    try graph.constants.append(CpuTensorUnion.init(eager_tensor));
     return Tensor{
         .tensorType = .{ .constant = graph.constants.len - 1 },
-        .shape = tensor.shape,
+        .shape = eager_tensor.shape,
+        .scalarType = tensorScalarType(@TypeOf(eager_tensor).ScalarType),
     };
 }
 
@@ -24,6 +40,9 @@ test "constant scalar" {
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, 5));
     std.testing.expectEqual(x.shape, &[_]usize{});
+    std.testing.expectEqual(x.scalarType, .f64);
+    const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
+    expect(std.mem.eql(u8, actualString, "Tensor(f64)"));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{x} });
@@ -44,6 +63,9 @@ test "constant array" {
         .{ 5, 6 },
     });
     std.testing.expect(std.mem.eql(usize, x.shape, &[_]usize{ 3, 2 }));
+    std.testing.expectEqual(x.scalarType, .f32);
+    const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
+    expect(std.mem.eql(u8, actualString, "Tensor([3][2]f32)"));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{x} });

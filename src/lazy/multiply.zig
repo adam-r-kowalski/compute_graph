@@ -83,6 +83,8 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 pub fn multiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     if (!std.mem.eql(usize, x.shape, y.shape))
         return error.ShapeMismatch;
+    if (x.scalarType != y.scalarType)
+        return error.ScalarTypeMismatch;
     var multiply_operation = try graph.arena.allocator.create(Multiply);
     multiply_operation.* = .{
         .operation = .{
@@ -96,6 +98,7 @@ pub fn multiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = x.shape,
+        .scalarType = x.scalarType,
     };
 }
 

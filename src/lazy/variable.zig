@@ -11,5 +11,6 @@ pub fn variable(graph: *Graph, initial_value: Tensor) !Tensor {
     return Tensor{
         .tensorType = .{ .variable = graph.variables.len - 1 },
         .shape = initial_value.shape,
+        .scalarType = initial_value.scalarType,
     };
 }

@@ -13,6 +13,8 @@ pub const Assign = struct {
 pub fn assign(graph: *Graph, variable: Tensor, value: Tensor) !Tensor {
     if (!std.mem.eql(usize, variable.shape, value.shape))
         return error.ShapeMismatch;
+    if (variable.scalarType != value.scalarType)
+        return error.ScalarTypeMismatch;
     try graph.assigns.append(Assign{
         .variable = variable,
         .value = value,
@@ -20,6 +22,7 @@ pub fn assign(graph: *Graph, variable: Tensor, value: Tensor) !Tensor {
     return Tensor{
         .tensorType = .{ .assign = graph.assigns.len - 1 },
         .shape = variable.shape,
+        .scalarType = variable.scalarType,
     };
 }
 
@@ -39,6 +42,7 @@ test "assign" {
     });
     const b = try variable(&graph, a);
     std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
+    std.testing.expectEqual(b.scalarType, .f64);
     const c = try constant(&graph, [_][2]f64{
         .{ 1, 1 },
         .{ 1, 1 },
@@ -46,6 +50,7 @@ test "assign" {
     const d = try add(&graph, b, c);
     const e = try assign(&graph, b, d);
     std.testing.expect(std.mem.eql(usize, e.shape, &[_]usize{ 2, 2 }));
+    std.testing.expectEqual(e.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
 
@@ -93,7 +98,7 @@ test "linear regression" {
     const m = try variable(&graph, try constant(&graph, @as(f64, 8)));
     const b = try variable(&graph, try constant(&graph, @as(f64, 6)));
 
-    const x = try placeholder(&graph, &[_]usize{});
+    const x = try placeholder(&graph, &[_]usize{}, .f64);
     const xs = [_]Tensor{
         try constant(&graph, @as(f64, 0)),
         try constant(&graph, @as(f64, 1)),
@@ -102,7 +107,7 @@ test "linear regression" {
         try constant(&graph, @as(f64, 4)),
     };
 
-    const y = try placeholder(&graph, &[_]usize{});
+    const y = try placeholder(&graph, &[_]usize{}, .f64);
     const ys = [_]Tensor{
         try constant(&graph, @as(f64, 1)),
         try constant(&graph, @as(f64, 3)),
