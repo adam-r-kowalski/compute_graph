@@ -79,9 +79,36 @@ test "sum rank 3" {
         },
     });
     const actual = try sum(i8, &arena.allocator, x);
-    std.debug.warn("\n{}\n", .{actual});
     const expected = try constant(&arena.allocator, @as(i8, 56));
     expectEqual(i8, actual, expected);
+}
+
+pub fn sumBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
+    std.debug.assert(context.forward_inputs.len == 1);
+    const input = context.forward_inputs[0];
+    const outputs = try context.allocator.alloc(CpuTensor(T), 1);
+    errdefer context.allocator.free(outputs);
+
+    switch (context.gradient_input.storage) {
+        .scalar => |scalar| {
+            outputs[0] = CpuTensor(T){
+                .shape = input.shape,
+                .stride = input.stride,
+                .storage = .{ .scalar = scalar },
+            };
+        },
+        .array => |array| {
+            const input_array = input.storage.array;
+            var new_array = try context.allocator.alloc(T, input_array.len);
+            for (new_array) |*e, i| e.* = input_array.len * array[i];
+            outputs[0] = CpuTensor(T){
+                .shape = input.shape,
+                .stride = input.stride,
+                .storage = .{ .array = new_array },
+            };
+        },
+    }
+    return outputs;
 }
 
 
