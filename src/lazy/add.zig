@@ -114,6 +114,7 @@ test "add scalar" {
     const y = try constant(&graph, @as(f64, 10));
     const z = try add(&graph, x, y);
     std.testing.expectEqual(z.shape, &[_]usize{});
+    std.testing.expectEqual(z.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -136,6 +137,7 @@ test "add matrix" {
     });
     const z = try add(&graph, x, x);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
+    std.testing.expectEqual(z.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -162,6 +164,7 @@ test "add matrix i32" {
     });
     const z = try add(&graph, x, x);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
+    std.testing.expectEqual(z.scalarType, .i32);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
@@ -193,6 +196,7 @@ test "gradient add" {
     });
     const c = try add(&graph, a, b);
     std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
+    std.testing.expectEqual(c.scalarType, .f64);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{ 2, 2 }));
@@ -227,6 +231,28 @@ test "add matrix shape mismatch" {
     });
     _ = add(&graph, x, y) catch |err| switch (err) {
         error.ShapeMismatch => {},
+        else => unreachable,
+    };
+}
+
+test "add matrix scalar type mismatch" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, [_][2]f64{
+        .{ 1, -2 },
+        .{ 3, -4 },
+    });
+    const y = try constant(&graph, [_][2]f32{
+        .{ 1, -2 },
+        .{ 3, -4 },
+    });
+    _ = add(&graph, x, y) catch |err| switch (err) {
+        error.ScalarTypeMismatch => {},
         else => unreachable,
     };
 }

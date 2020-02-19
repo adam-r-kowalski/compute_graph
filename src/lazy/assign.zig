@@ -42,6 +42,7 @@ test "assign" {
     });
     const b = try variable(&graph, a);
     std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
+    std.testing.expectEqual(b.scalarType, .f64);
     const c = try constant(&graph, [_][2]f64{
         .{ 1, 1 },
         .{ 1, 1 },
@@ -49,6 +50,7 @@ test "assign" {
     const d = try add(&graph, b, c);
     const e = try assign(&graph, b, d);
     std.testing.expect(std.mem.eql(usize, e.shape, &[_]usize{ 2, 2 }));
+    std.testing.expectEqual(e.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
 

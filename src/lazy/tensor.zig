@@ -15,12 +15,7 @@ const TensorType = union(enum) {
 };
 
 pub const ScalarType = enum {
-    f64,
-    f32,
-    f16,
-    i64,
-    i32,
-    i8
+    f64, f32, f16, i64, i32, i8
 };
 
 pub const Tensor = struct {
@@ -41,7 +36,7 @@ pub const Tensor = struct {
         const len = self.shape.len;
         while (i < len) : (i += 1)
             try std.fmt.format(context, Errors, output, "[{}]", .{self.shape[i]});
-        switch(self.scalarType) {
+        switch (self.scalarType) {
             .f64 => try std.fmt.format(context, Errors, output, "f64", .{}),
             .f32 => try std.fmt.format(context, Errors, output, "f32", .{}),
             .f16 => try std.fmt.format(context, Errors, output, "f16", .{}),

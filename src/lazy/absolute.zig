@@ -95,6 +95,7 @@ test "absolute scalar" {
     const x = try constant(&graph, @as(f64, -5));
     const y = try absolute(&graph, x);
     std.testing.expectEqual(y.shape, &[_]usize{});
+    std.testing.expectEqual(y.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
@@ -117,6 +118,7 @@ test "absolute matrix" {
     });
     const y = try absolute(&graph, x);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
+    std.testing.expectEqual(y.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
@@ -142,6 +144,7 @@ test "absolute matrix i32" {
         .{ -5, 6 },
     });
     const y = try absolute(&graph, x);
+    std.testing.expectEqual(y.scalarType, .i32);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -170,6 +173,7 @@ test "gradient absolute" {
     });
     const b = try absolute(&graph, a);
     std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
+    std.testing.expectEqual(b.scalarType, .f64);
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{ 2, 2 }));

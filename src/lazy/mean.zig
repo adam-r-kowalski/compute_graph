@@ -69,7 +69,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 }
 
 fn tensorScalarType(scalarType: ScalarType) ScalarType {
-    return switch(scalarType) {
+    return switch (scalarType) {
         .f64 => .f64,
         .f32 => .f32,
         .f16 => .f16,
