@@ -89,21 +89,24 @@ pub fn sumBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(
     const outputs = try context.allocator.alloc(CpuTensor(T), 1);
     errdefer context.allocator.free(outputs);
 
-    switch (context.gradient_input.storage) {
+    const shape = input.shape;
+    const stride = input.stride;
+    const gradient = context.gradient_input.storage.scalar;
+
+    switch (input.storage) {
         .scalar => |scalar| {
             outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
-                .storage = .{ .scalar = scalar },
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .scalar = gradient },
             };
         },
         .array => |array| {
-            const input_array = input.storage.array;
-            var new_array = try context.allocator.alloc(T, input_array.len);
-            for (new_array) |*e, i| e.* = input_array.len * array[i];
+            var new_array = try context.allocator.alloc(T, array.len);
+            for (new_array) |*e, i| e.* = gradient;
             outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
+                .shape = shape,
+                .stride = stride,
                 .storage = .{ .array = new_array },
             };
         },
@@ -111,62 +114,50 @@ pub fn sumBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(
     return outputs;
 }
 
+test "sum backward rank 0" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(&arena.allocator, @as(f64, 4));
+    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const actual = try sumBackward(f64, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+    });
+    const expected = try constant(&arena.allocator, @as(f64, 1));
+    expectEqual(f64, actual[0], expected);
+}
 
-// pub fn sumBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
-//     std.debug.assert(context.forward_inputs.len == 1);
-//     const input = context.forward_inputs[0];
-//     const outputs = try context.allocator.alloc(CpuTensor(T), 1);
-//     errdefer context.allocator.free(outputs);
-//     const scalar = context.gradient_input.storage.scalar;
-//     const value = scalar / @intToFloat(T, length(T, input));
-//     outputs[0] = try fill(T, context.allocator, value, context.forward_inputs[0].shape);
-//     return outputs;
-// }
+test "sum backward rank 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(&arena.allocator, [_]f64{ 1, 2, 3, 4, 5 });
+    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const actual = try sumBackward(f64, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+    });
+    const expected = try constant(&arena.allocator, [_]f64{ 1, 1, 1, 1, 1 });
+    expectEqual(f64, actual[0], expected);
+}
 
-// test "sum backward rank 0" {
-//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//     const forward_input = try constant(&arena.allocator, @as(f64, 4));
-//     const gradient_input = try constant(&arena.allocator, @as(f64, 1));
-//     const actual = try sumBackward(f64, backward.Context(f64){
-//         .allocator = &arena.allocator,
-//         .gradient_input = gradient_input,
-//         .forward_inputs = &[_]CpuTensor(f64){forward_input},
-//     });
-//     const expected = try constant(&arena.allocator, @as(f64, 1));
-//     expectEqual(f64, actual[0], expected);
-// }
-
-// test "sum backward rank 1" {
-//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//     const forward_input = try constant(&arena.allocator, [_]f64{ 1, 2, 3, 4, 5 });
-//     const gradient_input = try constant(&arena.allocator, @as(f64, 1));
-//     const actual = try sumBackward(f64, backward.Context(f64){
-//         .allocator = &arena.allocator,
-//         .gradient_input = gradient_input,
-//         .forward_inputs = &[_]CpuTensor(f64){forward_input},
-//     });
-//     const expected = try constant(&arena.allocator, [_]f64{ 0.2, 0.2, 0.2, 0.2, 0.2 });
-//     expectEqual(f64, actual[0], expected);
-// }
-
-// test "sum backward rank 2" {
-//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//     const forward_input = try constant(&arena.allocator, [_][2]f64{
-//         .{ 1, 2 },
-//         .{ 3, 4 },
-//     });
-//     const gradient_input = try constant(&arena.allocator, @as(f64, 1));
-//     const actual = try sumBackward(f64, backward.Context(f64){
-//         .allocator = &arena.allocator,
-//         .gradient_input = gradient_input,
-//         .forward_inputs = &[_]CpuTensor(f64){forward_input},
-//     });
-//     const expected = try constant(&arena.allocator, [_][2]f64{
-//         .{ 0.25, 0.25 },
-//         .{ 0.25, 0.25 },
-//     });
-//     expectEqual(f64, actual[0], expected);
-// }
+test "sum backward rank 2" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(&arena.allocator, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const actual = try sumBackward(f64, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+    });
+    const expected = try constant(&arena.allocator, [_][2]f64{
+        .{ 1, 1 },
+        .{ 1, 1 },
+    });
+    expectEqual(f64, actual[0], expected);
+}

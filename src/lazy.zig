@@ -18,6 +18,7 @@ pub const Session = @import("lazy/session.zig").Session;
 pub const subtract = @import("lazy/subtract.zig").subtract;
 pub const sine = @import("lazy/sine.zig").sine;
 pub const sigmoid = @import("lazy/sigmoid.zig").sigmoid;
+pub const sum = @import("lazy/sum.zig").sum;
 pub const Tensor = @import("lazy/tensor.zig").Tensor;
 
 test "" {
