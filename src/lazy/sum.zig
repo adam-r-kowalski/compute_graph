@@ -68,7 +68,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
-pub fn sum(graph: *Graph, x: Tensor) !Tensor {
+pub fn sum(graph: *Graph, x: Tensor, dimension: ?usize) !Tensor {
     var sum_operation = try graph.arena.allocator.create(Sum);
     sum_operation.* = .{
         .operation = .{
@@ -95,7 +95,7 @@ test "sum scalar" {
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, -5));
-    const y = try sum(&graph, x);
+    const y = try sum(&graph, x, null);
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -117,7 +117,7 @@ test "sum matrix" {
         .{ 7, 8 },
         .{ 10, 8 },
     });
-    const y = try sum(&graph, x);
+    const y = try sum(&graph, x, null);
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -139,7 +139,7 @@ test "sum matrix i32" {
         .{ 7, 8 },
         .{ 10, 8 },
     });
-    const y = try sum(&graph, x);
+    const y = try sum(&graph, x, null);
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -161,7 +161,7 @@ test "gradient sum" {
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const b = try sum(&graph, a);
+    const b = try sum(&graph, a, null);
     std.testing.expectEqual(b.shape, &[_]usize{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
@@ -188,7 +188,7 @@ test "gradient sum with multiply" {
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const b = try sum(&graph, a);
+    const b = try sum(&graph, a, null);
     const c = try constant(&graph, @as(f64, 5));
     const d = try multiply(&graph, b, c);
     std.testing.expectEqual(b.shape, &[_]usize{});
