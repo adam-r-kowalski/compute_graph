@@ -11,10 +11,6 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const Cache = std.AutoHashMap(Tensor, CpuTensorUnion);
 const GradientCaches = std.AutoHashMap(usize, Cache);
 pub const Environment = std.AutoHashMap(Tensor, Tensor);
-const ExecutionContext = struct {
-    tensors: []const Tensor,
-    environment: Environment = Environment.init(std.heap.page_allocator),
-};
 
 fn getValue(comptime Map: type, comptime Key: type, comptime Value: type, map: Map, key: Key) !Value {
     if (map.getValue(key)) |value| return value;
@@ -66,14 +62,14 @@ const ExecutionOrder = struct {
     }
 };
 
-fn executionOrder(session: Session, context: ExecutionContext) ![]const Tensor {
+fn executionOrder(session: Session, tensors: []const Tensor, environment: Environment) ![]const Tensor {
     var execution_order = ExecutionOrder.Tensors.init(&session.arena.allocator);
     errdefer execution_order.deinit();
     var visited = ExecutionOrder.Visited.init(session.arena.child_allocator);
     defer visited.deinit();
-    for (context.tensors) |tensor|
+    for (tensors) |tensor|
         if (!visited.contains(tensor))
-            try ExecutionOrder.recurse(&execution_order, &visited, session.graph, context.environment, tensor);
+            try ExecutionOrder.recurse(&execution_order, &visited, session.graph, environment, tensor);
     return execution_order.toSlice();
 }
 
@@ -83,6 +79,8 @@ test "execution order" {
     const multiply = @import("multiply.zig").multiply;
     const subtract = @import("subtract.zig").subtract;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const m = try constant(&graph, @as(f64, 3));
@@ -94,7 +92,8 @@ test "execution order" {
     const loss = try subtract(&graph, y, y_hat);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const execution_order = try executionOrder(session, .{ .tensors = &[_]Tensor{loss} });
+    const environment = Environment.init(&arena.allocator);
+    const execution_order = try executionOrder(session, &[_]Tensor{loss}, environment);
     std.testing.expectEqual(execution_order.len, 7);
     std.testing.expectEqual(execution_order[0], y);
     std.testing.expectEqual(execution_order[1], m);
@@ -118,7 +117,8 @@ test "execution order gradient" {
     const c = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const execution_order = try executionOrder(session, .{ .tensors = &[_]Tensor{c[0]} });
+    const environment = Environment.init(&arena.allocator);
+    const execution_order = try executionOrder(session, &[_]Tensor{c[0]}, environment);
     std.testing.expectEqual(execution_order.len, 3);
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], b);
@@ -137,7 +137,8 @@ test "execution order variable" {
     const b = try variable(&graph, a);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const execution_order = try executionOrder(session, .{ .tensors = &[_]Tensor{b} });
+    const environment = Environment.init(&arena.allocator);
+    const execution_order = try executionOrder(session, &[_]Tensor{b}, environment);
     std.testing.expectEqual(execution_order.len, 2);
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], b);
@@ -158,7 +159,8 @@ test "execution order assign" {
     const d = try assign(&graph, c, b);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const execution_order = try executionOrder(session, .{ .tensors = &[_]Tensor{ d, c } });
+    const environment = Environment.init(&arena.allocator);
+    const execution_order = try executionOrder(session, &[_]Tensor{ d, c }, environment);
     std.testing.expectEqual(execution_order.len, 4);
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], c);
@@ -170,6 +172,8 @@ test "execution order repeated tensors" {
     const constant = @import("constant.zig").constant;
     const add = @import("add.zig").add;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const a = try constant(&graph, @as(f64, 3));
@@ -178,7 +182,8 @@ test "execution order repeated tensors" {
     const d = try add(&graph, c, c);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const execution_order = try executionOrder(session, .{ .tensors = &[_]Tensor{d} });
+    const environment = Environment.init(&arena.allocator);
+    const execution_order = try executionOrder(session, &[_]Tensor{d}, environment);
     std.testing.expectEqual(execution_order.len, 4);
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], b);
@@ -190,6 +195,8 @@ test "execution order placeholder" {
     const constant = @import("constant.zig").constant;
     const placeholder = @import("placeholder.zig").placeholder;
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const a = try constant(&graph, @as(f64, 3));
@@ -200,20 +207,14 @@ test "execution order placeholder" {
 
     var environment = Environment.init(&session.arena.allocator);
     try environment.putNoClobber(c, a);
-    const execution_order = try executionOrder(session, .{
-        .tensors = &[_]Tensor{c},
-        .environment = environment,
-    });
+    const execution_order = try executionOrder(session, &[_]Tensor{c}, environment);
     std.testing.expectEqual(execution_order.len, 2);
     std.testing.expectEqual(execution_order[0], a);
     std.testing.expectEqual(execution_order[1], c);
 
     var environment2 = Environment.init(&session.arena.allocator);
     try environment2.putNoClobber(c, b);
-    const execution_order2 = try executionOrder(session, .{
-        .tensors = &[_]Tensor{c},
-        .environment = environment2,
-    });
+    const execution_order2 = try executionOrder(session, &[_]Tensor{c}, environment2);
     std.testing.expectEqual(execution_order2.len, 2);
     std.testing.expectEqual(execution_order2[0], b);
     std.testing.expectEqual(execution_order2[1], c);
@@ -363,14 +364,18 @@ pub const Session = struct {
         child_allocator.destroy(self.arena);
     }
 
-    pub fn run(self: *Session, context: ExecutionContext) ![]CpuTensorUnion {
+    const RunParameters = struct {
+        environment: Environment = Environment.init(std.heap.page_allocator),
+    };
+
+    pub fn run(self: *Session, tensors: []const Tensor, parameters: RunParameters) ![]CpuTensorUnion {
         const allocator = &self.arena.allocator;
         const graph = self.graph;
         var cache = Cache.init(allocator);
         defer cache.deinit();
         var gradient_caches = GradientCaches.init(allocator);
         defer gradient_caches.deinit();
-        const execution_order = try executionOrder(self.*, context);
+        const execution_order = try executionOrder(self.*, tensors, parameters.environment);
         for (execution_order) |current_tensor| {
             switch (current_tensor.tensorType) {
                 .constant => |index| try runConstant(self.*, &cache, index, current_tensor),
@@ -385,12 +390,12 @@ pub const Session = struct {
                 }),
                 .variable => |index| try runVariable(self.*, &cache, index, current_tensor),
                 .assign => |index| try runAssign(self, &cache, index, current_tensor),
-                .placeholder => try runPlaceholder(self.*, &cache, context.environment, current_tensor),
+                .placeholder => try runPlaceholder(self.*, &cache, parameters.environment, current_tensor),
             }
         }
-        const outputs = try self.arena.allocator.alloc(CpuTensorUnion, context.tensors.len);
+        const outputs = try self.arena.allocator.alloc(CpuTensorUnion, tensors.len);
         errdefer self.arena.allocator.free(outputs);
-        for (context.tensors) |tensor, index| outputs[index] = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
+        for (tensors) |tensor, index| outputs[index] = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
         return outputs;
     }
 };
@@ -435,7 +440,7 @@ test "session run" {
     const gradients = try gradient(&graph, loss, &[_]Tensor{ m, b });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{ loss, gradients[0], gradients[1] } });
+    const actual = try session.run(&[_]Tensor{ loss, gradients[0], gradients[1] }, .{});
     const expected_loss = try eager.constant(&arena.allocator, @as(f64, 26));
     const expected_m_gradient = try eager.constant(&arena.allocator, [_][3]f64{
         .{ 1 / 3., 2 / 3., 1 },
@@ -467,7 +472,7 @@ test "variable" {
     const b = try variable(&graph, a);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{b} });
+    const actual = try session.run(&[_]Tensor{b}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -504,7 +509,7 @@ test "duplicate" {
     const gradients = try gradient(&graph, g, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 3.5, 4 },
         .{ 4.5, 5 },

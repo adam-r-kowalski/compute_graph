@@ -126,7 +126,7 @@ test "matrixMultiply identity" {
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, [_][1]f64{
         .{1},
         .{2},
@@ -157,7 +157,7 @@ test "matrixMultiply flip" {
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, [_][1]f64{
         .{1},
         .{-2},
@@ -189,7 +189,7 @@ test "matrixMultiply flip" {
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 4, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 18, 41 },
         .{ 27, 65 },
@@ -224,7 +224,7 @@ test "gradient matrix multiply" {
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients, .{});
     const expected_a_gradient = try eager.constant(&arena.allocator, [_][3]f64{
         .{ 3.75, 4.75, 5.75 },
         .{ 3.75, 4.75, 5.75 },

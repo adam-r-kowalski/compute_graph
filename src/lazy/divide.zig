@@ -117,7 +117,7 @@ test "divide scalar" {
     std.testing.expectEqual(z.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, @as(f64, 0.5));
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -145,7 +145,7 @@ test "divide matrix" {
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0.1666, 0.4 },
         .{ 0.75, 1.3333 },
@@ -177,7 +177,7 @@ test "divide matrix i32" {
     std.testing.expectEqual(z.scalarType, .i32);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f32{
         .{ 0.1666, 0.4 },
         .{ 0.75, 1.3333 },
@@ -211,7 +211,7 @@ test "gradient divide" {
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients, .{});
     const expected_a_gradient = try eager.constant(&arena.allocator, [_][3]f64{
         .{ 0.0238, 0.02083, 0.0185 },
         .{ 0.0166, 0.0151, 0.0138 },
