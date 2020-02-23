@@ -73,7 +73,11 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
-pub fn sum(graph: *Graph, x: Tensor, dimension: ?usize) !Tensor {
+const SumParameters = struct {
+    dimension: ?usize = null,
+};
+
+pub fn sum(graph: *Graph, x: Tensor, parameters: SumParameters) !Tensor {
     var allocator = &graph.arena.allocator;
     var sum_operation = try allocator.create(Sum);
     sum_operation.* = .{
@@ -83,10 +87,10 @@ pub fn sum(graph: *Graph, x: Tensor, dimension: ?usize) !Tensor {
             .backward = backward,
         },
         .inputs = .{x},
-        .dimension = dimension,
+        .dimension = parameters.dimension,
     };
     try graph.operations.append(&sum_operation.operation);
-    const shape = try newShape(allocator, x.shape, dimension);
+    const shape = try newShape(allocator, x.shape, parameters.dimension);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = shape,
@@ -103,7 +107,7 @@ test "sum scalar" {
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const x = try constant(&graph, @as(f64, -5));
-    const y = try sum(&graph, x, null);
+    const y = try sum(&graph, x, .{});
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -125,7 +129,7 @@ test "sum matrix" {
         .{ 7, 8 },
         .{ 10, 8 },
     });
-    const y = try sum(&graph, x, null);
+    const y = try sum(&graph, x, .{});
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -147,7 +151,7 @@ test "sum matrix i32" {
         .{ 7, 8 },
         .{ 10, 8 },
     });
-    const y = try sum(&graph, x, null);
+    const y = try sum(&graph, x, .{});
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -174,7 +178,7 @@ test "sum rank 3 accross 0 dimension" {
             .{ 7, 8 },
         },
     });
-    const y = try sum(&graph, x, 0);
+    const y = try sum(&graph, x, .{ .dimension = 0 });
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -204,7 +208,7 @@ test "sum rank 3 accross 1 dimension" {
             .{ 7, 8 },
         },
     });
-    const y = try sum(&graph, x, 1);
+    const y = try sum(&graph, x, .{ .dimension = 1 });
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -234,7 +238,7 @@ test "sum rank 3 accross 2 dimension" {
             .{ 7, 8 },
         },
     });
-    const y = try sum(&graph, x, 2);
+    const y = try sum(&graph, x, .{ .dimension = 2 });
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -259,7 +263,7 @@ test "gradient sum" {
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const b = try sum(&graph, a, null);
+    const b = try sum(&graph, a, .{});
     std.testing.expectEqual(b.shape, &[_]usize{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
@@ -286,7 +290,7 @@ test "gradient sum with multiply" {
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const b = try sum(&graph, a, null);
+    const b = try sum(&graph, a, .{});
     const c = try constant(&graph, @as(f64, 5));
     const d = try multiply(&graph, b, c);
     std.testing.expectEqual(b.shape, &[_]usize{});
@@ -312,7 +316,7 @@ test "gradient sum rank 1 with multiply" {
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const a = try constant(&graph, [_]f64{ 1, 2, 3, 4 });
-    const b = try sum(&graph, a, null);
+    const b = try sum(&graph, a, .{});
     const c = try constant(&graph, @as(f64, 5));
     const d = try multiply(&graph, b, c);
     std.testing.expectEqual(b.shape, &[_]usize{});
@@ -335,7 +339,7 @@ test "gradient sum rank 1 dimension 0 with multiply" {
     var graph = try Graph.init(allocator);
     defer graph.deinit();
     const a = try constant(&graph, [_]f64{ 1, 2, 3, 4 });
-    const b = try sum(&graph, a, 0);
+    const b = try sum(&graph, a, .{ .dimension = 0 });
     const c = try constant(&graph, @as(f64, 5));
     const d = try multiply(&graph, b, c);
     std.testing.expectEqual(b.shape, &[_]usize{});
@@ -368,7 +372,7 @@ test "gradient sum rank 3 dimension 0 with multiply" {
             .{ 7, 8 },
         },
     });
-    const b = try sum(&graph, a, 0);
+    const b = try sum(&graph, a, .{ .dimension = 0 });
     const c = try constant(&graph, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -414,7 +418,7 @@ test "gradient sum rank 3 dimension 1 with multiply" {
             .{ 7, 8 },
         },
     });
-    const b = try sum(&graph, a, 1);
+    const b = try sum(&graph, a, .{ .dimension = 1 });
     const c = try constant(&graph, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -460,7 +464,7 @@ test "gradient sum rank 3 dimension 2 with multiply" {
             .{ 7, 8 },
         },
     });
-    const b = try sum(&graph, a, 2);
+    const b = try sum(&graph, a, .{ .dimension = 2 });
     const c = try constant(&graph, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
