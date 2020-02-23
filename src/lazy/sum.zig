@@ -301,6 +301,52 @@ test "gradient sum with multiply" {
     expectEqual(f64, actual[0].f64, expected);
 }
 
+test "gradient sum rank 1 with multiply" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const multiply = @import("multiply.zig").multiply;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_]f64{ 1, 2, 3, 4 });
+    const b = try sum(&graph, a, null);
+    const c = try constant(&graph, @as(f64, 5));
+    const d = try multiply(&graph, b, c);
+    std.testing.expectEqual(b.shape, &[_]usize{});
+    const gradients = try gradient(&graph, d, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{gradients[0]} });
+    const expected = try eager.constant(&arena.allocator, [_]f64{ 5, 5, 5, 5 });
+    expectEqual(f64, actual[0].f64, expected);
+}
+
+test "gradient sum rank 1 dimension 0 with multiply" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const multiply = @import("multiply.zig").multiply;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_]f64{ 1, 2, 3, 4 });
+    const b = try sum(&graph, a, 0);
+    const c = try constant(&graph, @as(f64, 5));
+    const d = try multiply(&graph, b, c);
+    std.testing.expectEqual(b.shape, &[_]usize{});
+    const gradients = try gradient(&graph, d, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{gradients[0]} });
+    const expected = try eager.constant(&arena.allocator, [_]f64{ 5, 5, 5, 5 });
+    expectEqual(f64, actual[0].f64, expected);
+}
+
 test "gradient sum rank 3 axis 0 with multiply" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;

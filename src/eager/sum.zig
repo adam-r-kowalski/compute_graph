@@ -326,73 +326,75 @@ pub fn sumBackward(comptime T: type, dimension: ?usize, context: backward.Contex
     const stride = input.stride;
 
     if (dimension) |d| {
-        const array = try allocator.alloc(T, input.storage.array.len);
-        errdefer allocator.free(array);
+        if (shape.len > 1) {
+            const array = try allocator.alloc(T, input.storage.array.len);
+            errdefer allocator.free(array);
 
-        const gradient_array = context.gradient_input.storage.array;
+            const gradient_array = context.gradient_input.storage.array;
 
-        var gradient_cartesian_index = try allocator.alloc(usize, shape.len - 1);
-        defer allocator.free(gradient_cartesian_index);
-        for (gradient_cartesian_index) |*e| e.* = 0;
+            var gradient_cartesian_index = try allocator.alloc(usize, shape.len - 1);
+            defer allocator.free(gradient_cartesian_index);
+            for (gradient_cartesian_index) |*e| e.* = 0;
 
-        var array_cartesian_index = try allocator.alloc(usize, shape.len);
-        defer allocator.free(array_cartesian_index);
+            var array_cartesian_index = try allocator.alloc(usize, shape.len);
+            defer allocator.free(array_cartesian_index);
 
-        const gradient_shape = context.gradient_input.shape;
+            const gradient_shape = context.gradient_input.shape;
 
-        while (true) {
-            for (array_cartesian_index) |*e, i| {
-                if (i < d) {
-                    e.* = gradient_cartesian_index[i];
-                } else if (i > d) {
-                    e.* = gradient_cartesian_index[i - 1];
-                } else {
-                    e.* = 0;
+            while (true) {
+                for (array_cartesian_index) |*e, i| {
+                    if (i < d) {
+                        e.* = gradient_cartesian_index[i];
+                    } else if (i > d) {
+                        e.* = gradient_cartesian_index[i - 1];
+                    } else {
+                        e.* = 0;
+                    }
                 }
+
+                const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
+
+                var i: usize = 0;
+                while (i < shape[d]) {
+                    array_cartesian_index[d] = i;
+                    const array_linear_index = linearIndex(stride, array_cartesian_index);
+                    array[array_linear_index] = gradient_array[gradient_linear_index];
+                    i += 1;
+                }
+
+                if (maximumCartesianIndex(gradient_shape, gradient_cartesian_index)) break;
+                incrementCartesianIndex(gradient_shape, gradient_cartesian_index);
             }
 
-            const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
-
-            var i: usize = 0;
-            while (i < shape[d]) {
-                array_cartesian_index[d] = i;
-                const array_linear_index = linearIndex(stride, array_cartesian_index);
-                array[array_linear_index] = gradient_array[gradient_linear_index];
-                i += 1;
-            }
-
-            if (maximumCartesianIndex(gradient_shape, gradient_cartesian_index)) break;
-            incrementCartesianIndex(gradient_shape, gradient_cartesian_index);
-        }
-
-        outputs[0] = CpuTensor(T){
-            .shape = shape,
-            .stride = stride,
-            .storage = .{ .array = array },
-        };
-    } else {
-        const gradient = context.gradient_input.storage.scalar;
-        switch (input.storage) {
-            .scalar => |scalar| {
-                outputs[0] = CpuTensor(T){
-                    .shape = shape,
-                    .stride = stride,
-                    .storage = .{ .scalar = gradient },
-                };
-            },
-            .array => |array| {
-                const new_array = try allocator.alloc(T, array.len);
-                errdefer allocator.free(new_array);
-                for (new_array) |*e, i| e.* = gradient;
-                outputs[0] = CpuTensor(T){
-                    .shape = shape,
-                    .stride = stride,
-                    .storage = .{ .array = new_array },
-                };
-            },
+            outputs[0] = CpuTensor(T){
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .array = array },
+            };
+            return outputs;
         }
     }
 
+    const gradient = context.gradient_input.storage.scalar;
+    switch (input.storage) {
+        .scalar => |scalar| {
+            outputs[0] = CpuTensor(T){
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .scalar = gradient },
+            };
+        },
+        .array => |array| {
+            const new_array = try allocator.alloc(T, array.len);
+            errdefer allocator.free(new_array);
+            for (new_array) |*e, i| e.* = gradient;
+            outputs[0] = CpuTensor(T){
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .array = new_array },
+            };
+        },
+    }
     return outputs;
 }
 
