@@ -24,12 +24,12 @@ fn inputs(operation: *const Operation) []const Tensor {
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
     return switch (context.values[0]) {
-        .f64 => |t| .{ .f64 = try eager.sum(f64, context.allocator, t) },
-        .f32 => |t| .{ .f32 = try eager.sum(f32, context.allocator, t) },
-        .f16 => |t| .{ .f16 = try eager.sum(f16, context.allocator, t) },
-        .i64 => |t| .{ .i64 = try eager.sum(i64, context.allocator, t) },
-        .i32 => |t| .{ .i32 = try eager.sum(i32, context.allocator, t) },
-        .i8 => |t| .{ .i8 = try eager.sum(i8, context.allocator, t) },
+        .f64 => |t| .{ .f64 = try eager.sum(f64, context.allocator, t, null) },
+        .f32 => |t| .{ .f32 = try eager.sum(f32, context.allocator, t, null) },
+        .f16 => |t| .{ .f16 = try eager.sum(f16, context.allocator, t, null) },
+        .i64 => |t| .{ .i64 = try eager.sum(i64, context.allocator, t, null) },
+        .i32 => |t| .{ .i32 = try eager.sum(i32, context.allocator, t, null) },
+        .i8 => |t| .{ .i8 = try eager.sum(i8, context.allocator, t, null) },
     };
 }
 
