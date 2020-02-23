@@ -38,11 +38,12 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
 }
 
 fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
+    const dimension = @fieldParentPtr(Sum, "operation", context.operation).dimension;
     const values = try context.allocator.alloc(CpuTensorUnion, 1);
     errdefer context.allocator.free(values);
     switch (context.gradient_input) {
         .f64 => |gradient_input| {
-            const gradients = try sumBackward(f64, EagerBackwardContext(f64){
+            const gradients = try sumBackward(f64, dimension, EagerBackwardContext(f64){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
@@ -50,7 +51,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f64 = gradients[0] };
         },
         .f32 => |gradient_input| {
-            const gradients = try sumBackward(f32, EagerBackwardContext(f32){
+            const gradients = try sumBackward(f32, dimension, EagerBackwardContext(f32){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
@@ -58,7 +59,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f32 = gradients[0] };
         },
         .f16 => |gradient_input| {
-            const gradients = try sumBackward(f16, EagerBackwardContext(f16){
+            const gradients = try sumBackward(f16, dimension, EagerBackwardContext(f16){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
@@ -296,6 +297,144 @@ test "gradient sum with multiply" {
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 5, 5 },
         .{ 5, 5 },
+    });
+    expectEqual(f64, actual[0].f64, expected);
+}
+
+test "gradient sum rank 3 axis 0 with multiply" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const multiply = @import("multiply.zig").multiply;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][2][2]f64{
+        .{
+            .{ 1, 2 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const b = try sum(&graph, a, 0);
+    const c = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const d = try multiply(&graph, b, c);
+    const e = try mean(&graph, d);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
+    const gradients = try gradient(&graph, e, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{gradients[0]} });
+    const expected = try eager.constant(&arena.allocator, [_][2][2]f64{
+        .{
+            .{ 0.25, 0.5 },
+            .{ 0.75, 1 },
+        },
+        .{
+            .{ 0.25, 0.5 },
+            .{ 0.75, 1 },
+        },
+    });
+    expectEqual(f64, actual[0].f64, expected);
+}
+
+test "gradient sum rank 3 axis 1 with multiply" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const multiply = @import("multiply.zig").multiply;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][2][2]f64{
+        .{
+            .{ 1, 2 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const b = try sum(&graph, a, 1);
+    const c = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const d = try multiply(&graph, b, c);
+    const e = try mean(&graph, d);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
+    const gradients = try gradient(&graph, e, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{gradients[0]} });
+    const expected = try eager.constant(&arena.allocator, [_][2][2]f64{
+        .{
+            .{ 0.25, 0.5 },
+            .{ 0.25, 0.5 },
+        },
+        .{
+            .{ 0.75, 1 },
+            .{ 0.75, 1 },
+        },
+    });
+    expectEqual(f64, actual[0].f64, expected);
+}
+
+test "gradient sum rank 3 axis 2 with multiply" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const multiply = @import("multiply.zig").multiply;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(&graph, [_][2][2]f64{
+        .{
+            .{ 1, 2 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const b = try sum(&graph, a, 2);
+    const c = try constant(&graph, [_][2]f64{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const d = try multiply(&graph, b, c);
+    const e = try mean(&graph, d);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
+    const gradients = try gradient(&graph, e, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{gradients[0]} });
+    const expected = try eager.constant(&arena.allocator, [_][2][2]f64{
+        .{
+            .{ 0.25, 0.25 },
+            .{ 0.5, 0.5 },
+        },
+        .{
+            .{ 0.75, 0.75 },
+            .{ 1, 1 },
+        },
     });
     expectEqual(f64, actual[0].f64, expected);
 }
