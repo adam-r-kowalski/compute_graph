@@ -6,30 +6,9 @@ const cpu_tensor = @import("cpu_tensor.zig");
 const CpuTensor = cpu_tensor.CpuTensor;
 const tensorLength = cpu_tensor.tensorLength;
 const tensorStride = cpu_tensor.tensorStride;
+const linearIndex = cpu_tensor.linearIndex;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
-
-fn linear_index(stride: []const usize, cartesian_index: []const usize) usize {
-    var index: usize = 0;
-    for (stride) |s, i| index += s * cartesian_index[i];
-    return index;
-}
-
-test "linear index" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const tensor = try constant(&arena.allocator, &[_][3]i32{
-        .{ 1, 2, 3 },
-        .{ 4, 5, 6 },
-    });
-    const stride = tensor.stride;
-    std.testing.expectEqual(linear_index(stride, &[_]usize{ 0, 0 }), 0);
-    std.testing.expectEqual(linear_index(stride, &[_]usize{ 0, 1 }), 1);
-    std.testing.expectEqual(linear_index(stride, &[_]usize{ 0, 2 }), 2);
-    std.testing.expectEqual(linear_index(stride, &[_]usize{ 1, 0 }), 3);
-    std.testing.expectEqual(linear_index(stride, &[_]usize{ 1, 1 }), 4);
-    std.testing.expectEqual(linear_index(stride, &[_]usize{ 1, 2 }), 5);
-}
 
 pub fn matrixMultiply(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     if (x.shape[1] != y.shape[0])
@@ -57,12 +36,12 @@ pub fn matrixMultiply(comptime T: type, allocator: *Allocator, x: CpuTensor(T), 
     while (i < m) : (i += 1) {
         var j: usize = 0;
         while (j < p) : (j += 1) {
-            const t_index = linear_index(tensor.stride, &[_]usize{ i, j });
+            const t_index = linearIndex(tensor.stride, &[_]usize{ i, j });
             tensor_array[t_index] = 0;
             var k: usize = 0;
             while (k < n) : (k += 1) {
-                const x_index = linear_index(x.stride, &[_]usize{ i, k });
-                const y_index = linear_index(y.stride, &[_]usize{ k, j });
+                const x_index = linearIndex(x.stride, &[_]usize{ i, k });
+                const y_index = linearIndex(y.stride, &[_]usize{ k, j });
                 tensor_array[t_index] += x_array[x_index] * y_array[y_index];
             }
         }
@@ -105,8 +84,8 @@ fn transpose(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !Cpu
     while (row < shape[0]) : (row += 1) {
         var column: usize = 0;
         while (column < shape[1]) : (column += 1) {
-            const index = linear_index(stride, &[_]usize{ row, column });
-            const tensor_index = linear_index(tensor.stride, &[_]usize{ column, row });
+            const index = linearIndex(stride, &[_]usize{ row, column });
+            const tensor_index = linearIndex(tensor.stride, &[_]usize{ column, row });
             array[index] = tensor_array[tensor_index];
         }
     }

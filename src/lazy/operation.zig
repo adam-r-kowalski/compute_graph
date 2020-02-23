@@ -8,6 +8,7 @@ pub const Operation = struct {
         ShapeMismatch,
         Overflow,
         OperationNotDefinedForScalarType,
+        InvalidDimension,
     };
 
     pub const BackwardError = error{

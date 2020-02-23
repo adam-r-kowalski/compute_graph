@@ -204,3 +204,19 @@ test "length rank 4" {
     const shape = [_]usize{ 3, 4, 5, 6 };
     expectEqual(tensorLength(shape[0..]), 360);
 }
+
+pub fn linearIndex(stride: []const usize, cartesian_index: []const usize) usize {
+    var index: usize = 0;
+    for (stride) |s, i| index += s * cartesian_index[i];
+    return index;
+}
+
+test "linear index" {
+    const stride = &[_]usize{ 3, 1 };
+    std.testing.expectEqual(linearIndex(stride, &[_]usize{ 0, 0 }), 0);
+    std.testing.expectEqual(linearIndex(stride, &[_]usize{ 0, 1 }), 1);
+    std.testing.expectEqual(linearIndex(stride, &[_]usize{ 0, 2 }), 2);
+    std.testing.expectEqual(linearIndex(stride, &[_]usize{ 1, 0 }), 3);
+    std.testing.expectEqual(linearIndex(stride, &[_]usize{ 1, 1 }), 4);
+    std.testing.expectEqual(linearIndex(stride, &[_]usize{ 1, 2 }), 5);
+}
