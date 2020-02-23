@@ -446,7 +446,7 @@ test "sum backward rank 2" {
     expectEqual(f64, actual[0], expected);
 }
 
-test "sum backward rank 3 axis 0" {
+test "sum backward rank 3 dimension 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(&arena.allocator, [_][2][2]f64{
@@ -481,7 +481,7 @@ test "sum backward rank 3 axis 0" {
     expectEqual(f64, actual[0], expected);
 }
 
-test "sum backward rank 3 axis 1" {
+test "sum backward rank 3 dimension 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(&arena.allocator, [_][2][2]f64{
@@ -516,7 +516,7 @@ test "sum backward rank 3 axis 1" {
     expectEqual(f64, actual[0], expected);
 }
 
-test "sum backward rank 3 axis 2" {
+test "sum backward rank 3 dimension 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(&arena.allocator, [_][2][2]f64{

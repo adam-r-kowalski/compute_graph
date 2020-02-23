@@ -347,7 +347,7 @@ test "gradient sum rank 1 dimension 0 with multiply" {
     expectEqual(f64, actual[0].f64, expected);
 }
 
-test "gradient sum rank 3 axis 0 with multiply" {
+test "gradient sum rank 3 dimension 0 with multiply" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const gradient = @import("gradient.zig").gradient;
@@ -393,7 +393,7 @@ test "gradient sum rank 3 axis 0 with multiply" {
     expectEqual(f64, actual[0].f64, expected);
 }
 
-test "gradient sum rank 3 axis 1 with multiply" {
+test "gradient sum rank 3 dimension 1 with multiply" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const gradient = @import("gradient.zig").gradient;
@@ -439,7 +439,7 @@ test "gradient sum rank 3 axis 1 with multiply" {
     expectEqual(f64, actual[0].f64, expected);
 }
 
-test "gradient sum rank 3 axis 2 with multiply" {
+test "gradient sum rank 3 dimension 2 with multiply" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
     const gradient = @import("gradient.zig").gradient;
