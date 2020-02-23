@@ -30,7 +30,7 @@ test "sigmoid scalar" {
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y}, .{});
     const expected = try eager.constant(&arena.allocator, @as(f64, 0.0066));
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -53,7 +53,7 @@ test "sigmoid matrix" {
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0.7310, 0.1192 },
         .{ 0.9525, 0.0179 },
@@ -83,7 +83,7 @@ test "gradient sigmoid" {
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0.0492, 0.0262 },
         .{ 0.0113, 0.0044 },

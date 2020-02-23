@@ -116,7 +116,7 @@ test "subtract scalar" {
     std.testing.expectEqual(z.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, @as(f64, -5));
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -143,7 +143,7 @@ test "subtract matrix" {
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 2, -4 },
         .{ 6, -8 },
@@ -174,7 +174,7 @@ test "subtract matrix i32" {
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ 2, -4 },
         .{ 6, -8 },
@@ -207,7 +207,7 @@ test "gradient subtract" {
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients, .{});
     const expected_a_gradient = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },

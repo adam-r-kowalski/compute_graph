@@ -48,8 +48,7 @@ test "placeholder" {
 
     var environment = Environment.init(&session.arena.allocator);
     try environment.putNoClobber(c, a);
-    const actual = try session.run(.{
-        .tensors = &[_]Tensor{c},
+    const actual = try session.run(&[_]Tensor{c}, .{
         .environment = environment,
     });
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
@@ -60,8 +59,7 @@ test "placeholder" {
 
     var environment2 = Environment.init(&session.arena.allocator);
     try environment2.putNoClobber(c, b);
-    const actual2 = try session.run(.{
-        .tensors = &[_]Tensor{c},
+    const actual2 = try session.run(&[_]Tensor{c}, .{
         .environment = environment2,
     });
     const expected2 = try eager.constant(&arena.allocator, [_][2]f64{

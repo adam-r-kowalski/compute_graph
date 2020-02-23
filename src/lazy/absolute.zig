@@ -98,7 +98,7 @@ test "absolute scalar" {
     std.testing.expectEqual(y.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y}, .{});
     const expected = try eager.constant(&arena.allocator, @as(f64, 5));
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -121,7 +121,7 @@ test "absolute matrix" {
     std.testing.expectEqual(y.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -148,7 +148,7 @@ test "absolute matrix i32" {
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y}, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]i32{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -179,7 +179,7 @@ test "gradient absolute" {
     std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{ 2, 2 }));
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients, .{});
     const expected = try eager.constant(&arena.allocator, [_][2]f64{
         .{ 0, -0.25 },
         .{ 0.25, -0.25 },
