@@ -6,7 +6,9 @@ const Tensor = tensor.Tensor;
 const ScalarType = tensor.ScalarType;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
-const sumBackward = @import("../eager/sum.zig").sumBackward;
+const eager_sum = @import("../eager/sum.zig");
+const sumBackward = eager_sum.sumBackward;
+const newShape = eager_sum.newShape;
 const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
@@ -15,6 +17,7 @@ const EagerBackwardContext = @import("../eager/backward.zig").Context;
 const Sum = struct {
     operation: Operation,
     inputs: [1]Tensor,
+    dimension: ?usize,
 };
 
 fn inputs(operation: *const Operation) []const Tensor {
@@ -23,13 +26,14 @@ fn inputs(operation: *const Operation) []const Tensor {
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
+    const dimension = @fieldParentPtr(Sum, "operation", context.operation).dimension;
     return switch (context.values[0]) {
-        .f64 => |t| .{ .f64 = try eager.sum(f64, context.allocator, t, null) },
-        .f32 => |t| .{ .f32 = try eager.sum(f32, context.allocator, t, null) },
-        .f16 => |t| .{ .f16 = try eager.sum(f16, context.allocator, t, null) },
-        .i64 => |t| .{ .i64 = try eager.sum(i64, context.allocator, t, null) },
-        .i32 => |t| .{ .i32 = try eager.sum(i32, context.allocator, t, null) },
-        .i8 => |t| .{ .i8 = try eager.sum(i8, context.allocator, t, null) },
+        .f64 => |t| .{ .f64 = try eager.sum(f64, context.allocator, t, dimension) },
+        .f32 => |t| .{ .f32 = try eager.sum(f32, context.allocator, t, dimension) },
+        .f16 => |t| .{ .f16 = try eager.sum(f16, context.allocator, t, dimension) },
+        .i64 => |t| .{ .i64 = try eager.sum(i64, context.allocator, t, dimension) },
+        .i32 => |t| .{ .i32 = try eager.sum(i32, context.allocator, t, dimension) },
+        .i8 => |t| .{ .i8 = try eager.sum(i8, context.allocator, t, dimension) },
     };
 }
 
@@ -69,7 +73,8 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 }
 
 pub fn sum(graph: *Graph, x: Tensor, dimension: ?usize) !Tensor {
-    var sum_operation = try graph.arena.allocator.create(Sum);
+    var allocator = &graph.arena.allocator;
+    var sum_operation = try allocator.create(Sum);
     sum_operation.* = .{
         .operation = .{
             .inputs = inputs,
@@ -77,11 +82,13 @@ pub fn sum(graph: *Graph, x: Tensor, dimension: ?usize) !Tensor {
             .backward = backward,
         },
         .inputs = .{x},
+        .dimension = dimension,
     };
     try graph.operations.append(&sum_operation.operation);
+    const shape = try newShape(allocator, x.shape, dimension);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
-        .shape = &[_]usize{},
+        .shape = shape,
         .scalarType = x.scalarType,
     };
 }
@@ -146,6 +153,96 @@ test "sum matrix i32" {
     const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(&arena.allocator, @as(i32, 48));
     expectEqual(i32, actual[0].i32, expected);
+}
+
+test "sum rank 3 accross 0 dimension" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, [_][2][2]i64{
+        .{
+            .{ 1, 2 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const y = try sum(&graph, x, 0);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const expected = try eager.constant(&arena.allocator, [_][2]i64{
+        .{ 6, 8 },
+        .{ 4, 12 },
+    });
+    expectEqual(i64, actual[0].i64, expected);
+}
+
+test "sum rank 3 accross 1 dimension" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, [_][2][2]i64{
+        .{
+            .{ 1, 2 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const y = try sum(&graph, x, 1);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const expected = try eager.constant(&arena.allocator, [_][2]i64{
+        .{ -2, 6 },
+        .{ 12, 14 },
+    });
+    expectEqual(i64, actual[0].i64, expected);
+}
+
+test "sum rank 3 accross 2 dimension" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(&graph, [_][2][2]i64{
+        .{
+            .{ 1, 2 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const y = try sum(&graph, x, 2);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const expected = try eager.constant(&arena.allocator, [_][2]i64{
+        .{ 3, 1 },
+        .{ 11, 15 },
+    });
+    expectEqual(i64, actual[0].i64, expected);
 }
 
 test "gradient sum" {

@@ -9,7 +9,7 @@ const linearIndex = cpu_tensor.linearIndex;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
 
-fn newShape(allocator: *Allocator, shape: []const usize, dimension: ?usize) ![]const usize {
+pub fn newShape(allocator: *Allocator, shape: []const usize, dimension: ?usize) ![]const usize {
     if (dimension) |d| {
         if (d >= shape.len) return error.InvalidDimension;
         const new_shape = try allocator.alloc(usize, shape.len - 1);
@@ -135,13 +135,14 @@ pub fn sum(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), dimens
             if (dimension) |d| {
                 if (shape.len > 0) {
                     const sum_array = try allocator.alloc(T, tensorLength(shape));
+                    errdefer allocator.free(sum_array);
 
                     var sum_cartesian_index = try allocator.alloc(usize, shape.len);
-                    errdefer allocator.free(sum_cartesian_index);
+                    defer allocator.free(sum_cartesian_index);
                     for (sum_cartesian_index) |*e| e.* = 0;
 
                     var array_cartesian_index = try allocator.alloc(usize, shape.len + 1);
-                    errdefer allocator.free(array_cartesian_index);
+                    defer allocator.free(array_cartesian_index);
 
                     while (true) {
                         for (array_cartesian_index) |*e, i| {
