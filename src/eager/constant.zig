@@ -95,10 +95,40 @@ test "constant rank 1" {
     expect(std.mem.eql(u8, actual, "CpuTensor([3]f64{ 1.0e+00, 2.0e+00, 3.0e+00 })"));
 }
 
+test "constant rank 1 array literal" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(f64, &arena.allocator, [_]f64{ 1, 2, 3 });
+    expect(std.mem.eql(usize, tensor.shape, &[_]usize{3}));
+    expect(std.mem.eql(usize, tensor.stride, &[_]usize{1}));
+    expect(std.mem.eql(f64, tensor.storage.array, &[_]f64{ 1, 2, 3 }));
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor});
+    expect(std.mem.eql(u8, actual, "CpuTensor([3]f64{ 1.0e+00, 2.0e+00, 3.0e+00 })"));
+}
+
 test "constant rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const tensor = try constant(i32, &arena.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    expect(std.mem.eql(usize, tensor.shape, &[_]usize{ 2, 3 }));
+    expect(std.mem.eql(usize, tensor.stride, &[_]usize{ 3, 1 }));
+    expect(std.mem.eql(i32, tensor.storage.array, &[_]i32{ 1, 2, 3, 4, 5, 6 }));
+    const actual = try std.fmt.allocPrint(&arena.allocator, "{}", .{tensor});
+    expect(std.mem.eql(u8, actual,
+        \\CpuTensor([2][3]i32{
+        \\  .{ 1, 2, 3 },
+        \\  .{ 4, 5, 6 }
+        \\})
+    ));
+}
+
+test "constant rank 2 array literal" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tensor = try constant(i32, &arena.allocator, [_][3]i32{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
