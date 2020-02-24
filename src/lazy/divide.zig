@@ -110,15 +110,15 @@ test "divide scalar" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, @as(f64, 5));
-    const y = try constant(&graph, @as(f64, 10));
+    const x = try constant(f64, &graph, 5);
+    const y = try constant(f64, &graph, 10);
     const z = try divide(&graph, x, y);
     std.testing.expectEqual(z.shape, &[_]usize{});
     std.testing.expectEqual(z.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, @as(f64, 0.5));
+    const expected = try eager.constant(f64, &arena.allocator, 0.5);
     expectEqual(f64, actual[0].f64, expected);
 }
 
@@ -130,12 +130,12 @@ test "divide matrix" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const y = try constant(&graph, [_][2]f64{
+    const y = try constant(f64, &graph, .{
         .{ 6, -5 },
         .{ 4, -3 },
         .{ -2, 1 },
@@ -146,7 +146,7 @@ test "divide matrix" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.1666, 0.4 },
         .{ 0.75, 1.3333 },
         .{ 2.5, 6 },
@@ -162,12 +162,12 @@ test "divide matrix i32" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]i32{
+    const x = try constant(i32, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const y = try constant(&graph, [_][2]i32{
+    const y = try constant(i32, &graph, .{
         .{ 6, -5 },
         .{ 4, -3 },
         .{ -2, 1 },
@@ -178,7 +178,7 @@ test "divide matrix i32" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f32{
+    const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 0.1666, 0.4 },
         .{ 0.75, 1.3333 },
         .{ 2.5, 6 },
@@ -196,11 +196,11 @@ test "gradient divide" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][3]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
-    const b = try constant(&graph, [_][3]f64{
+    const b = try constant(f64, &graph, .{
         .{ 7, 8, 9 },
         .{ 10, 11, 12 },
     });
@@ -212,11 +212,11 @@ test "gradient divide" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(gradients, .{});
-    const expected_a_gradient = try eager.constant(&arena.allocator, [_][3]f64{
+    const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 0.0238, 0.02083, 0.0185 },
         .{ 0.0166, 0.0151, 0.0138 },
     });
-    const expected_b_gradient = try eager.constant(&arena.allocator, [_][3]f64{
+    const expected_b_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ -0.0034, -0.0052, -0.0061 },
         .{ -0.0066, -0.0068, -0.0069 },
     });

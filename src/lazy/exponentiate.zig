@@ -80,13 +80,13 @@ test "exponentiate scalar" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, @as(f64, -5));
+    const x = try constant(f64, &graph, -5);
     const y = try exponentiate(&graph, x);
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{y}, .{});
-    const expected = try eager.constant(&arena.allocator, @as(f64, 0.00673));
+    const expected = try eager.constant(f64, &arena.allocator, 0.00673);
     expectEqual(f64, actual[0].f64, expected);
 }
 
@@ -98,7 +98,7 @@ test "exponentiate matrix" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
@@ -108,7 +108,7 @@ test "exponentiate matrix" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{y}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 2.7182, 0.1353 },
         .{ 20.0855, 0.0183 },
         .{ 0.00673, 403.4287 },
@@ -126,7 +126,7 @@ test "gradient exponentiate" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][2]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
@@ -137,7 +137,7 @@ test "gradient exponentiate" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(gradients, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.6795, 1.8472 },
         .{ 5.0213, 13.6495 },
     });

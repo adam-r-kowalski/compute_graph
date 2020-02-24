@@ -15,6 +15,10 @@ pub fn arrayInfo(comptime T: type) ArrayInfo {
                 rank += 1;
                 ScalarType = array.child;
             },
+            .Struct => |s| {
+                rank += 1;
+                ScalarType = s.fields[0].field_type;
+            },
             else => return .{ .ScalarType = ScalarType, .rank = rank },
         }
     }
@@ -50,4 +54,31 @@ test "array info rank 3" {
         },
     }));
     std.testing.expectEqual(info, ArrayInfo{ .ScalarType = f16, .rank = 3 });
+}
+
+test "array info rank 1 anonymous list" {
+    const info = arrayInfo(@TypeOf(.{ 1, 2, 3 }));
+    std.testing.expectEqual(info, ArrayInfo{ .ScalarType = comptime_int, .rank = 1 });
+}
+
+test "array info rank 2 anonymous list" {
+    const info = arrayInfo(@TypeOf(.{
+        .{ 1, 2, 3 },
+        .{ 1, 2, 3 },
+    }));
+    std.testing.expectEqual(info, ArrayInfo{ .ScalarType = comptime_int, .rank = 2 });
+}
+
+test "array info rank 3 anonymous list" {
+    const info = arrayInfo(@TypeOf(.{
+        .{
+            .{ 1, 2, 3 },
+            .{ 1, 2, 3 },
+        },
+        .{
+            .{ 1, 2, 3 },
+            .{ 1, 2, 3 },
+        },
+    }));
+    std.testing.expectEqual(info, ArrayInfo{ .ScalarType = comptime_int, .rank = 3 });
 }

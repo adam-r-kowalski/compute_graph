@@ -110,15 +110,15 @@ test "add scalar" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, @as(f64, 5));
-    const y = try constant(&graph, @as(f64, 10));
+    const x = try constant(f64, &graph, 5);
+    const y = try constant(f64, &graph, 10);
     const z = try add(&graph, x, y);
     std.testing.expectEqual(z.shape, &[_]usize{});
     std.testing.expectEqual(z.scalarType, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, @as(f64, 15));
+    const expected = try eager.constant(f64, &arena.allocator, 15);
     expectEqual(f64, actual[0].f64, expected);
 }
 
@@ -130,7 +130,7 @@ test "add matrix" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
@@ -141,7 +141,7 @@ test "add matrix" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
@@ -157,7 +157,7 @@ test "add matrix i32" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]i32{
+    const x = try constant(i32, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
@@ -168,7 +168,7 @@ test "add matrix i32" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]i32{
+    const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
@@ -186,11 +186,11 @@ test "gradient add" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][2]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const b = try constant(&graph, [_][2]f64{
+    const b = try constant(f64, &graph, .{
         .{ 5, 6 },
         .{ 7, 8 },
     });
@@ -204,7 +204,7 @@ test "gradient add" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(gradients, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
     });
@@ -220,11 +220,11 @@ test "add matrix shape mismatch" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
     });
-    const y = try constant(&graph, [_][3]f64{
+    const y = try constant(f64, &graph, .{
         .{ 1, -2, 3 },
         .{ 3, -4, 5 },
         .{ 3, -4, 6 },
@@ -243,11 +243,11 @@ test "add matrix scalar type mismatch" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
     });
-    const y = try constant(&graph, [_][2]f32{
+    const y = try constant(f32, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
     });

@@ -110,14 +110,14 @@ test "multiply scalar" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, @as(f64, 5));
-    const y = try constant(&graph, @as(f64, 10));
+    const x = try constant(f64, &graph, 5);
+    const y = try constant(f64, &graph, 10);
     const z = try multiply(&graph, x, y);
     std.testing.expectEqual(z.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, @as(f64, 50));
+    const expected = try eager.constant(f64, &arena.allocator, 50);
     expectEqual(f64, actual[0].f64, expected);
 }
 
@@ -129,7 +129,7 @@ test "multiply matrix" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
@@ -139,7 +139,7 @@ test "multiply matrix" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 4 },
         .{ 9, 16 },
         .{ 25, 36 },
@@ -155,7 +155,7 @@ test "multiply matrix i32" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]i32{
+    const x = try constant(i32, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
@@ -165,7 +165,7 @@ test "multiply matrix i32" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]i32{
+    const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 1, 4 },
         .{ 9, 16 },
         .{ 25, 36 },
@@ -183,11 +183,11 @@ test "gradient multiply" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][2]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const b = try constant(&graph, [_][2]f64{
+    const b = try constant(f64, &graph, .{
         .{ 5, 6 },
         .{ 7, 8 },
     });
@@ -198,11 +198,11 @@ test "gradient multiply" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(gradients, .{});
-    const expected_a_gradient = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 5 * 0.25, 6 * 0.25 },
         .{ 7 * 0.25, 8 * 0.25 },
     });
-    const expected_b_gradient = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected_b_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 1 * 0.25, 2 * 0.25 },
         .{ 3 * 0.25, 4 * 0.25 },
     });

@@ -33,11 +33,11 @@ test "placeholder" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][2]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const b = try constant(&graph, [_][2]f64{
+    const b = try constant(f64, &graph, .{
         .{ 5, 6 },
         .{ 7, 8 },
     });
@@ -51,7 +51,7 @@ test "placeholder" {
     const actual = try session.run(&[_]Tensor{c}, .{
         .environment = environment,
     });
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
@@ -62,7 +62,7 @@ test "placeholder" {
     const actual2 = try session.run(&[_]Tensor{c}, .{
         .environment = environment2,
     });
-    const expected2 = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected2 = try eager.constant(f64, &arena.allocator, .{
         .{ 5, 6 },
         .{ 7, 8 },
     });

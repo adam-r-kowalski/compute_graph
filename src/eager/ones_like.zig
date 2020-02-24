@@ -32,31 +32,31 @@ pub fn onesLike(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !
 test "onesLike rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, -5));
+    const x = try constant(f64, &arena.allocator, -5);
     const actual = try onesLike(f64, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, @as(f64, 1));
+    const expected = try constant(f64, &arena.allocator, 1);
     expectEqual(f64, actual, expected);
 }
 
 test "onesLike rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]i32{ 1, -2, 3, -4, -5, 6 });
+    const x = try constant(i32, &arena.allocator, .{ 1, -2, 3, -4, -5, 6 });
     const actual = try onesLike(i32, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_]i32{ 1, 1, 1, 1, 1, 1 });
+    const expected = try constant(i32, &arena.allocator, .{ 1, 1, 1, 1, 1, 1 });
     expectEqual(i32, actual, expected);
 }
 
 test "onesLike rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f16{
+    const x = try constant(f16, &arena.allocator, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
     const actual = try onesLike(f16, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_][2]f16{
+    const expected = try constant(f16, &arena.allocator, .{
         .{ 1, 1 },
         .{ 1, 1 },
         .{ 1, 1 },
@@ -67,7 +67,7 @@ test "onesLike rank 2" {
 test "onesLike rank 3" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2][2]i8{
+    const x = try constant(i8, &arena.allocator, .{
         .{
             .{ 1, -2 },
             .{ 3, -4 },
@@ -78,7 +78,7 @@ test "onesLike rank 3" {
         },
     });
     const actual = try onesLike(i8, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_][2][2]i8{
+    const expected = try constant(i8, &arena.allocator, .{
         .{
             .{ 1, 1 },
             .{ 1, 1 },

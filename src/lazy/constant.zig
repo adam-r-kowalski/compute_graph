@@ -21,8 +21,8 @@ fn tensorScalarType(comptime T: type) ScalarType {
     };
 }
 
-pub fn constant(graph: *Graph, literal: var) !Tensor {
-    const eager_tensor = try eager.constant(&graph.arena.allocator, literal);
+pub fn constant(comptime T: type, graph: *Graph, literal: var) !Tensor {
+    const eager_tensor = try eager.constant(T, &graph.arena.allocator, literal);
     try graph.constants.append(CpuTensorUnion.init(eager_tensor));
     return Tensor{
         .tensorType = .{ .constant = graph.constants.len - 1 },
@@ -38,7 +38,7 @@ test "constant scalar" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, @as(f64, 5));
+    const x = try constant(f64, &graph, 5);
     std.testing.expectEqual(x.shape, &[_]usize{});
     std.testing.expectEqual(x.scalarType, .f64);
     const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
@@ -46,7 +46,7 @@ test "constant scalar" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{x}, .{});
-    const expected = try eager.constant(&arena.allocator, @as(f64, 5));
+    const expected = try eager.constant(f64, &arena.allocator, 5);
     expectEqual(f64, actual[0].f64, expected);
 }
 
@@ -57,7 +57,7 @@ test "constant array" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]f32{
+    const x = try constant(f32, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
@@ -69,7 +69,7 @@ test "constant array" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{x}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f32{
+    const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
