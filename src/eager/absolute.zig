@@ -40,31 +40,31 @@ pub fn absolute(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !
 test "absolute rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, -5));
+    const x = try constant(f64, &arena.allocator, -5);
     const actual = try absolute(f64, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, @as(f64, 5));
+    const expected = try constant(f64, &arena.allocator, 5);
     expectEqual(f64, actual, expected);
 }
 
 test "absolute rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]i32{ 1, -2, 3, -4, -5, 6 });
+    const x = try constant(i32, &arena.allocator, .{ 1, -2, 3, -4, -5, 6 });
     const actual = try absolute(i32, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_]i32{ 1, 2, 3, 4, 5, 6 });
+    const expected = try constant(i32, &arena.allocator, .{ 1, 2, 3, 4, 5, 6 });
     expectEqual(i32, actual, expected);
 }
 
 test "absolute rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f16{
+    const x = try constant(f16, &arena.allocator, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
     const actual = try absolute(f16, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_][2]f16{
+    const expected = try constant(f16, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
@@ -75,7 +75,7 @@ test "absolute rank 2" {
 test "absolute rank 3" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2][2]i8{
+    const x = try constant(i8, &arena.allocator, .{
         .{
             .{ 1, -2 },
             .{ 3, -4 },
@@ -86,7 +86,7 @@ test "absolute rank 3" {
         },
     });
     const actual = try absolute(i8, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_][2][2]i8{
+    const expected = try constant(i8, &arena.allocator, .{
         .{
             .{ 1, 2 },
             .{ 3, 4 },
@@ -140,39 +140,39 @@ pub fn absoluteBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
 test "absolute backward rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, -4));
-    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const x = try constant(f64, &arena.allocator, -4);
+    const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try absoluteBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
     });
-    const expected = try constant(&arena.allocator, @as(f64, -1));
+    const expected = try constant(f64, &arena.allocator, -1);
     expectEqual(f64, actual[0], expected);
 }
 
 test "absolute backward rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]f64{ 0, 2, -3, 4, -5 });
-    const gradient_input = try constant(&arena.allocator, [_]f64{ 2, 4, 6, 8, 10 });
+    const x = try constant(f64, &arena.allocator, .{ 0, 2, -3, 4, -5 });
+    const gradient_input = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
     const actual = try absoluteBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
     });
-    const expected = try constant(&arena.allocator, [_]f64{ 0, 4, -6, 8, -10 });
+    const expected = try constant(f64, &arena.allocator, .{ 0, 4, -6, 8, -10 });
     expectEqual(f64, actual[0], expected);
 }
 
 test "absolute backward rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f64{
+    const x = try constant(f64, &arena.allocator, .{
         .{ 0, -2 },
         .{ 3, -4 },
     });
-    const gradient_input = try constant(&arena.allocator, [_][2]f64{
+    const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
     });
@@ -181,7 +181,7 @@ test "absolute backward rank 2" {
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
     });
-    const expected = try constant(&arena.allocator, [_][2]f64{
+    const expected = try constant(f64, &arena.allocator, .{
         .{ 0, -4 },
         .{ 6, -8 },
     });

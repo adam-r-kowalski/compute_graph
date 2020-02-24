@@ -112,12 +112,12 @@ test "matrixMultiply identity" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][3]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, 0, 0 },
         .{ 0, 1, 0 },
         .{ 0, 0, 1 },
     });
-    const y = try constant(&graph, [_][1]f64{
+    const y = try constant(f64, &graph, .{
         .{1},
         .{2},
         .{3},
@@ -127,7 +127,7 @@ test "matrixMultiply identity" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][1]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{1},
         .{2},
         .{3},
@@ -143,12 +143,12 @@ test "matrixMultiply flip" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][3]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, 0, 0 },
         .{ 0, -1, 0 },
         .{ 0, 0, 1 },
     });
-    const y = try constant(&graph, [_][1]f64{
+    const y = try constant(f64, &graph, .{
         .{1},
         .{2},
         .{3},
@@ -158,7 +158,7 @@ test "matrixMultiply flip" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][1]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{1},
         .{-2},
         .{3},
@@ -174,13 +174,13 @@ test "matrixMultiply flip" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][3]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 2, 5 },
         .{ 9, 8, 4 },
         .{ 6, 5, 3 },
     });
-    const y = try constant(&graph, [_][2]f64{
+    const y = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 4, 6 },
         .{ 3, 9 },
@@ -190,7 +190,7 @@ test "matrixMultiply flip" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 18, 41 },
         .{ 27, 65 },
         .{ 53, 102 },
@@ -209,11 +209,11 @@ test "gradient matrix multiply" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][3]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
-    const b = try constant(&graph, [_][2]f64{
+    const b = try constant(f64, &graph, .{
         .{ 7, 8 },
         .{ 9, 10 },
         .{ 11, 12 },
@@ -225,11 +225,11 @@ test "gradient matrix multiply" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(gradients, .{});
-    const expected_a_gradient = try eager.constant(&arena.allocator, [_][3]f64{
+    const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 3.75, 4.75, 5.75 },
         .{ 3.75, 4.75, 5.75 },
     });
-    const expected_b_gradient = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected_b_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 1.25, 1.25 },
         .{ 1.75, 1.75 },
         .{ 2.25, 2.25 },
@@ -246,12 +246,12 @@ test "matrixMultiply shape mismatch" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][3]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 2, 5 },
         .{ 6, 5, 3 },
     });
-    const y = try constant(&graph, [_][2]f64{
+    const y = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 4, 6 },
     });

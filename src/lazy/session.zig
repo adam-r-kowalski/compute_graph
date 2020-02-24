@@ -83,10 +83,10 @@ test "execution order" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const m = try constant(&graph, @as(f64, 3));
-    const b = try constant(&graph, @as(f64, 5));
-    const y = try constant(&graph, @as(f64, 35));
-    const x = try constant(&graph, @as(f64, 10));
+    const m = try constant(f64, &graph, 3);
+    const b = try constant(f64, &graph, 5);
+    const y = try constant(f64, &graph, 35);
+    const x = try constant(f64, &graph, 10);
     const h = try multiply(&graph, m, x);
     const y_hat = try add(&graph, h, b);
     const loss = try subtract(&graph, y, y_hat);
@@ -112,7 +112,7 @@ test "execution order gradient" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, @as(f64, 5));
+    const a = try constant(f64, &graph, 5);
     const b = try mean(&graph, a);
     const c = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
@@ -133,7 +133,7 @@ test "execution order variable" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, @as(f64, 5));
+    const a = try constant(f64, &graph, 5);
     const b = try variable(&graph, a);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -153,8 +153,8 @@ test "execution order assign" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, @as(f64, 5));
-    const b = try constant(&graph, @as(f64, 10));
+    const a = try constant(f64, &graph, 5);
+    const b = try constant(f64, &graph, 10);
     const c = try variable(&graph, a);
     const d = try assign(&graph, c, b);
     var session = try Session.init(allocator, &graph);
@@ -176,8 +176,8 @@ test "execution order repeated tensors" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, @as(f64, 3));
-    const b = try constant(&graph, @as(f64, 5));
+    const a = try constant(f64, &graph, 3);
+    const b = try constant(f64, &graph, 5);
     const c = try add(&graph, a, b);
     const d = try add(&graph, c, c);
     var session = try Session.init(allocator, &graph);
@@ -199,8 +199,8 @@ test "execution order placeholder" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, @as(f64, 3));
-    const b = try constant(&graph, @as(f64, 5));
+    const a = try constant(f64, &graph, 3);
+    const b = try constant(f64, &graph, 5);
     const c = try placeholder(&graph, &[_]usize{}, .f64);
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
@@ -276,9 +276,9 @@ fn runGradient(context: GradientContext) !void {
         const gradient_operation = context.session.graph.gradients.at(context.gradient_handle.gradient);
         const of = gradient_operation.of;
         const one = switch (try getValue(Cache, Tensor, CpuTensorUnion, context.cache.*, of)) {
-            .f64 => CpuTensorUnion.init(try eager.constant(allocator, @as(f64, 1))),
-            .f32 => CpuTensorUnion.init(try eager.constant(allocator, @as(f32, 1))),
-            .f16 => CpuTensorUnion.init(try eager.constant(allocator, @as(f16, 1))),
+            .f64 => CpuTensorUnion.init(try eager.constant(f64, allocator, 1)),
+            .f32 => CpuTensorUnion.init(try eager.constant(f64, allocator, 1)),
+            .f16 => CpuTensorUnion.init(try eager.constant(f64, allocator, 1)),
             else => return error.CannotDifferentiateIntegral,
         };
         try gradient_cache.putNoClobber(of, one);
@@ -412,24 +412,24 @@ test "session run" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const m = try constant(&graph, [_][3]f64{
+    const m = try constant(f64, &graph, .{
         .{ 0, 7, 3 },
         .{ 4, 5, 6 },
         .{ -10, -2, 0 },
     });
-    const x = try constant(&graph, [_][1]f64{
+    const x = try constant(f64, &graph, .{
         .{1},
         .{2},
         .{3},
     });
     const h = try matrixMultiply(&graph, m, x);
-    const b = try constant(&graph, [_][1]f64{
+    const b = try constant(f64, &graph, .{
         .{3},
         .{7},
         .{5},
     });
     const y_hat = try add(&graph, h, b);
-    const y = try constant(&graph, [_][1]f64{
+    const y = try constant(f64, &graph, .{
         .{1},
         .{4},
         .{9},
@@ -441,13 +441,13 @@ test "session run" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{ loss, gradients[0], gradients[1] }, .{});
-    const expected_loss = try eager.constant(&arena.allocator, @as(f64, 26));
-    const expected_m_gradient = try eager.constant(&arena.allocator, [_][3]f64{
+    const expected_loss = try eager.constant(f64, &arena.allocator, 26);
+    const expected_m_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 1 / 3., 2 / 3., 1 },
         .{ 1 / 3., 2 / 3., 1 },
         .{ -1 / 3., -2 / 3., -1 },
     });
-    const expected_b_gradient = try eager.constant(&arena.allocator, [_][1]f64{
+    const expected_b_gradient = try eager.constant(f64, &arena.allocator, .{
         .{1 / 3.},
         .{1 / 3.},
         .{-1 / 3.},
@@ -465,7 +465,7 @@ test "variable" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][2]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
@@ -473,7 +473,7 @@ test "variable" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{b}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
@@ -490,15 +490,15 @@ test "duplicate" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][2]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const b = try constant(&graph, [_][2]f64{
+    const b = try constant(f64, &graph, .{
         .{ 5, 6 },
         .{ 7, 8 },
     });
-    const c = try constant(&graph, [_][2]f64{
+    const c = try constant(f64, &graph, .{
         .{ 9, 10 },
         .{ 11, 12 },
     });
@@ -510,7 +510,7 @@ test "duplicate" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(gradients, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 3.5, 4 },
         .{ 4.5, 5 },
     });

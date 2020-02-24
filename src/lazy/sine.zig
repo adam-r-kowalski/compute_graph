@@ -80,13 +80,13 @@ test "sine scalar" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, @as(f64, -5));
+    const x = try constant(f64, &graph, -5);
     const y = try sine(&graph, x);
     std.testing.expectEqual(y.shape, &[_]usize{});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{y}, .{});
-    const expected = try eager.constant(&arena.allocator, @as(f64, 0.95892));
+    const expected = try eager.constant(f64, &arena.allocator, 0.95892);
     expectEqual(f64, actual[0].f64, expected);
 }
 
@@ -98,7 +98,7 @@ test "sine matrix" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const x = try constant(&graph, [_][2]f64{
+    const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
@@ -108,7 +108,7 @@ test "sine matrix" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{y}, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.84147, -0.90929 },
         .{ 0.14112, 0.75680 },
         .{ 0.95892, -0.27941 },
@@ -126,7 +126,7 @@ test "gradient sine" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][2]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
@@ -137,7 +137,7 @@ test "gradient sine" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(gradients, .{});
-    const expected = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.13507, -0.10403 },
         .{ -0.2474, -0.16341 },
     });

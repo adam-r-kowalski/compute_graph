@@ -36,14 +36,14 @@ test "assign" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const a = try constant(&graph, [_][2]f64{
+    const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
     const b = try variable(&graph, a);
     std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
     std.testing.expectEqual(b.scalarType, .f64);
-    const c = try constant(&graph, [_][2]f64{
+    const c = try constant(f64, &graph, .{
         .{ 1, 1 },
         .{ 1, 1 },
     });
@@ -55,7 +55,7 @@ test "assign" {
     defer session.deinit();
 
     const actual1 = try session.run(&[_]Tensor{ e, b }, .{});
-    const expected1 = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected1 = try eager.constant(f64, &arena.allocator, .{
         .{ 2, 3 },
         .{ 4, 5 },
     });
@@ -63,7 +63,7 @@ test "assign" {
     expectEqual(f64, actual1[1].f64, expected1);
 
     const actual2 = try session.run(&[_]Tensor{ e, b }, .{});
-    const expected2 = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected2 = try eager.constant(f64, &arena.allocator, .{
         .{ 3, 4 },
         .{ 5, 6 },
     });
@@ -71,7 +71,7 @@ test "assign" {
     expectEqual(f64, actual2[1].f64, expected2);
 
     const actual3 = try session.run(&[_]Tensor{ e, b }, .{});
-    const expected3 = try eager.constant(&arena.allocator, [_][2]f64{
+    const expected3 = try eager.constant(f64, &arena.allocator, .{
         .{ 4, 5 },
         .{ 6, 7 },
     });
@@ -95,31 +95,31 @@ test "linear regression" {
     defer arena.deinit();
     var graph = try Graph.init(allocator);
     defer graph.deinit();
-    const m = try variable(&graph, try constant(&graph, @as(f64, 8)));
-    const b = try variable(&graph, try constant(&graph, @as(f64, 6)));
+    const m = try variable(&graph, try constant(f64, &graph, 8));
+    const b = try variable(&graph, try constant(f64, &graph, 6));
 
     const x = try placeholder(&graph, &[_]usize{}, .f64);
     const xs = [_]Tensor{
-        try constant(&graph, @as(f64, 0)),
-        try constant(&graph, @as(f64, 1)),
-        try constant(&graph, @as(f64, 2)),
-        try constant(&graph, @as(f64, 3)),
-        try constant(&graph, @as(f64, 4)),
+        try constant(f64, &graph, 0),
+        try constant(f64, &graph, 1),
+        try constant(f64, &graph, 2),
+        try constant(f64, &graph, 3),
+        try constant(f64, &graph, 4),
     };
 
     const y = try placeholder(&graph, &[_]usize{}, .f64);
     const ys = [_]Tensor{
-        try constant(&graph, @as(f64, 1)),
-        try constant(&graph, @as(f64, 3)),
-        try constant(&graph, @as(f64, 5)),
-        try constant(&graph, @as(f64, 7)),
-        try constant(&graph, @as(f64, 9)),
+        try constant(f64, &graph, 1),
+        try constant(f64, &graph, 3),
+        try constant(f64, &graph, 5),
+        try constant(f64, &graph, 7),
+        try constant(f64, &graph, 9),
     };
 
     const y_hat = try add(&graph, try multiply(&graph, m, x), b);
     const loss = try absolute(&graph, try subtract(&graph, y, y_hat));
     const gradients = try gradient(&graph, loss, &[_]Tensor{ m, b });
-    const step_size = try constant(&graph, @as(f64, 0.01));
+    const step_size = try constant(f64, &graph, 0.01);
     const dm = try multiply(&graph, gradients[0], step_size);
     const db = try multiply(&graph, gradients[1], step_size);
     const improve_m = try assign(&graph, m, try subtract(&graph, m, dm));
@@ -138,7 +138,7 @@ test "linear regression" {
         .environment = environments[2],
     });
     const actual_loss = actual[0];
-    expectEqual(f64, actual_loss.f64, try eager.constant(&arena.allocator, @as(f64, 17)));
+    expectEqual(f64, actual_loss.f64, try eager.constant(f64, &arena.allocator, 17));
 
     var i: usize = 0;
     var j: usize = 0;
@@ -155,7 +155,7 @@ test "linear regression" {
     const actual_loss1 = actual1[0];
     const actual_m1 = actual1[1];
     const actual_b1 = actual1[2];
-    expectEqual(f64, actual_m1.f64, try eager.constant(&arena.allocator, @as(f64, 2.02)));
-    expectEqual(f64, actual_b1.f64, try eager.constant(&arena.allocator, @as(f64, 1.02)));
-    expectEqual(f64, actual_loss1.f64, try eager.constant(&arena.allocator, @as(f64, 0.02)));
+    expectEqual(f64, actual_m1.f64, try eager.constant(f64, &arena.allocator, 2.02));
+    expectEqual(f64, actual_b1.f64, try eager.constant(f64, &arena.allocator, 1.02));
+    expectEqual(f64, actual_loss1.f64, try eager.constant(f64, &arena.allocator, 0.02));
 }

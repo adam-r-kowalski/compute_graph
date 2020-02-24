@@ -35,38 +35,38 @@ pub fn subtract(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: Cpu
 test "subtract rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, 5));
-    const y = try constant(&arena.allocator, @as(f64, 10));
+    const x = try constant(f64, &arena.allocator, 5);
+    const y = try constant(f64, &arena.allocator, 10);
     const actual = try subtract(f64, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, @as(f64, -5));
+    const expected = try constant(f64, &arena.allocator, -5);
     expectEqual(f64, actual, expected);
 }
 
 test "subtract rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]i32{ 1, -2, 3, -4, -5, 6 });
-    const y = try constant(&arena.allocator, [_]i32{ -1, 2, -3, 4, 5, -6 });
+    const x = try constant(i32, &arena.allocator, .{ 1, -2, 3, -4, -5, 6 });
+    const y = try constant(i32, &arena.allocator, .{ -1, 2, -3, 4, 5, -6 });
     const actual = try subtract(i32, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, [_]i32{ 2, -4, 6, -8, -10, 12 });
+    const expected = try constant(i32, &arena.allocator, .{ 2, -4, 6, -8, -10, 12 });
     expectEqual(i32, actual, expected);
 }
 
 test "subtract rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f16{
+    const x = try constant(f16, &arena.allocator, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const y = try constant(&arena.allocator, [_][2]f16{
+    const y = try constant(f16, &arena.allocator, .{
         .{ -1, 2 },
         .{ -3, 4 },
         .{ 5, -6 },
     });
     const actual = try subtract(f16, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, [_][2]f16{
+    const expected = try constant(f16, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
@@ -77,7 +77,7 @@ test "subtract rank 2" {
 test "subtract rank 3" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2][2]i8{
+    const x = try constant(i8, &arena.allocator, .{
         .{
             .{ 1, -2 },
             .{ 3, -4 },
@@ -87,7 +87,7 @@ test "subtract rank 3" {
             .{ 7, -8 },
         },
     });
-    const y = try constant(&arena.allocator, [_][2][2]i8{
+    const y = try constant(i8, &arena.allocator, .{
         .{
             .{ -1, 2 },
             .{ -3, 4 },
@@ -98,7 +98,7 @@ test "subtract rank 3" {
         },
     });
     const actual = try subtract(i8, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, [_][2][2]i8{
+    const expected = try constant(i8, &arena.allocator, .{
         .{
             .{ 2, -4 },
             .{ 6, -8 },
@@ -147,16 +147,16 @@ pub fn subtractBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
 test "subtract backward rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, 4));
-    const y = try constant(&arena.allocator, @as(f64, 10));
-    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const x = try constant(f64, &arena.allocator, 4);
+    const y = try constant(f64, &arena.allocator, 10);
+    const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try subtractBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
-    const expected_a_gradient = try constant(&arena.allocator, @as(f64, 1));
-    const expected_b_gradient = try constant(&arena.allocator, @as(f64, -1));
+    const expected_a_gradient = try constant(f64, &arena.allocator, 1);
+    const expected_b_gradient = try constant(f64, &arena.allocator, -1);
     expectEqual(f64, actual[0], expected_a_gradient);
     expectEqual(f64, actual[1], expected_b_gradient);
 }
@@ -164,16 +164,16 @@ test "subtract backward rank 0" {
 test "subtract backward rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]f64{ 1, 2, 3, 4, 5 });
-    const y = try constant(&arena.allocator, [_]f64{ 6, 7, 8, 9, 10 });
-    const gradient_input = try constant(&arena.allocator, [_]f64{ 2, 4, 6, 8, 10 });
+    const x = try constant(f64, &arena.allocator, .{ 1, 2, 3, 4, 5 });
+    const y = try constant(f64, &arena.allocator, .{ 6, 7, 8, 9, 10 });
+    const gradient_input = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
     const actual = try subtractBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
-    const expected_a_gradient = try constant(&arena.allocator, [_]f64{ 2, 4, 6, 8, 10 });
-    const expected_b_gradient = try constant(&arena.allocator, [_]f64{ -2, -4, -6, -8, -10 });
+    const expected_a_gradient = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
+    const expected_b_gradient = try constant(f64, &arena.allocator, .{ -2, -4, -6, -8, -10 });
     expectEqual(f64, actual[0], expected_a_gradient);
     expectEqual(f64, actual[1], expected_b_gradient);
 }
@@ -181,15 +181,15 @@ test "subtract backward rank 1" {
 test "subtract backward rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f64{
+    const x = try constant(f64, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const y = try constant(&arena.allocator, [_][2]f64{
+    const y = try constant(f64, &arena.allocator, .{
         .{ 5, 6 },
         .{ 7, 8 },
     });
-    const gradient_input = try constant(&arena.allocator, [_][2]f64{
+    const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
     });
@@ -198,11 +198,11 @@ test "subtract backward rank 2" {
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
-    const expected_a_gradient = try constant(&arena.allocator, [_][2]f64{
+    const expected_a_gradient = try constant(f64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
     });
-    const expected_b_gradient = try constant(&arena.allocator, [_][2]f64{
+    const expected_b_gradient = try constant(f64, &arena.allocator, .{
         .{ -2, -4 },
         .{ -6, -8 },
     });

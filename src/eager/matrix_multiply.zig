@@ -52,17 +52,17 @@ pub fn matrixMultiply(comptime T: type, allocator: *Allocator, x: CpuTensor(T), 
 test "matrixMultiply" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]i32{
+    const x = try constant(i32, &arena.allocator, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ 5, -6 },
     });
-    const y = try constant(&arena.allocator, [_][3]i32{
+    const y = try constant(i32, &arena.allocator, .{
         .{ 1, -2, 3 },
         .{ -4, 5, -6 },
     });
     const actual = try matrixMultiply(i32, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, [_][3]i32{
+    const expected = try constant(i32, &arena.allocator, .{
         .{ 9, -12, 15 },
         .{ 19, -26, 33 },
         .{ 29, -40, 51 },
@@ -99,13 +99,13 @@ fn transpose(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !Cpu
 test "transpose matrix" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const tensor = try constant(&arena.allocator, [_][2]i32{
+    const tensor = try constant(i32, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
     const actual = try transpose(i32, &arena.allocator, tensor);
-    const expected = try constant(&arena.allocator, [_][3]i32{
+    const expected = try constant(i32, &arena.allocator, .{
         .{ 1, 3, 5 },
         .{ 2, 4, 6 },
     });
@@ -128,16 +128,16 @@ pub fn matrixMultiplyBackward(comptime T: type, context: backward.Context(T)) ![
 test "matrix multiply backward" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][3]f64{
+    const x = try constant(f64, &arena.allocator, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
-    const y = try constant(&arena.allocator, [_][2]f64{
+    const y = try constant(f64, &arena.allocator, .{
         .{ 7, 8 },
         .{ 9, 10 },
         .{ 11, 12 },
     });
-    const gradient_input = try constant(&arena.allocator, [_][2]f64{
+    const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
     });
@@ -146,11 +146,11 @@ test "matrix multiply backward" {
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
-    const expected_x_gradient = try constant(&arena.allocator, [_][3]f64{
+    const expected_x_gradient = try constant(f64, &arena.allocator, .{
         .{ 3.75, 4.75, 5.75 },
         .{ 3.75, 4.75, 5.75 },
     });
-    const expected_y_gradient = try constant(&arena.allocator, [_][2]f64{
+    const expected_y_gradient = try constant(f64, &arena.allocator, .{
         .{ 1.25, 1.25 },
         .{ 1.75, 1.75 },
         .{ 2.25, 2.25 },

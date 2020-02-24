@@ -57,38 +57,38 @@ pub fn divide(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTe
 test "divide rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, 5));
-    const y = try constant(&arena.allocator, @as(f64, 10));
+    const x = try constant(f64, &arena.allocator, 5);
+    const y = try constant(f64, &arena.allocator, 10);
     const actual = try divide(f64, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, @as(f64, 0.5));
+    const expected = try constant(f64, &arena.allocator, 0.5);
     expectEqual(f64, actual, expected);
 }
 
 test "divide rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]i32{ 1, -2, 3, -4, -5, 6 });
-    const y = try constant(&arena.allocator, [_]i32{ 6, -5, 4, -3, -2, 1 });
+    const x = try constant(i32, &arena.allocator, .{ 1, -2, 3, -4, -5, 6 });
+    const y = try constant(i32, &arena.allocator, .{ 6, -5, 4, -3, -2, 1 });
     const actual = try divide(i32, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, [_]f32{ 0.1666, 0.4, 0.75, 1.3333, 2.5, 6 });
+    const expected = try constant(f32, &arena.allocator, .{ 0.1666, 0.4, 0.75, 1.3333, 2.5, 6 });
     expectEqual(f32, actual, expected);
 }
 
 test "divide rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f16{
+    const x = try constant(f16, &arena.allocator, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
-    const y = try constant(&arena.allocator, [_][2]f16{
+    const y = try constant(f16, &arena.allocator, .{
         .{ 6, -5 },
         .{ 4, -3 },
         .{ -2, 1 },
     });
     const actual = try divide(f16, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, [_][2]f16{
+    const expected = try constant(f16, &arena.allocator, .{
         .{ 0.1666, 0.4 },
         .{ 0.75, 1.3333 },
         .{ 2.5, 6 },
@@ -99,7 +99,7 @@ test "divide rank 2" {
 test "divide rank 3" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2][2]i8{
+    const x = try constant(i8, &arena.allocator, .{
         .{
             .{ 1, -2 },
             .{ 3, -4 },
@@ -109,7 +109,7 @@ test "divide rank 3" {
             .{ 7, -8 },
         },
     });
-    const y = try constant(&arena.allocator, [_][2][2]i8{
+    const y = try constant(i8, &arena.allocator, .{
         .{
             .{ 8, -7 },
             .{ 6, -5 },
@@ -120,7 +120,7 @@ test "divide rank 3" {
         },
     });
     const actual = try divide(i8, &arena.allocator, x, y);
-    const expected = try constant(&arena.allocator, [_][2][2]f16{
+    const expected = try constant(f16, &arena.allocator, .{
         .{
             .{ 0.125, 0.2856 },
             .{ 0.5, 0.7998 },
@@ -158,16 +158,16 @@ pub fn divideBackward(comptime T: type, context: backward.Context(T)) ![]CpuTens
 test "divide backward rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, 4));
-    const y = try constant(&arena.allocator, @as(f64, 10));
-    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const x = try constant(f64, &arena.allocator, 4);
+    const y = try constant(f64, &arena.allocator, 10);
+    const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try divideBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
-    const expected_x_gradient = try constant(&arena.allocator, @as(f64, 0.1));
-    const expected_y_gradient = try constant(&arena.allocator, @as(f64, -0.04));
+    const expected_x_gradient = try constant(f64, &arena.allocator, 0.1);
+    const expected_y_gradient = try constant(f64, &arena.allocator, -0.04);
     expectEqual(f64, actual[0], expected_x_gradient);
     expectEqual(f64, actual[1], expected_y_gradient);
 }
@@ -175,16 +175,16 @@ test "divide backward rank 0" {
 test "divide backward rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]f64{ 1, 2, 3, 4, 5 });
-    const y = try constant(&arena.allocator, [_]f64{ 6, 7, 8, 9, 10 });
-    const gradient_input = try constant(&arena.allocator, [_]f64{ 2, 4, 6, 8, 10 });
+    const x = try constant(f64, &arena.allocator, .{ 1, 2, 3, 4, 5 });
+    const y = try constant(f64, &arena.allocator, .{ 6, 7, 8, 9, 10 });
+    const gradient_input = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
     const actual = try divideBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
-    const expected_x_gradient = try constant(&arena.allocator, [_]f64{ 0.3333, 0.5714, 0.75, 0.8888, 1.0 });
-    const expected_y_gradient = try constant(&arena.allocator, [_]f64{ -0.0555, -0.1632, -0.2812, -0.3950, -0.50 });
+    const expected_x_gradient = try constant(f64, &arena.allocator, .{ 0.3333, 0.5714, 0.75, 0.8888, 1.0 });
+    const expected_y_gradient = try constant(f64, &arena.allocator, .{ -0.0555, -0.1632, -0.2812, -0.3950, -0.50 });
     expectEqual(f64, actual[0], expected_x_gradient);
     expectEqual(f64, actual[1], expected_y_gradient);
 }
@@ -192,15 +192,15 @@ test "divide backward rank 1" {
 test "divide backward rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f64{
+    const x = try constant(f64, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const y = try constant(&arena.allocator, [_][2]f64{
+    const y = try constant(f64, &arena.allocator, .{
         .{ 5, 6 },
         .{ 7, 8 },
     });
-    const gradient_input = try constant(&arena.allocator, [_][2]f64{
+    const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
     });
@@ -209,11 +209,11 @@ test "divide backward rank 2" {
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
     });
-    const expected_x_gradient = try constant(&arena.allocator, [_][2]f64{
+    const expected_x_gradient = try constant(f64, &arena.allocator, .{
         .{ 0.4, 0.6666 },
         .{ 0.8571, 1 },
     });
-    const expected_y_gradient = try constant(&arena.allocator, [_][2]f64{
+    const expected_y_gradient = try constant(f64, &arena.allocator, .{
         .{ -0.080, -0.2222 },
         .{ -0.3673, -0.5 },
     });

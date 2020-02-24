@@ -32,31 +32,31 @@ pub fn exponentiate(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T
 test "exponentiate rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, -5));
+    const x = try constant(f64, &arena.allocator, -5);
     const actual = try exponentiate(f64, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, @as(f64, 0.0067));
+    const expected = try constant(f64, &arena.allocator, 0.0067);
     expectEqual(f64, actual, expected);
 }
 
 test "exponentiate rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]f32{ 1, -2, 3, -4, -5, 6 });
+    const x = try constant(f32, &arena.allocator, .{ 1, -2, 3, -4, -5, 6 });
     const actual = try exponentiate(f32, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_]f32{ 2.7182, 0.1353, 20.0855, 0.0183, 0.00673, 403.4288 });
+    const expected = try constant(f32, &arena.allocator, .{ 2.7182, 0.1353, 20.0855, 0.0183, 0.00673, 403.4288 });
     expectEqual(f32, actual, expected);
 }
 
 test "exponentiate rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f64{
+    const x = try constant(f64, &arena.allocator, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
     const actual = try exponentiate(f64, &arena.allocator, x);
-    const expected = try constant(&arena.allocator, [_][2]f64{
+    const expected = try constant(f64, &arena.allocator, .{
         .{ 2.7182, 0.1353 },
         .{ 20.0855, 0.0183 },
         .{ 0.0067, 403.4287 },
@@ -95,39 +95,39 @@ pub fn exponentiateBackward(comptime T: type, context: backward.Context(T)) ![]C
 test "exponentiate backward rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, @as(f64, -4));
-    const gradient_input = try constant(&arena.allocator, @as(f64, 1));
+    const x = try constant(f64, &arena.allocator, -4);
+    const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try exponentiateBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
     });
-    const expected = try constant(&arena.allocator, @as(f64, 0.0183));
+    const expected = try constant(f64, &arena.allocator, 0.0183);
     expectEqual(f64, actual[0], expected);
 }
 
 test "exponentiate backward rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_]f64{ 0, 2, -3, 4, -5 });
-    const gradient_input = try constant(&arena.allocator, [_]f64{ 2, 4, 6, 8, 10 });
+    const x = try constant(f64, &arena.allocator, .{ 0, 2, -3, 4, -5 });
+    const gradient_input = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
     const actual = try exponentiateBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
     });
-    const expected = try constant(&arena.allocator, [_]f64{ 2.0, 29.5562, 0.2987, 436.7852, 0.0673 });
+    const expected = try constant(f64, &arena.allocator, .{ 2.0, 29.5562, 0.2987, 436.7852, 0.0673 });
     expectEqual(f64, actual[0], expected);
 }
 
 test "exponentiate backward rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(&arena.allocator, [_][2]f64{
+    const x = try constant(f64, &arena.allocator, .{
         .{ 0, -2 },
         .{ 3, -4 },
     });
-    const gradient_input = try constant(&arena.allocator, [_][2]f64{
+    const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
     });
@@ -136,7 +136,7 @@ test "exponentiate backward rank 2" {
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
     });
-    const expected = try constant(&arena.allocator, [_][2]f64{
+    const expected = try constant(f64, &arena.allocator, .{
         .{ 2.0, 0.5413 },
         .{ 120.5132, 0.1465 },
     });

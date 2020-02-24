@@ -9,16 +9,16 @@ const CpuStorage = cpu_tensor.CpuStorage;
 const tensorStride = cpu_tensor.tensorStride;
 const tensorLength = cpu_tensor.tensorLength;
 
-fn ConstantType(comptime T: type) type {
-    return CpuTensor(arrayInfo(T).ScalarType);
-}
-
 fn transferMemory(comptime T: type, array: []T, literal: var, index: *usize) void {
     switch (@typeInfo(@TypeOf(literal))) {
         .Pointer, .Array => {
-            var i: usize = 0;
-            while (i < literal.len) : (i += 1)
-                transferMemory(T, array, literal[i], index);
+            for (literal) |e|
+                transferMemory(T, array, e, index);
+        },
+        .Struct => |s| {
+            comptime var i: usize = 0;
+            inline while (i < s.fields.len) : (i += 1)
+                transferMemory(T, array, @field(literal, s.fields[i].name), index);
         },
         else => {
             array[index.*] = literal;
@@ -37,6 +37,10 @@ fn tensorShape(comptime rank: usize, allocator: *Allocator, literal: var) ![]usi
                     s[i] = l.len;
                     call(s, i + 1, l[0]);
                 },
+                .Struct => {
+                    s[i] = l.len;
+                    call(s, i + 1, l[0]);
+                },
                 else => {},
             }
         }
@@ -45,35 +49,34 @@ fn tensorShape(comptime rank: usize, allocator: *Allocator, literal: var) ![]usi
     return shape;
 }
 
-pub fn constant(allocator: *Allocator, literal: var) !ConstantType(@TypeOf(literal)) {
+pub fn constant(comptime T: type, allocator: *Allocator, literal: var) !CpuTensor(T) {
     const info = arrayInfo(@TypeOf(literal));
-    const T = CpuTensor(info.ScalarType);
     const shape = try tensorShape(info.rank, allocator, literal);
     errdefer allocator.free(shape);
     const stride = try tensorStride(allocator, shape);
     errdefer allocator.free(stride);
     if (info.rank == 0) {
-        return T{
+        return CpuTensor(T){
             .shape = shape,
             .stride = stride,
-            .storage = CpuStorage(info.ScalarType){ .scalar = literal },
+            .storage = CpuStorage(T){ .scalar = @as(T, literal) },
         };
     }
-    var array = try allocator.alloc(info.ScalarType, tensorLength(shape));
+    var array = try allocator.alloc(T, tensorLength(shape));
     errdefer allocator.free(array);
     var index: usize = 0;
-    transferMemory(info.ScalarType, array, literal, &index);
-    return T{
+    transferMemory(T, array, literal, &index);
+    return CpuTensor(T){
         .shape = shape,
         .stride = stride,
-        .storage = CpuStorage(info.ScalarType){ .array = array },
+        .storage = CpuStorage(T){ .array = array },
     };
 }
 
 test "constant rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const tensor = try constant(&arena.allocator, @as(f16, 5));
+    const tensor = try constant(f16, &arena.allocator, 5);
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{}));
     expectEqual(tensor.storage.scalar, 5);
@@ -84,7 +87,7 @@ test "constant rank 0" {
 test "constant rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const tensor = try constant(&arena.allocator, &[_]f64{ 1, 2, 3 });
+    const tensor = try constant(f64, &arena.allocator, .{ 1, 2, 3 });
     expect(std.mem.eql(usize, tensor.shape, &[_]usize{3}));
     expect(std.mem.eql(usize, tensor.stride, &[_]usize{1}));
     expect(std.mem.eql(f64, tensor.storage.array, &[_]f64{ 1, 2, 3 }));
@@ -95,7 +98,7 @@ test "constant rank 1" {
 test "constant rank 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const tensor = try constant(&arena.allocator, &[_][3]i32{
+    const tensor = try constant(i32, &arena.allocator, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
@@ -114,7 +117,7 @@ test "constant rank 2" {
 test "constant rank 3" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const tensor = try constant(&arena.allocator, &[_][2][3]f16{
+    const tensor = try constant(f16, &arena.allocator, .{
         .{
             .{ 1, 2, 3 },
             .{ 4, 5, 6 },
@@ -155,7 +158,7 @@ test "constant rank 3" {
 test "constant rank 4" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const tensor = try constant(&arena.allocator, &[_][2][3][4]i32{
+    const tensor = try constant(i32, &arena.allocator, .{
         .{
             .{
                 .{ 1, 2, 3, 4 },
@@ -250,7 +253,7 @@ test "CpuTensorUnion formatted printing" {
     const CpuTensorUnion = cpu_tensor.CpuTensorUnion;
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const tensor = try constant(&arena.allocator, &[_][2][3]f16{
+    const tensor = try constant(f16, &arena.allocator, .{
         .{
             .{ 1, 2, 3 },
             .{ 4, 5, 6 },
