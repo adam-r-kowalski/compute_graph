@@ -6,6 +6,7 @@ pub const Operation = struct {
     pub const ForwardError = error{
         OutOfMemory,
         ShapeMismatch,
+        CouldNotBroadcastShapes,
         Overflow,
         OperationNotDefinedForScalarType,
         InvalidDimension,
