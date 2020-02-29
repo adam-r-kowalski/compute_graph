@@ -8,6 +8,9 @@ const tensorLength = cpu_tensor.tensorLength;
 const linearIndex = cpu_tensor.linearIndex;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
+const broadcast = @import("broadcast.zig");
+const maximumCartesianIndex = broadcast.maximumCartesianIndex;
+const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 
 pub fn newShape(allocator: *Allocator, shape: []const usize, dimension: ?usize) ![]const usize {
     if (dimension) |d| {
@@ -62,60 +65,6 @@ test "newShape invalid dimension" {
         error.InvalidDimension => {},
         else => unreachable,
     };
-}
-
-fn incrementCartesianIndex(shape: []const usize, cartesian_index: []usize) void {
-    var i = shape.len - 1;
-    var increment = true;
-    while (increment) {
-        cartesian_index[i] += 1;
-        if (cartesian_index[i] == shape[i]) {
-            cartesian_index[i] = 0;
-            if (i > 0) {
-                i -= 1;
-            } else {
-                increment = false;
-            }
-        } else {
-            increment = false;
-        }
-    }
-}
-
-test "incrementCartesianIndex" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const shape = [_]usize{ 2, 2 };
-    var cartesian_index = [_]usize{ 0, 0 };
-
-    incrementCartesianIndex(shape[0..], cartesian_index[0..]);
-    std.testing.expect(std.mem.eql(usize, &cartesian_index, &[_]usize{ 0, 1 }));
-
-    incrementCartesianIndex(shape[0..], cartesian_index[0..]);
-    std.testing.expect(std.mem.eql(usize, &cartesian_index, &[_]usize{ 1, 0 }));
-
-    incrementCartesianIndex(shape[0..], cartesian_index[0..]);
-    std.testing.expect(std.mem.eql(usize, &cartesian_index, &[_]usize{ 1, 1 }));
-
-    incrementCartesianIndex(shape[0..], cartesian_index[0..]);
-    std.testing.expect(std.mem.eql(usize, &cartesian_index, &[_]usize{ 0, 0 }));
-}
-
-fn maximumCartesianIndex(shape: []const usize, cartesian_index: []const usize) bool {
-    var i: usize = 0;
-    while (i < shape.len) {
-        if (cartesian_index[i] < shape[i] - 1)
-            return false;
-        i += 1;
-    }
-    return true;
-}
-
-test "maximumCartesianIndex" {
-    std.testing.expect(!maximumCartesianIndex(&[_]usize{ 2, 2 }, &[_]usize{ 0, 0 }));
-    std.testing.expect(!maximumCartesianIndex(&[_]usize{ 2, 2 }, &[_]usize{ 0, 1 }));
-    std.testing.expect(!maximumCartesianIndex(&[_]usize{ 2, 2 }, &[_]usize{ 1, 0 }));
-    std.testing.expect(maximumCartesianIndex(&[_]usize{ 2, 2 }, &[_]usize{ 1, 1 }));
 }
 
 pub fn sum(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), dimension: ?usize) !CpuTensor(T) {

@@ -1,9 +1,18 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
-const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const cpu_tensor = @import("cpu_tensor.zig");
+const CpuTensor = cpu_tensor.CpuTensor;
+const tensorStride = cpu_tensor.tensorStride;
+const tensorLength = cpu_tensor.tensorLength;
+const linearIndex = cpu_tensor.linearIndex;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
+const broadcast = @import("broadcast.zig");
+const broadcastShape = broadcast.broadcastShape;
+const maximumCartesianIndex = broadcast.maximumCartesianIndex;
+const incrementCartesianIndex = broadcast.incrementCartesianIndex;
+const debroadcastIndex = broadcast.debroadcastIndex;
 
 fn addSameShape(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     const shape = x.shape;
@@ -44,70 +53,37 @@ fn addBroadcastScalar(comptime T: type, allocator: *Allocator, scalar: T, tensor
     };
 }
 
-fn broadcastShape(allocator: *Allocator, x: []const usize, y: []const usize) ![]usize {
-    const len = std.math.max(x.len, y.len);
-    const shape = try allocator.alloc(usize, len);
-
-    const candidate = struct {
-        fn closure(s: []const usize, i: usize) usize {
-            return if (i <= s.len) s[s.len - i] else 1;
-        }
-    }.closure;
-
-    var i: usize = 1;
-    while (i <= len) : (i += 1) {
-        const x_candidate = candidate(x, i);
-        const y_candidate = candidate(y, i);
-        if (x_candidate == y_candidate) {
-            shape[len - i] = x_candidate;
-        } else if (x_candidate == 1) {
-            shape[len - i] = y_candidate;
-        } else if (y_candidate == 1) {
-            shape[len - i] = x_candidate;
-        } else {
-            return error.CouldNotBroadcastShapes;
-        }
-    }
-
-    return shape;
-}
-
-test "broadcast shape" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-
-    const actual = try broadcastShape(&arena.allocator, &[_]usize{ 8, 1, 6, 1 }, &[_]usize{ 7, 1, 5 });
-    std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 8, 7, 6, 5 }));
-
-    const actual2 = try broadcastShape(&arena.allocator, &[_]usize{ 5, 4 }, &[_]usize{1});
-    std.testing.expect(std.mem.eql(usize, actual2, &[_]usize{ 5, 4 }));
-
-    const actual3 = try broadcastShape(&arena.allocator, &[_]usize{ 5, 4 }, &[_]usize{4});
-    std.testing.expect(std.mem.eql(usize, actual3, &[_]usize{ 5, 4 }));
-
-    const actual4 = try broadcastShape(&arena.allocator, &[_]usize{ 15, 3, 5 }, &[_]usize{ 15, 1, 5 });
-    std.testing.expect(std.mem.eql(usize, actual4, &[_]usize{ 15, 3, 5 }));
-
-    const actual5 = try broadcastShape(&arena.allocator, &[_]usize{ 15, 3, 5 }, &[_]usize{ 3, 5 });
-    std.testing.expect(std.mem.eql(usize, actual5, &[_]usize{ 15, 3, 5 }));
-
-    const actual6 = try broadcastShape(&arena.allocator, &[_]usize{ 15, 3, 5 }, &[_]usize{ 3, 1 });
-    std.testing.expect(std.mem.eql(usize, actual6, &[_]usize{ 15, 3, 5 }));
-
-    _ = broadcastShape(&arena.allocator, &[_]usize{3}, &[_]usize{4}) catch |err| switch (err) {
-        error.CouldNotBroadcastShapes => {},
-        else => unreachable,
-    };
-
-    _ = broadcastShape(&arena.allocator, &[_]usize{ 2, 1 }, &[_]usize{ 8, 4, 3 }) catch |err| switch (err) {
-        error.CouldNotBroadcastShapes => {},
-        else => unreachable,
-    };
-}
-
 fn addBroadcast(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     const shape = try broadcastShape(allocator, x.shape, y.shape);
-    return error.CouldNotBroadcastShapes;
+    errdefer allocator.free(shape);
+    const stride = try tensorStride(allocator, shape);
+    errdefer allocator.free(stride);
+    const cartesianIndex = try allocator.alloc(usize, shape.len);
+    errdefer allocator.free(cartesianIndex);
+    for (cartesianIndex) |*e| e.* = 0;
+    const xCartesianIndex = try allocator.alloc(usize, x.shape.len);
+    errdefer allocator.free(xCartesianIndex);
+    const yCartesianIndex = try allocator.alloc(usize, x.shape.len);
+    errdefer allocator.free(yCartesianIndex);
+    const array = try allocator.alloc(T, tensorLength(shape));
+    errdefer allocator.free(array);
+    const xArray = x.storage.array;
+    const yArray = y.storage.array;
+    while (true) {
+        debroadcastIndex(x.shape, cartesianIndex, xCartesianIndex);
+        debroadcastIndex(y.shape, cartesianIndex, yCartesianIndex);
+        const xIndex = linearIndex(x.stride, xCartesianIndex);
+        const yIndex = linearIndex(y.stride, yCartesianIndex);
+        const index = linearIndex(stride, cartesianIndex);
+        array[index] = xArray[xIndex] + yArray[yIndex];
+        if (maximumCartesianIndex(shape, cartesianIndex)) break;
+        incrementCartesianIndex(shape, cartesianIndex);
+    }
+    return CpuTensor(T){
+        .shape = shape,
+        .stride = stride,
+        .storage = .{ .array = array },
+    };
 }
 
 pub fn add(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
@@ -243,6 +219,42 @@ test "add broadcast scalar rank 3" {
     });
     expectEqual(i8, actual, expected);
     expectEqual(i8, actual2, expected);
+}
+
+test "add broadcast rank 3 to rank 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const rank3 = try constant(i8, &arena.allocator, .{
+        .{
+            .{ 1, 2, 3 },
+            .{ 4, 5, 6 },
+        },
+        .{
+            .{ 7, 8, 9 },
+            .{ 10, 11, 12 },
+        },
+        .{
+            .{ 13, 14, 15 },
+            .{ 16, 17, 18 },
+        },
+    });
+    const rank1 = try constant(i8, &arena.allocator, .{ 0, 1, 2 });
+    const actual = try add(i8, &arena.allocator, rank3, rank1);
+    const expected = try constant(i8, &arena.allocator, .{
+        .{
+            .{ 1, 2, 3 },
+            .{ 4, 5, 6 },
+        },
+        .{
+            .{ 8, 9, 10 },
+            .{ 11, 12, 13 },
+        },
+        .{
+            .{ 15, 16, 17 },
+            .{ 18, 19, 20 },
+        },
+    });
+    expectEqual(i8, actual, expected);
 }
 
 pub fn addBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
