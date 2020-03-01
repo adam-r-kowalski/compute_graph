@@ -63,7 +63,7 @@ fn addBroadcast(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: Cpu
     for (cartesianIndex) |*e| e.* = 0;
     const xCartesianIndex = try allocator.alloc(usize, x.shape.len);
     errdefer allocator.free(xCartesianIndex);
-    const yCartesianIndex = try allocator.alloc(usize, x.shape.len);
+    const yCartesianIndex = try allocator.alloc(usize, y.shape.len);
     errdefer allocator.free(yCartesianIndex);
     const array = try allocator.alloc(T, tensorLength(shape));
     errdefer allocator.free(array);
@@ -242,19 +242,87 @@ test "add broadcast rank 3 to rank 1" {
     const actual = try add(i8, &arena.allocator, rank3, rank1);
     const expected = try constant(i8, &arena.allocator, .{
         .{
-            .{ 1, 2, 3 },
-            .{ 4, 5, 6 },
+            .{ 1, 3, 5 },
+            .{ 4, 6, 8 },
         },
         .{
-            .{ 8, 9, 10 },
-            .{ 11, 12, 13 },
+            .{ 7, 9, 11 },
+            .{ 10, 12, 14 },
         },
         .{
-            .{ 15, 16, 17 },
-            .{ 18, 19, 20 },
+            .{ 13, 15, 17 },
+            .{ 16, 18, 20 },
         },
     });
     expectEqual(i8, actual, expected);
+}
+
+test "add broadcast rank 3 to rank 4" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const rank3 = try constant(i64, &arena.allocator, .{
+        .{
+            .{ 1, 2 },
+        },
+        .{
+            .{ 3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+        },
+    });
+
+    const rank4 = try constant(i64, &arena.allocator, .{
+        .{.{
+            .{ 1, 2 },
+            .{ 3, 4 },
+            .{ 5, 6 },
+        }},
+        .{.{
+            .{ 7, 8 },
+            .{ 9, 10 },
+            .{ 11, 12 },
+        }},
+    });
+
+    const actual = try add(i64, &arena.allocator, rank3, rank4);
+    const expected = try constant(i64, &arena.allocator, .{
+        .{
+            .{
+                .{ 2, 4 },
+                .{ 4, 6 },
+                .{ 6, 8 },
+            },
+            .{
+                .{ 4, 6 },
+                .{ 6, 8 },
+                .{ 8, 10 },
+            },
+            .{
+                .{ 6, 8 },
+                .{ 8, 10 },
+                .{ 10, 12 },
+            },
+        },
+        .{
+            .{
+                .{ 8, 10 },
+                .{ 10, 12 },
+                .{ 12, 14 },
+            },
+            .{
+                .{ 10, 12 },
+                .{ 12, 14 },
+                .{ 14, 16 },
+            },
+            .{
+                .{ 12, 14 },
+                .{ 14, 16 },
+                .{ 16, 18 },
+            },
+        },
+    });
+    expectEqual(i64, actual, expected);
 }
 
 pub fn addBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {

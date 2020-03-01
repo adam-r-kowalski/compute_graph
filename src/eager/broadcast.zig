@@ -56,10 +56,11 @@ test "maximumCartesianIndex" {
 }
 
 pub fn debroadcastIndex(shape: []const usize, broadcastIndex: []const usize, outputIndex: []usize) void {
+    std.debug.assert(shape.len == outputIndex.len);
     const delta = broadcastIndex.len - outputIndex.len;
     var i: usize = 0;
     while (i < outputIndex.len) : (i += 1) {
-        outputIndex[i] = broadcastIndex[i + delta];
+        outputIndex[i] = if (shape[i] == 1) 0 else broadcastIndex[i + delta];
     }
 }
 
