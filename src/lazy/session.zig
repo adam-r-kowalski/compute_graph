@@ -277,8 +277,8 @@ fn runGradient(context: GradientContext) !void {
         const of = gradient_operation.of;
         const one = switch (try getValue(Cache, Tensor, CpuTensorUnion, context.cache.*, of)) {
             .f64 => CpuTensorUnion.init(try eager.constant(f64, allocator, 1)),
-            .f32 => CpuTensorUnion.init(try eager.constant(f64, allocator, 1)),
-            .f16 => CpuTensorUnion.init(try eager.constant(f64, allocator, 1)),
+            .f32 => CpuTensorUnion.init(try eager.constant(f32, allocator, 1)),
+            .f16 => CpuTensorUnion.init(try eager.constant(f16, allocator, 1)),
             else => return error.CannotDifferentiateIntegral,
         };
         try gradient_cache.putNoClobber(of, one);
