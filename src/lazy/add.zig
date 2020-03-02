@@ -9,6 +9,7 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const addBackward = @import("../eager/add.zig").addBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const broadcastShape = eager.broadcast.broadcastShape;
 
 const Add = struct {
     operation: Operation,
@@ -80,11 +81,20 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
+fn outputShape(allocator: *std.mem.Allocator, x: Tensor, y: Tensor) ![]const usize {
+    if (std.mem.eql(usize, x.shape, y.shape))
+        return x.shape;
+    if (x.shape.len == 0)
+        return y.shape;
+    if (y.shape.len == 0)
+        return x.shape;
+    return try broadcastShape(allocator, x.shape, y.shape);
+}
+
 pub fn add(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
-    if (!std.mem.eql(usize, x.shape, y.shape))
-        return error.ShapeMismatch;
     if (x.scalarType != y.scalarType)
         return error.ScalarTypeMismatch;
+    const shape = try outputShape(&graph.arena.allocator, x, y);
     var add_operation = try graph.arena.allocator.create(Add);
     add_operation.* = .{
         .operation = .{
@@ -97,7 +107,7 @@ pub fn add(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     try graph.operations.append(&add_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
-        .shape = x.shape,
+        .shape = shape,
         .scalarType = x.scalarType,
     };
 }
@@ -230,7 +240,7 @@ test "add matrix shape mismatch" {
         .{ 3, -4, 6 },
     });
     _ = add(&graph, x, y) catch |err| switch (err) {
-        error.ShapeMismatch => {},
+        error.CouldNotBroadcastShapes => {},
         else => unreachable,
     };
 }
