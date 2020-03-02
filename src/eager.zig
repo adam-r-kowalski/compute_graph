@@ -15,6 +15,7 @@ pub const onesLike = @import("eager/ones_like.zig").onesLike;
 const cpu_tensor = @import("eager/cpu_tensor.zig");
 pub const CpuTensor = cpu_tensor.CpuTensor;
 pub const CpuTensorUnion = cpu_tensor.CpuTensorUnion;
+pub const broadcast = @import("eager/broadcast.zig");
 
 test "" {
     const std = @import("std");
