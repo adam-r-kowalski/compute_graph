@@ -4,32 +4,14 @@ const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
+const zip = @import("broadcast.zig").zip;
 
 pub fn subtract(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
-    if (!std.mem.eql(usize, x.shape, y.shape))
-        return error.ShapeMismatch;
-    const shape = x.shape;
-    const stride = x.stride;
-    switch (x.storage) {
-        .scalar => |scalar| {
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = scalar - y.storage.scalar },
-            };
-        },
-        .array => |array| {
-            const new_array = try allocator.alloc(T, array.len);
-            errdefer allocator.free(new_array);
-            const y_array = y.storage.array;
-            for (array) |e, i| new_array[i] = e - y_array[i];
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
+    return try zip(T, allocator, x, y, struct {
+        fn call(a: T, b: T) T {
+            return a - b;
+        }
+    }.call);
 }
 
 test "subtract rank 0" {

@@ -15,9 +15,11 @@ pub const Operation = struct {
     pub const BackwardError = error{
         OutOfMemory,
         ShapeMismatch,
+        CouldNotBroadcastShapes,
         Overflow,
-        CannotDifferentiateIntegral,
         OperationNotDefinedForScalarType,
+        InvalidDimension,
+        CannotDifferentiateIntegral,
     };
 
     pub const ForwardContext = struct {
