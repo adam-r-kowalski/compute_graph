@@ -13,88 +13,15 @@ const broadcastShape = broadcast.broadcastShape;
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const debroadcastIndex = broadcast.debroadcastIndex;
+const zip = broadcast.zip;
 const sum = @import("sum.zig").sum;
 
-fn addSameShape(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
-    const shape = x.shape;
-    const stride = x.stride;
-    switch (x.storage) {
-        .scalar => |scalar| {
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = scalar + y.storage.scalar },
-            };
-        },
-        .array => |array| {
-            const new_array = try allocator.alloc(T, array.len);
-            errdefer allocator.free(new_array);
-            const y_array = y.storage.array;
-            for (array) |e, i| new_array[i] = e + y_array[i];
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
-}
-
-fn addBroadcastScalar(comptime T: type, allocator: *Allocator, scalar: T, tensor: CpuTensor(T)) !CpuTensor(T) {
-    const shape = tensor.shape;
-    const stride = tensor.stride;
-    const array = tensor.storage.array;
-    const new_array = try allocator.alloc(T, array.len);
-    errdefer allocator.free(new_array);
-    for (array) |e, i| new_array[i] = scalar + array[i];
-    return CpuTensor(T){
-        .shape = shape,
-        .stride = stride,
-        .storage = .{ .array = new_array },
-    };
-}
-
-fn addBroadcast(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
-    const shape = try broadcastShape(allocator, x.shape, y.shape);
-    errdefer allocator.free(shape);
-    const stride = try tensorStride(allocator, shape);
-    errdefer allocator.free(stride);
-    const cartesian_index = try allocator.alloc(usize, shape.len);
-    errdefer allocator.free(cartesian_index);
-    for (cartesian_index) |*e| e.* = 0;
-    const x_cartesian_index = try allocator.alloc(usize, x.shape.len);
-    errdefer allocator.free(x_cartesian_index);
-    const y_cartesian_index = try allocator.alloc(usize, y.shape.len);
-    errdefer allocator.free(y_cartesian_index);
-    const array = try allocator.alloc(T, tensorLength(shape));
-    errdefer allocator.free(array);
-    const x_array = x.storage.array;
-    const y_array = y.storage.array;
-    while (true) {
-        debroadcastIndex(x.shape, cartesian_index, x_cartesian_index);
-        debroadcastIndex(y.shape, cartesian_index, y_cartesian_index);
-        const x_index = linearIndex(x.stride, x_cartesian_index);
-        const y_index = linearIndex(y.stride, y_cartesian_index);
-        const index = linearIndex(stride, cartesian_index);
-        array[index] = x_array[x_index] + y_array[y_index];
-        if (maximumCartesianIndex(shape, cartesian_index)) break;
-        incrementCartesianIndex(shape, cartesian_index);
-    }
-    return CpuTensor(T){
-        .shape = shape,
-        .stride = stride,
-        .storage = .{ .array = array },
-    };
-}
-
 pub fn add(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
-    if (std.mem.eql(usize, x.shape, y.shape))
-        return try addSameShape(T, allocator, x, y);
-    if (x.shape.len == 0)
-        return try addBroadcastScalar(T, allocator, x.storage.scalar, y);
-    if (y.shape.len == 0)
-        return try addBroadcastScalar(T, allocator, y.storage.scalar, x);
-    return try addBroadcast(T, allocator, x, y);
+    return try zip(T, allocator, x, y, struct {
+        fn call(a: T, b: T) T {
+            return a + b;
+        }
+    }.call);
 }
 
 test "add rank 0" {
@@ -381,11 +308,11 @@ pub fn addBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(
         outputs[0] = context.gradient_input;
         outputs[1] = context.gradient_input;
     } else if (inputs[0].shape.len == 0) {
-        outputs[0] = sum(T, context.allocator, context.gradient_input, null) catch unreachable;
+        outputs[0] = try sum(T, context.allocator, context.gradient_input, null);
         outputs[1] = context.gradient_input;
     } else if (inputs[1].shape.len == 0) {
         outputs[0] = context.gradient_input;
-        outputs[1] = sum(T, context.allocator, context.gradient_input, null) catch unreachable;
+        outputs[1] = try sum(T, context.allocator, context.gradient_input, null);
     } else {
         try addBackwardBroadcast(T, context, outputs);
     }

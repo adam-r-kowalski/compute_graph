@@ -7,6 +7,7 @@ const backward = @import("backward.zig");
 const onesLike = @import("ones_like.zig").onesLike;
 const multiply = @import("multiply.zig").multiply;
 const negate = @import("negate.zig").negate;
+const zip = @import("broadcast.zig").zip;
 
 fn TensorType(comptime T: type) type {
     const ScalarType = switch (T) {
@@ -26,6 +27,7 @@ fn coerceToFloat(comptime T: type, x: var) T {
     };
 }
 
+// TODO(alternative design choice) should I support integer division rather than convert to float?
 pub fn divide(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !TensorType(T) {
     if (!std.mem.eql(usize, x.shape, y.shape))
         return error.ShapeMismatch;
