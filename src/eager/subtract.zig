@@ -100,6 +100,149 @@ test "subtract rank 3" {
     expectEqual(i8, actual, expected);
 }
 
+test "subtract broadcast scalar rank 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const scalar = try constant(i32, &arena.allocator, 5);
+    const tensor = try constant(i32, &arena.allocator, .{ 1, -2, 3, -4, -5, 6 });
+    const actual = try subtract(i32, &arena.allocator, scalar, tensor);
+    const actual2 = try subtract(i32, &arena.allocator, tensor, scalar);
+    const expected = try constant(i32, &arena.allocator, .{ 4, 7, 2, 9, 10, -1 });
+    const expected2 = try constant(i32, &arena.allocator, .{ -4, -7, -2, -9, -10, 1 });
+    expectEqual(i32, actual, expected);
+    expectEqual(i32, actual2, expected2);
+}
+
+test "subtract broadcast scalar rank 2" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const scalar = try constant(f16, &arena.allocator, 3);
+    const tensor = try constant(f16, &arena.allocator, .{
+        .{ 1, -2 },
+        .{ 3, -4 },
+        .{ -5, 6 },
+    });
+    const actual = try subtract(f16, &arena.allocator, scalar, tensor);
+    const actual2 = try subtract(f16, &arena.allocator, tensor, scalar);
+    const expected = try constant(f16, &arena.allocator, .{
+        .{ 2, 5 },
+        .{ 0, 7 },
+        .{ 8, -3 },
+    });
+    const expected2 = try constant(f16, &arena.allocator, .{
+        .{ -2, -5 },
+        .{ 0, -7 },
+        .{ -8, 3 },
+    });
+    expectEqual(f16, actual, expected);
+    expectEqual(f16, actual2, expected2);
+}
+
+test "subtract broadcast rank 3 to rank 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const rank3 = try constant(i8, &arena.allocator, .{
+        .{
+            .{ 1, 2, 3 },
+            .{ 4, 5, 6 },
+        },
+        .{
+            .{ 7, 8, 9 },
+            .{ 10, 11, 12 },
+        },
+        .{
+            .{ 13, 14, 15 },
+            .{ 16, 17, 18 },
+        },
+    });
+    const rank1 = try constant(i8, &arena.allocator, .{ 0, 1, 2 });
+    const actual = try subtract(i8, &arena.allocator, rank3, rank1);
+    const expected = try constant(i8, &arena.allocator, .{
+        .{
+            .{ 1, 1, 1 },
+            .{ 4, 4, 4 },
+        },
+        .{
+            .{ 7, 7, 7 },
+            .{ 10, 10, 10 },
+        },
+        .{
+            .{ 13, 13, 13 },
+            .{ 16, 16, 16 },
+        },
+    });
+    expectEqual(i8, actual, expected);
+}
+
+test "subtract broadcast rank 3 to rank 4" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const rank3 = try constant(i64, &arena.allocator, .{
+        .{
+            .{ 1, 2 },
+        },
+        .{
+            .{ 3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+        },
+    });
+
+    const rank4 = try constant(i64, &arena.allocator, .{
+        .{.{
+            .{ 1, 2 },
+            .{ 3, 4 },
+            .{ 5, 6 },
+        }},
+        .{.{
+            .{ 7, 8 },
+            .{ 9, 10 },
+            .{ 11, 12 },
+        }},
+    });
+
+    const actual = try subtract(i64, &arena.allocator, rank3, rank4);
+    const expected = try constant(i64, &arena.allocator, .{
+        .{
+            .{
+                .{ 0, 0 },
+                .{ -2, -2 },
+                .{ -4, -4 },
+            },
+            .{
+                .{ 2, 2 },
+                .{ 0, 0 },
+                .{ -2, -2 },
+            },
+            .{
+                .{ 4, 4 },
+                .{ 2, 2 },
+                .{ 0, 0 },
+            },
+        },
+        .{
+            .{
+                .{ -6, -6 },
+                .{ -8, -8 },
+                .{ -10, -10 },
+            },
+            .{
+                .{ -4, -4 },
+                .{ -6, -6 },
+                .{ -8, -8 },
+            },
+            .{
+                .{ -2, -2 },
+                .{ -4, -4 },
+                .{ -6, -6 },
+            },
+        },
+    });
+    expectEqual(i64, actual, expected);
+}
+
+// TODO(refactor) replace this function with map
 fn scale(comptime T: type, allocator: *Allocator, by: T, tensor: CpuTensor(T)) !CpuTensor(T) {
     const shape = tensor.shape;
     const stride = tensor.stride;
@@ -124,6 +267,7 @@ fn scale(comptime T: type, allocator: *Allocator, by: T, tensor: CpuTensor(T)) !
     }
 }
 
+// TODO(refactor) unify with subtract backward broadcast
 pub fn subtractBackwardBroadcast(comptime T: type, context: backward.Context(T), outputs: []CpuTensor(T)) !void {
     const allocator = context.allocator;
     const gradient_input = context.gradient_input;
@@ -154,7 +298,7 @@ pub fn subtractBackwardBroadcast(comptime T: type, context: backward.Context(T),
         const y_index = linearIndex(y_stride, y_cartesian_index);
         const gradient_index = linearIndex(gradient_stride, gradient_cartesian_index);
         x_array[x_index] += gradient_array[gradient_index];
-        y_array[y_index] += -gradient_array[gradient_index];
+        y_array[y_index] -= gradient_array[gradient_index];
         if (maximumCartesianIndex(gradient_shape, gradient_cartesian_index)) break;
         incrementCartesianIndex(gradient_shape, gradient_cartesian_index);
     }
@@ -182,8 +326,9 @@ pub fn subtractBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
         outputs[0] = try sum(T, context.allocator, context.gradient_input, null);
         outputs[1] = try scale(T, context.allocator, -1, context.gradient_input);
     } else if (inputs[1].shape.len == 0) {
-        const scaled = try scale(T, context.allocator, -1, context.gradient_input);
         outputs[0] = context.gradient_input;
+        // TODO(performance) fuse scale and sum into single operation using map reduce
+        const scaled = try scale(T, context.allocator, -1, context.gradient_input);
         outputs[1] = try sum(T, context.allocator, scaled, null);
     } else {
         try subtractBackwardBroadcast(T, context, outputs);

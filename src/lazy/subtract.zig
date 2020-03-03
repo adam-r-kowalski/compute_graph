@@ -9,6 +9,7 @@ const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const subtractBackward = @import("../eager/subtract.zig").subtractBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const broadcastShape = @import("broadcast.zig").broadcastShape;
 
 const Subtract = struct {
     operation: Operation,
@@ -81,10 +82,9 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 }
 
 pub fn subtract(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
-    if (!std.mem.eql(usize, x.shape, y.shape))
-        return error.ShapeMismatch;
     if (x.scalarType != y.scalarType)
         return error.ScalarTypeMismatch;
+    const shape = try broadcastShape(&graph.arena.allocator, x, y);
     var subtract_operation = try graph.arena.allocator.create(Subtract);
     subtract_operation.* = .{
         .operation = .{
@@ -97,7 +97,7 @@ pub fn subtract(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     try graph.operations.append(&subtract_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
-        .shape = x.shape,
+        .shape = shape,
         .scalarType = x.scalarType,
     };
 }
@@ -183,6 +183,113 @@ test "subtract matrix i32" {
     expectEqual(i32, actual[0].i32, expected);
 }
 
+test "subtract broadcast scalar rank 2" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f16, &graph, 3);
+    const b = try constant(f16, &graph, .{
+        .{ 1, -2 },
+        .{ 3, -4 },
+        .{ -5, 6 },
+    });
+    const c = try subtract(&graph, a, b);
+    const d = try subtract(&graph, b, a);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{ c, d }, .{});
+    const expected = try eager.constant(f16, &arena.allocator, .{
+        .{ 2, 5 },
+        .{ 0, 7 },
+        .{ 8, -3 },
+    });
+    const expected2 = try eager.constant(f16, &arena.allocator, .{
+        .{ -2, -5 },
+        .{ 0, -7 },
+        .{ -8, 3 },
+    });
+    expectEqual(f16, actual[0].f16, expected);
+    expectEqual(f16, actual[1].f16, expected2);
+}
+
+test "subtract broadcast rank 3 to rank 4" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(i64, &graph, .{
+        .{
+            .{ 1, 2 },
+        },
+        .{
+            .{ 3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+        },
+    });
+    const b = try constant(i64, &graph, .{
+        .{.{
+            .{ 1, 2 },
+            .{ 3, 4 },
+            .{ 5, 6 },
+        }},
+        .{.{
+            .{ 7, 8 },
+            .{ 9, 10 },
+            .{ 11, 12 },
+        }},
+    });
+    const c = try subtract(&graph, a, b);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{c}, .{});
+    const expected = try eager.constant(i64, &arena.allocator, .{
+        .{
+            .{
+                .{ 0, 0 },
+                .{ -2, -2 },
+                .{ -4, -4 },
+            },
+            .{
+                .{ 2, 2 },
+                .{ 0, 0 },
+                .{ -2, -2 },
+            },
+            .{
+                .{ 4, 4 },
+                .{ 2, 2 },
+                .{ 0, 0 },
+            },
+        },
+        .{
+            .{
+                .{ -6, -6 },
+                .{ -8, -8 },
+                .{ -10, -10 },
+            },
+            .{
+                .{ -4, -4 },
+                .{ -6, -6 },
+                .{ -8, -8 },
+            },
+            .{
+                .{ -2, -2 },
+                .{ -4, -4 },
+                .{ -6, -6 },
+            },
+        },
+    });
+    expectEqual(i64, actual[0].i64, expected);
+}
+
 test "gradient subtract" {
     const constant = @import("constant.zig").constant;
     const Session = @import("session.zig").Session;
@@ -218,4 +325,106 @@ test "gradient subtract" {
     });
     expectEqual(f64, actual[0].f64, expected_a_gradient);
     expectEqual(f64, actual[1].f64, expected_b_gradient);
+}
+
+test "subtract backwards broadcast rank 3 to rank 4" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, -5);
+    const b = try constant(f64, &graph, .{
+        .{
+            .{ 1, -2 },
+            .{ 3, -4 },
+        },
+        .{
+            .{ 5, -6 },
+            .{ 7, -8 },
+        },
+    });
+    const c = try subtract(&graph, a, b);
+    const d = try mean(&graph, c);
+    const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const expected_scalar_gradient = try eager.constant(f64, &arena.allocator, 1);
+    const expected_tensor_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{
+            .{ -0.125, -0.125 },
+            .{ -0.125, -0.125 },
+        },
+        .{
+            .{ -0.125, -0.125 },
+            .{ -0.125, -0.125 },
+        },
+    });
+    expectEqual(f64, expected_scalar_gradient, actual[0].f64);
+    expectEqual(f64, expected_tensor_gradient, actual[1].f64);
+}
+
+test "subtract backwards broadcast rank 3 to rank 4" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, .{
+        .{
+            .{ 1, 2 },
+        },
+        .{
+            .{ 3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+        },
+    });
+    const b = try constant(f64, &graph, .{
+        .{.{
+            .{ 1, 2 },
+            .{ 3, 4 },
+            .{ 5, 6 },
+        }},
+        .{.{
+            .{ 7, 8 },
+            .{ 9, 10 },
+            .{ 11, 12 },
+        }},
+    });
+    const c = try subtract(&graph, a, b);
+    const d = try mean(&graph, c);
+    const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const expected_rank_3_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{.{ 0.16667, 0.16667 }},
+        .{.{ 0.16667, 0.16667 }},
+        .{.{ 0.16667, 0.16667 }},
+    });
+    const expected_rank_4_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{.{
+            .{ -0.0833, -0.0833 },
+            .{ -0.0833, -0.0833 },
+            .{ -0.0833, -0.0833 },
+        }},
+        .{.{
+            .{ -0.0833, -0.0833 },
+            .{ -0.0833, -0.0833 },
+            .{ -0.0833, -0.0833 },
+        }},
+    });
+    expectEqual(f64, expected_rank_3_gradient, actual[0].f64);
+    expectEqual(f64, expected_rank_4_gradient, actual[1].f64);
 }

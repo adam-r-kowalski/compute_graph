@@ -9,7 +9,7 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const addBackward = @import("../eager/add.zig").addBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
-const broadcastShape = eager.broadcast.broadcastShape;
+const broadcastShape = @import("broadcast.zig").broadcastShape;
 
 const Add = struct {
     operation: Operation,
@@ -81,20 +81,10 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
-fn outputShape(allocator: *std.mem.Allocator, x: Tensor, y: Tensor) ![]const usize {
-    if (std.mem.eql(usize, x.shape, y.shape))
-        return x.shape;
-    if (x.shape.len == 0)
-        return y.shape;
-    if (y.shape.len == 0)
-        return x.shape;
-    return try broadcastShape(allocator, x.shape, y.shape);
-}
-
 pub fn add(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     if (x.scalarType != y.scalarType)
         return error.ScalarTypeMismatch;
-    const shape = try outputShape(&graph.arena.allocator, x, y);
+    const shape = try broadcastShape(&graph.arena.allocator, x, y);
     var add_operation = try graph.arena.allocator.create(Add);
     add_operation.* = .{
         .operation = .{

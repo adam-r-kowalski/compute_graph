@@ -209,6 +209,20 @@ fn zipBroadcastScalar(comptime T: type, allocator: *Allocator, scalar: T, tensor
     };
 }
 
+fn zipBroadcastScalarFlip(comptime T: type, allocator: *Allocator, scalar: T, tensor: CpuTensor(T), f: fn (T, T) T) !CpuTensor(T) {
+    const shape = tensor.shape;
+    const stride = tensor.stride;
+    const array = tensor.storage.array;
+    const new_array = try allocator.alloc(T, array.len);
+    errdefer allocator.free(new_array);
+    for (array) |e, i| new_array[i] = f(array[i], scalar);
+    return CpuTensor(T){
+        .shape = shape,
+        .stride = stride,
+        .storage = .{ .array = new_array },
+    };
+}
+
 fn zipBroadcast(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T), f: fn (T, T) T) !CpuTensor(T) {
     const shape = try broadcastShape(allocator, x.shape, y.shape);
     errdefer allocator.free(shape);
@@ -247,7 +261,8 @@ pub fn zip(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTenso
         return try zipSameShape(T, allocator, x, y, f);
     if (x.shape.len == 0)
         return try zipBroadcastScalar(T, allocator, x.storage.scalar, y, f);
-    if (y.shape.len == 0)
-        return try zipBroadcastScalar(T, allocator, y.storage.scalar, x, f);
+    if (y.shape.len == 0) {
+        return try zipBroadcastScalarFlip(T, allocator, y.storage.scalar, x, f);
+    }
     return try zipBroadcast(T, allocator, x, y, f);
 }
