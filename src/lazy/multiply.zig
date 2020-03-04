@@ -323,3 +323,105 @@ test "gradient multiply" {
     expectEqual(f64, actual[0].f64, expected_a_gradient);
     expectEqual(f64, actual[1].f64, expected_b_gradient);
 }
+
+test "gradient multiply broadcast scalar rank 3" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, -5);
+    const b = try constant(f64, &graph, .{
+        .{
+            .{ 1, -2 },
+            .{ 3, -4 },
+        },
+        .{
+            .{ 5, -6 },
+            .{ 7, -8 },
+        },
+    });
+    const c = try multiply(&graph, a, b);
+    const d = try mean(&graph, c);
+    const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const expected_scalar_gradient = try eager.constant(f64, &arena.allocator, -0.5);
+    const expected_tensor_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{
+            .{ -0.625, -0.625 },
+            .{ -0.625, -0.625 },
+        },
+        .{
+            .{ -6.25e-01, -6.25e-01 },
+            .{ -6.25e-01, -6.25e-01 },
+        },
+    });
+    expectEqual(f64, actual[0].f64, expected_scalar_gradient);
+    expectEqual(f64, actual[1].f64, expected_tensor_gradient);
+}
+
+test "gradient multiply broadcast rank 3 to rank 4" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, .{
+        .{
+            .{ 1, 2 },
+        },
+        .{
+            .{ 3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+        },
+    });
+    const b = try constant(f64, &graph, .{
+        .{.{
+            .{ 1, 2 },
+            .{ 3, 4 },
+            .{ 5, 6 },
+        }},
+        .{.{
+            .{ 7, 8 },
+            .{ 9, 10 },
+            .{ 11, 12 },
+        }},
+    });
+    const c = try multiply(&graph, a, b);
+    const d = try mean(&graph, c);
+    const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const expected_rank_3_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{.{ 1, 1.1667 }},
+        .{.{ 1, 1.1667 }},
+        .{.{ 1, 1.1667 }},
+    });
+    const expected_rank_4_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{.{
+            .{ 0.25, 0.3333 },
+            .{ 0.25, 0.3333 },
+            .{ 0.25, 0.3333 },
+        }},
+        .{.{
+            .{ 0.25, 0.3333 },
+            .{ 0.25, 0.3333 },
+            .{ 0.25, 0.3333 },
+        }},
+    });
+    expectEqual(f64, expected_rank_3_gradient, actual[0].f64);
+    expectEqual(f64, expected_rank_4_gradient, actual[1].f64);
+}
