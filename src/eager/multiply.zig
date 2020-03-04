@@ -79,12 +79,13 @@ test "multiply rank 3" {
 
 pub fn multiplyBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 2);
-    const x = context.forward_inputs[0];
-    const y = context.forward_inputs[1];
     const outputs = try context.allocator.alloc(CpuTensor(T), 2);
     errdefer context.allocator.free(outputs);
-    outputs[0] = try multiply(T, context.allocator, context.gradient_input, y);
-    outputs[1] = try multiply(T, context.allocator, context.gradient_input, x);
+    const inputs = context.forward_inputs;
+    if (std.mem.eql(usize, inputs[0].shape, inputs[1].shape)) {
+        outputs[0] = try multiply(T, context.allocator, context.gradient_input, inputs[1]);
+        outputs[1] = try multiply(T, context.allocator, context.gradient_input, inputs[0]);
+    } else if (inputs[0].shape.len == 0) {}
     return outputs;
 }
 

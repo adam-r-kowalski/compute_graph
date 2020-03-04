@@ -9,6 +9,7 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const multiplyBackward = @import("../eager/multiply.zig").multiplyBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const broadcastShape = @import("broadcast.zig").broadcastShape;
 
 const Multiply = struct {
     operation: Operation,
@@ -81,10 +82,9 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 }
 
 pub fn multiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
-    if (!std.mem.eql(usize, x.shape, y.shape))
-        return error.ShapeMismatch;
     if (x.scalarType != y.scalarType)
         return error.ScalarTypeMismatch;
+    const shape = try broadcastShape(&graph.arena.allocator, x, y);
     var multiply_operation = try graph.arena.allocator.create(Multiply);
     multiply_operation.* = .{
         .operation = .{
@@ -97,7 +97,7 @@ pub fn multiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     try graph.operations.append(&multiply_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
-        .shape = x.shape,
+        .shape = shape,
         .scalarType = x.scalarType,
     };
 }
@@ -171,6 +171,120 @@ test "multiply matrix i32" {
         .{ 25, 36 },
     });
     expectEqual(i32, actual[0].i32, expected);
+}
+
+test "multiply broadcast scalar rank 3" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(i8, &graph, -5);
+    const y = try constant(i8, &graph, .{
+        .{
+            .{ 1, -2 },
+            .{ 3, -4 },
+        },
+        .{
+            .{ 5, -6 },
+            .{ 7, -8 },
+        },
+    });
+    const z = try multiply(&graph, x, y);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 2, 2 }));
+    std.testing.expectEqual(z.scalarType, .i8);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{z}, .{});
+    const expected = try eager.constant(i8, &arena.allocator, .{
+        .{
+            .{ -5, 10 },
+            .{ -15, 20 },
+        },
+        .{
+            .{ -25, 30 },
+            .{ -35, 40 },
+        },
+    });
+    expectEqual(i8, actual[0].i8, expected);
+}
+
+test "multiply broadcast rank 3 to rank 4" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(i64, &graph, .{
+        .{
+            .{ 1, 2 },
+        },
+        .{
+            .{ 3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+        },
+    });
+    const y = try constant(i64, &graph, .{
+        .{.{
+            .{ 1, 2 },
+            .{ 3, 4 },
+            .{ 5, 6 },
+        }},
+        .{.{
+            .{ 7, 8 },
+            .{ 9, 10 },
+            .{ 11, 12 },
+        }},
+    });
+    const z = try multiply(&graph, x, y);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 3, 3, 2 }));
+    std.testing.expectEqual(z.scalarType, .i64);
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{z}, .{});
+    const expected = try eager.constant(i64, &arena.allocator, .{
+        .{
+            .{
+                .{ 1, 4 },
+                .{ 3, 8 },
+                .{ 5, 12 },
+            },
+            .{
+                .{ 3, 8 },
+                .{ 9, 16 },
+                .{ 15, 24 },
+            },
+            .{
+                .{ 5, 12 },
+                .{ 15, 24 },
+                .{ 25, 36 },
+            },
+        },
+        .{
+            .{
+                .{ 7, 16 },
+                .{ 9, 20 },
+                .{ 11, 24 },
+            },
+            .{
+                .{ 21, 32 },
+                .{ 27, 40 },
+                .{ 33, 48 },
+            },
+            .{
+                .{ 35, 48 },
+                .{ 45, 60 },
+                .{ 55, 72 },
+            },
+        },
+    });
+    expectEqual(i64, actual[0].i64, expected);
 }
 
 test "gradient multiply" {
