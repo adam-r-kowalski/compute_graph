@@ -16,6 +16,7 @@ const cpu_tensor = @import("eager/cpu_tensor.zig");
 pub const CpuTensor = cpu_tensor.CpuTensor;
 pub const CpuTensorUnion = cpu_tensor.CpuTensorUnion;
 pub const broadcast = @import("eager/broadcast.zig");
+pub const invoke = @import("eager/invoke.zig");
 
 test "" {
     const std = @import("std");

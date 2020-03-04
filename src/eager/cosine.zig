@@ -4,29 +4,14 @@ const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
+const map = @import("map.zig").map;
 
 pub fn cosine(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !CpuTensor(T) {
-    const shape = tensor.shape;
-    const stride = tensor.stride;
-    switch (tensor.storage) {
-        .scalar => |scalar| {
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = std.math.cos(scalar) },
-            };
-        },
-        .array => |array| {
-            const new_array = try allocator.alloc(T, array.len);
-            errdefer allocator.free(new_array);
-            for (array) |e, i| new_array[i] = std.math.cos(e);
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
+    return try map(T, allocator, tensor, struct {
+        fn call(t: T) T {
+            return std.math.cos(t);
+        }
+    }.call);
 }
 
 test "cosine rank 0" {
