@@ -5,6 +5,8 @@ const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
 const zip = @import("broadcast.zig").zip;
+const map = @import("map.zig").map;
+const sum = @import("sum.zig").sum;
 
 pub fn multiply(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     return try zip(T, allocator, x, y, struct {
@@ -85,7 +87,25 @@ pub fn multiplyBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
     if (std.mem.eql(usize, inputs[0].shape, inputs[1].shape)) {
         outputs[0] = try multiply(T, context.allocator, context.gradient_input, inputs[1]);
         outputs[1] = try multiply(T, context.allocator, context.gradient_input, inputs[0]);
-    } else if (inputs[0].shape.len == 0) {}
+    } else if (inputs[0].shape.len == 0) {
+        // TODO(performance) fuse multiply and sum into single operation using map reduce
+        const multiplied = try multiply(T, context.allocator, context.gradient_input, inputs[1]);
+        outputs[0] = try sum(T, context.allocator, multiplied, null);
+        outputs[1] = try map(T, context.allocator, context.gradient_input, struct {
+            fn call(t: T) T {
+                return t * -5;
+            }
+        }.call);
+    } else if (inputs[1].shape.len == 0) {
+        outputs[0] = try map(T, context.allocator, context.gradient_input, struct {
+            fn call(t: T) T {
+                return t * -5;
+            }
+        }.call);
+        // TODO(performance) fuse multiply and sum into single operation using map reduce
+        const multiplied = try multiply(T, context.allocator, context.gradient_input, inputs[0]);
+        outputs[1] = try sum(T, context.allocator, multiplied, null);
+    }
     return outputs;
 }
 
@@ -157,4 +177,67 @@ test "multiply backward rank 2" {
     });
     expectEqual(f64, actual[0], expected_x_gradient);
     expectEqual(f64, actual[1], expected_y_gradient);
+}
+
+test "multiply backwards broadcast scalar rank 3" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const scalar = try constant(f64, &arena.allocator, -5);
+    const tensor = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 1, -2 },
+            .{ 3, -4 },
+        },
+        .{
+            .{ 5, -6 },
+            .{ 7, -8 },
+        },
+    });
+    const gradient_input = try constant(f64, &arena.allocator, .{
+        .{
+            .{
+                0.125,
+                0.125,
+            },
+            .{
+                0.125,
+                0.125,
+            },
+        },
+        .{
+            .{
+                0.125,
+                0.125,
+            },
+            .{
+                0.125,
+                0.125,
+            },
+        },
+    });
+    const actual = try multiplyBackward(f64, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ scalar, tensor },
+    });
+    const actual2 = try multiplyBackward(f64, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ tensor, scalar },
+    });
+    const expected_scalar_gradient = try constant(f64, &arena.allocator, -0.5);
+    const expected_tensor_gradient = try constant(f64, &arena.allocator, .{
+        .{
+            .{ -0.625, -0.625 },
+            .{ -0.625, -0.625 },
+        },
+        .{
+            .{ -6.25e-01, -6.25e-01 },
+            .{ -6.25e-01, -6.25e-01 },
+        },
+    });
+    expectEqual(f64, actual[0], expected_scalar_gradient);
+    expectEqual(f64, actual[1], expected_tensor_gradient);
+    expectEqual(f64, actual2[0], expected_tensor_gradient);
+    expectEqual(f64, actual2[1], expected_scalar_gradient);
 }

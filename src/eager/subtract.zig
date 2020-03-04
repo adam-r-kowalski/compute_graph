@@ -12,6 +12,7 @@ const broadcast = @import("broadcast.zig");
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const debroadcastIndex = broadcast.debroadcastIndex;
+const map = @import("map.zig").map;
 
 pub fn subtract(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     return try zip(T, allocator, x, y, struct {
@@ -242,31 +243,6 @@ test "subtract broadcast rank 3 to rank 4" {
     expectEqual(i64, actual, expected);
 }
 
-// TODO(refactor) replace this function with map
-fn scale(comptime T: type, allocator: *Allocator, by: T, tensor: CpuTensor(T)) !CpuTensor(T) {
-    const shape = tensor.shape;
-    const stride = tensor.stride;
-    switch (tensor.storage) {
-        .scalar => |scalar| {
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = scalar * by },
-            };
-        },
-        .array => |array| {
-            const new_array = try allocator.alloc(T, array.len);
-            errdefer allocator.free(new_array);
-            for (array) |e, i| new_array[i] = e * by;
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
-}
-
 // TODO(refactor) unify with subtract backward broadcast
 pub fn subtractBackwardBroadcast(comptime T: type, context: backward.Context(T), outputs: []CpuTensor(T)) !void {
     const allocator = context.allocator;
@@ -319,16 +295,21 @@ pub fn subtractBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
     const outputs = try context.allocator.alloc(CpuTensor(T), 2);
     errdefer context.allocator.free(outputs);
     const inputs = context.forward_inputs;
+    const negate = struct {
+        fn call(t: T) T {
+            return -1 * t;
+        }
+    }.call;
     if (std.mem.eql(usize, inputs[0].shape, inputs[1].shape)) {
         outputs[0] = context.gradient_input;
-        outputs[1] = try scale(T, context.allocator, -1, context.gradient_input);
+        outputs[1] = try map(T, context.allocator, context.gradient_input, negate);
     } else if (inputs[0].shape.len == 0) {
         outputs[0] = try sum(T, context.allocator, context.gradient_input, null);
-        outputs[1] = try scale(T, context.allocator, -1, context.gradient_input);
+        outputs[1] = try map(T, context.allocator, context.gradient_input, negate);
     } else if (inputs[1].shape.len == 0) {
         outputs[0] = context.gradient_input;
         // TODO(performance) fuse scale and sum into single operation using map reduce
-        const scaled = try scale(T, context.allocator, -1, context.gradient_input);
+        const scaled = try map(T, context.allocator, context.gradient_input, negate);
         outputs[1] = try sum(T, context.allocator, scaled, null);
     } else {
         try subtractBackwardBroadcast(T, context, outputs);
