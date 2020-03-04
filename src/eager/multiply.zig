@@ -84,6 +84,12 @@ pub fn multiplyBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
     const outputs = try context.allocator.alloc(CpuTensor(T), 2);
     errdefer context.allocator.free(outputs);
     const inputs = context.forward_inputs;
+    const Closure = struct {
+        scalar: T,
+        pub fn call(self: @This(), t: T) T {
+            return t * self.scalar;
+        }
+    };
     if (std.mem.eql(usize, inputs[0].shape, inputs[1].shape)) {
         outputs[0] = try multiply(T, context.allocator, context.gradient_input, inputs[1]);
         outputs[1] = try multiply(T, context.allocator, context.gradient_input, inputs[0]);
@@ -91,17 +97,9 @@ pub fn multiplyBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
         // TODO(performance) fuse multiply and sum into single operation using map reduce
         const multiplied = try multiply(T, context.allocator, context.gradient_input, inputs[1]);
         outputs[0] = try sum(T, context.allocator, multiplied, null);
-        outputs[1] = try map(T, context.allocator, context.gradient_input, struct {
-            fn call(t: T) T {
-                return t * -5;
-            }
-        }.call);
+        outputs[1] = try map(T, context.allocator, context.gradient_input, Closure{ .scalar = inputs[0].storage.scalar });
     } else if (inputs[1].shape.len == 0) {
-        outputs[0] = try map(T, context.allocator, context.gradient_input, struct {
-            fn call(t: T) T {
-                return t * -5;
-            }
-        }.call);
+        outputs[0] = try map(T, context.allocator, context.gradient_input, Closure{ .scalar = inputs[1].storage.scalar });
         // TODO(performance) fuse multiply and sum into single operation using map reduce
         const multiplied = try multiply(T, context.allocator, context.gradient_input, inputs[0]);
         outputs[1] = try sum(T, context.allocator, multiplied, null);

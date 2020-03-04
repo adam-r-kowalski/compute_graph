@@ -12,7 +12,7 @@ fn ReturnType(comptime Invokable: type) type {
     }
 }
 
-fn invoke(invokable: var, args: var) ReturnType(@TypeOf(invokable)) {
+pub fn invoke(invokable: var, args: var) ReturnType(@TypeOf(invokable)) {
     switch (@typeInfo(@TypeOf(invokable))) {
         .Fn => return @call(.{}, invokable, args),
         .Struct => return @call(.{}, invokable.call, args),
@@ -22,21 +22,21 @@ fn invoke(invokable: var, args: var) ReturnType(@TypeOf(invokable)) {
 
 test "invoke function pointer" {
     const callable = struct {
-        fn call(x: i32) i32 {
-            return x + 2;
+        fn call(x: i32, y: i32) i32 {
+            return x + y * 2;
         }
     };
-    std.testing.expectEqual(invoke(callable.call, .{10}), 12);
+    std.testing.expectEqual(invoke(callable.call, .{ 10, 20 }), 50);
 }
 
 test "invoke closure" {
     const Callable = struct {
         x: i32,
 
-        fn call(self: @This(), y: i32) i32 {
-            return self.x + y;
+        fn call(self: @This(), y: i32, z: i32) i32 {
+            return self.x + y * z;
         }
     };
     const callable = Callable{ .x = 5 };
-    std.testing.expectEqual(invoke(callable, .{10}), 15);
+    std.testing.expectEqual(invoke(callable, .{ 10, 3 }), 35);
 }
