@@ -17,30 +17,11 @@ fn divideScalar(comptime T: type, x: T, y: T) T {
 }
 
 pub fn divide(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
-    if (!std.mem.eql(usize, x.shape, y.shape))
-        return error.ShapeMismatch;
-    const shape = x.shape;
-    const stride = x.stride;
-    switch (x.storage) {
-        .scalar => |scalar| {
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = divideScalar(T, scalar, y.storage.scalar) },
-            };
-        },
-        .array => |array| {
-            const new_array = try allocator.alloc(T, array.len);
-            errdefer allocator.free(new_array);
-            const y_array = y.storage.array;
-            for (array) |e, i| new_array[i] = divideScalar(T, e, y_array[i]);
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
+    return try zip(T, allocator, x, y, struct {
+        fn call(a: T, b: T) T {
+            return divideScalar(T, a, b);
+        }
+    }.call);
 }
 
 test "divide rank 0" {
