@@ -9,45 +9,32 @@ const multiply = @import("multiply.zig").multiply;
 const negate = @import("negate.zig").negate;
 const zip = @import("broadcast.zig").zip;
 
-fn TensorType(comptime T: type) type {
-    const ScalarType = switch (T) {
-        f64, f32, f16 => T,
-        i64 => f64,
-        i32 => f32,
-        i8 => f16,
-        else => @compileError("ScalarType not supported"),
-    };
-    return CpuTensor(ScalarType);
-}
-
-fn coerceToFloat(comptime T: type, x: var) T {
-    return switch (@TypeOf(x)) {
-        f64, f32, f16 => @as(T, x),
-        else => @intToFloat(T, x),
+fn divideScalar(comptime T: type, x: T, y: T) T {
+    return switch (T) {
+        i64, i32, i8 => @divFloor(x, y),
+        else => x / y,
     };
 }
 
-// TODO(alternative design choice) should I support integer division rather than convert to float?
-pub fn divide(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !TensorType(T) {
+pub fn divide(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     if (!std.mem.eql(usize, x.shape, y.shape))
         return error.ShapeMismatch;
-    const Tensor = TensorType(T);
     const shape = x.shape;
     const stride = x.stride;
     switch (x.storage) {
         .scalar => |scalar| {
-            return Tensor{
+            return CpuTensor(T){
                 .shape = shape,
                 .stride = stride,
-                .storage = .{ .scalar = coerceToFloat(Tensor.ScalarType, scalar) / coerceToFloat(Tensor.ScalarType, y.storage.scalar) },
+                .storage = .{ .scalar = divideScalar(T, scalar, y.storage.scalar) },
             };
         },
         .array => |array| {
-            const new_array = try allocator.alloc(Tensor.ScalarType, array.len);
+            const new_array = try allocator.alloc(T, array.len);
             errdefer allocator.free(new_array);
             const y_array = y.storage.array;
-            for (array) |e, i| new_array[i] = coerceToFloat(Tensor.ScalarType, e) / coerceToFloat(Tensor.ScalarType, y_array[i]);
-            return Tensor{
+            for (array) |e, i| new_array[i] = divideScalar(T, e, y_array[i]);
+            return CpuTensor(T){
                 .shape = shape,
                 .stride = stride,
                 .storage = .{ .array = new_array },
@@ -72,8 +59,8 @@ test "divide rank 1" {
     const x = try constant(i32, &arena.allocator, .{ 1, -2, 3, -4, -5, 6 });
     const y = try constant(i32, &arena.allocator, .{ 6, -5, 4, -3, -2, 1 });
     const actual = try divide(i32, &arena.allocator, x, y);
-    const expected = try constant(f32, &arena.allocator, .{ 0.1666, 0.4, 0.75, 1.3333, 2.5, 6 });
-    expectEqual(f32, actual, expected);
+    const expected = try constant(i32, &arena.allocator, .{ 0, 0, 0, 1, 2, 6 });
+    expectEqual(i32, actual, expected);
 }
 
 test "divide rank 2" {
@@ -122,17 +109,17 @@ test "divide rank 3" {
         },
     });
     const actual = try divide(i8, &arena.allocator, x, y);
-    const expected = try constant(f16, &arena.allocator, .{
+    const expected = try constant(i8, &arena.allocator, .{
         .{
-            .{ 0.125, 0.2856 },
-            .{ 0.5, 0.7998 },
+            .{ 0, 0 },
+            .{ 0, 0 },
         },
         .{
-            .{ 1.25, 2 },
-            .{ 3.5, 8 },
+            .{ 1, 2 },
+            .{ 3, 8 },
         },
     });
-    expectEqual(f16, actual, expected);
+    expectEqual(i8, actual, expected);
 }
 
 pub fn divideBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {

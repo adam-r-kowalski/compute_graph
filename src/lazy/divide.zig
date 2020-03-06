@@ -27,9 +27,9 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
         .f64 => |tensor| .{ .f64 = try eager.divide(f64, context.allocator, tensor, y.f64) },
         .f32 => |tensor| .{ .f32 = try eager.divide(f32, context.allocator, tensor, y.f32) },
         .f16 => |tensor| .{ .f16 = try eager.divide(f16, context.allocator, tensor, y.f16) },
-        .i64 => |tensor| .{ .f64 = try eager.divide(i64, context.allocator, tensor, y.i64) },
-        .i32 => |tensor| .{ .f32 = try eager.divide(i32, context.allocator, tensor, y.i32) },
-        .i8 => |tensor| .{ .f16 = try eager.divide(i8, context.allocator, tensor, y.i8) },
+        .i64 => |tensor| .{ .i64 = try eager.divide(i64, context.allocator, tensor, y.i64) },
+        .i32 => |tensor| .{ .i32 = try eager.divide(i32, context.allocator, tensor, y.i32) },
+        .i8 => |tensor| .{ .i8 = try eager.divide(i8, context.allocator, tensor, y.i8) },
     };
 }
 
@@ -178,12 +178,12 @@ test "divide matrix i32" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(f32, &arena.allocator, .{
-        .{ 0.1666, 0.4 },
-        .{ 0.75, 1.3333 },
-        .{ 2.5, 6 },
+    const expected = try eager.constant(i32, &arena.allocator, .{
+        .{ 0, 0 },
+        .{ 0, 1 },
+        .{ 2, 6 },
     });
-    expectEqual(f32, actual[0].f32, expected);
+    expectEqual(i32, actual[0].i32, expected);
 }
 
 test "gradient divide" {
