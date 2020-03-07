@@ -6,6 +6,7 @@ const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
 const onesLike = @import("ones_like.zig").onesLike;
 const multiply = @import("multiply.zig").multiply;
+const sum = @import("sum.zig").sum;
 const negate = @import("negate.zig").negate;
 const zip = @import("broadcast.zig").zip;
 
@@ -111,17 +112,45 @@ pub fn divideBackward(comptime T: type, context: backward.Context(T)) ![]CpuTens
     const b = context.forward_inputs[1];
     const g = context.gradient_input;
     const allocator = context.allocator;
-    outputs[0] = blk: {
-        const c = try onesLike(T, allocator, b);
-        const d = try divide(T, allocator, c, b);
-        break :blk try multiply(T, allocator, d, g);
-    };
-    outputs[1] = blk: {
-        const c = try divide(T, allocator, a, b);
-        const d = try divide(T, allocator, c, b);
-        const e = try negate(T, allocator, d);
-        break :blk try multiply(T, allocator, e, g);
-    };
+    if (std.mem.eql(usize, a.shape, b.shape)) {
+        outputs[0] = blk: {
+            const c = try onesLike(T, allocator, b);
+            const d = try divide(T, allocator, c, b);
+            break :blk try multiply(T, allocator, d, g);
+        };
+        outputs[1] = blk: {
+            const c = try divide(T, allocator, a, b);
+            const d = try divide(T, allocator, c, b);
+            const e = try negate(T, allocator, d);
+            break :blk try multiply(T, allocator, e, g);
+        };
+    } else if (a.shape.len == 0) {
+        outputs[0] = blk: {
+            const c = try onesLike(T, allocator, b);
+            const d = try divide(T, allocator, c, b);
+            const e = try multiply(T, allocator, d, g);
+            break :blk try sum(T, allocator, e, null);
+        };
+        outputs[1] = blk: {
+            const c = try divide(T, allocator, a, b);
+            const d = try divide(T, allocator, c, b);
+            const e = try negate(T, allocator, d);
+            break :blk try multiply(T, allocator, e, g);
+        };
+    } else if (b.shape.len == 0) {
+        outputs[0] = blk: {
+            const c = try onesLike(T, allocator, b);
+            const d = try divide(T, allocator, c, b);
+            break :blk try multiply(T, allocator, d, g);
+        };
+        outputs[1] = blk: {
+            const c = try divide(T, allocator, a, b);
+            const d = try divide(T, allocator, c, b);
+            const e = try negate(T, allocator, d);
+            const f = try multiply(T, allocator, e, g);
+            break :blk try sum(T, allocator, f, null);
+        };
+    }
     return outputs;
 }
 
@@ -189,4 +218,78 @@ test "divide backward rank 2" {
     });
     expectEqual(f64, actual[0], expected_x_gradient);
     expectEqual(f64, actual[1], expected_y_gradient);
+}
+
+test "divide backwards broadcast scalar rank 3" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const scalar = try constant(f64, &arena.allocator, -5);
+    const tensor = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 1, -2 },
+            .{ 3, -4 },
+        },
+        .{
+            .{ 5, -6 },
+            .{ 7, -8 },
+        },
+    });
+    const gradient_input = try constant(f64, &arena.allocator, .{
+        .{
+            .{
+                0.125,
+                0.125,
+            },
+            .{
+                0.125,
+                0.125,
+            },
+        },
+        .{
+            .{
+                0.125,
+                0.125,
+            },
+            .{
+                0.125,
+                0.125,
+            },
+        },
+    });
+    const actual = try divideBackward(f64, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ scalar, tensor },
+    });
+    const actual2 = try divideBackward(f64, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ tensor, scalar },
+    });
+    const expected_scalar_gradient = try constant(f64, &arena.allocator, 0.0793);
+    const expected_tensor_gradient = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 0.625, 0.1562 },
+            .{ 0.0694, 0.0391 },
+        },
+        .{
+            .{ 0.025, 0.0174 },
+            .{ 0.0128, 0.0098 },
+        },
+    });
+    const expected2_scalar_gradient = try constant(f64, &arena.allocator, 0.02);
+    const expected2_tensor_gradient = try constant(f64, &arena.allocator, .{
+        .{
+            .{ -0.025, -0.025 },
+            .{ -0.025, -0.025 },
+        },
+        .{
+            .{ -0.025, -0.025 },
+            .{ -0.025, -0.025 },
+        },
+    });
+    expectEqual(f64, actual[0], expected_scalar_gradient);
+    expectEqual(f64, actual[1], expected_tensor_gradient);
+    expectEqual(f64, actual2[0], expected2_tensor_gradient);
+    expectEqual(f64, actual2[1], expected2_scalar_gradient);
 }
