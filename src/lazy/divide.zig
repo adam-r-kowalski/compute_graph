@@ -9,6 +9,7 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const divideBackward = @import("../eager/divide.zig").divideBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const broadcastShape = @import("broadcast.zig").broadcastShape;
 
 const Divide = struct {
     operation: Operation,
@@ -27,9 +28,9 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
         .f64 => |tensor| .{ .f64 = try eager.divide(f64, context.allocator, tensor, y.f64) },
         .f32 => |tensor| .{ .f32 = try eager.divide(f32, context.allocator, tensor, y.f32) },
         .f16 => |tensor| .{ .f16 = try eager.divide(f16, context.allocator, tensor, y.f16) },
-        .i64 => |tensor| .{ .f64 = try eager.divide(i64, context.allocator, tensor, y.i64) },
-        .i32 => |tensor| .{ .f32 = try eager.divide(i32, context.allocator, tensor, y.i32) },
-        .i8 => |tensor| .{ .f16 = try eager.divide(i8, context.allocator, tensor, y.i8) },
+        .i64 => |tensor| .{ .i64 = try eager.divide(i64, context.allocator, tensor, y.i64) },
+        .i32 => |tensor| .{ .i32 = try eager.divide(i32, context.allocator, tensor, y.i32) },
+        .i8 => |tensor| .{ .i8 = try eager.divide(i8, context.allocator, tensor, y.i8) },
     };
 }
 
@@ -81,10 +82,9 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 }
 
 pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
-    if (!std.mem.eql(usize, x.shape, y.shape))
-        return error.ShapeMismatch;
     if (x.scalarType != y.scalarType)
         return error.ScalarTypeMismatch;
+    const shape = try broadcastShape(&graph.arena.allocator, x, y);
     var divide_operation = try graph.arena.allocator.create(Divide);
     divide_operation.* = .{
         .operation = .{
@@ -97,7 +97,7 @@ pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
     try graph.operations.append(&divide_operation.operation);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
-        .shape = x.shape,
+        .shape = shape,
         .scalarType = x.scalarType,
     };
 }
@@ -178,12 +178,12 @@ test "divide matrix i32" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
     const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(f32, &arena.allocator, .{
-        .{ 0.1666, 0.4 },
-        .{ 0.75, 1.3333 },
-        .{ 2.5, 6 },
+    const expected = try eager.constant(i32, &arena.allocator, .{
+        .{ 0, 0 },
+        .{ 0, 1 },
+        .{ 2, 6 },
     });
-    expectEqual(f32, actual[0].f32, expected);
+    expectEqual(i32, actual[0].i32, expected);
 }
 
 test "gradient divide" {
@@ -222,4 +222,147 @@ test "gradient divide" {
     });
     expectEqual(f64, actual[0].f64, expected_a_gradient);
     expectEqual(f64, actual[1].f64, expected_b_gradient);
+}
+
+test "gradient divide broadcast scalar rank 3" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, -5);
+    const b = try constant(f64, &graph, .{
+        .{
+            .{ 1, -2 },
+            .{ 3, -4 },
+        },
+        .{
+            .{ 5, -6 },
+            .{ 7, -8 },
+        },
+    });
+    const c = try divide(&graph, a, b);
+    const d = try mean(&graph, c);
+    const e = try divide(&graph, b, a);
+    const f = try mean(&graph, e);
+    const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    const gradients2 = try gradient(&graph, f, &[_]Tensor{ a, b });
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const actual2 = try session.run(gradients2, .{});
+    const expected_a_gradient = try eager.constant(f64, &arena.allocator, 0.0793);
+    const expected_b_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{
+            .{ 0.625, 0.1562 },
+            .{ 0.0694, 0.0391 },
+        },
+        .{
+            .{ 0.025, 0.0174 },
+            .{ 0.0128, 0.0098 },
+        },
+    });
+    const expected2_a_gradient = try eager.constant(f64, &arena.allocator, 0.02);
+    const expected2_b_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{
+            .{ -0.025, -0.025 },
+            .{ -0.025, -0.025 },
+        },
+        .{
+            .{ -0.025, -0.025 },
+            .{ -0.025, -0.025 },
+        },
+    });
+    expectEqual(f64, actual[0].f64, expected_a_gradient);
+    expectEqual(f64, actual[1].f64, expected_b_gradient);
+    expectEqual(f64, actual2[0].f64, expected2_a_gradient);
+    expectEqual(f64, actual2[1].f64, expected2_b_gradient);
+}
+
+test "gradient divide broadcast rank 3 to rank 4" {
+    const constant = @import("constant.zig").constant;
+    const Session = @import("session.zig").Session;
+    const gradient = @import("gradient.zig").gradient;
+    const mean = @import("mean.zig").mean;
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, .{
+        .{
+            .{ 1, 2 },
+        },
+        .{
+            .{ 3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+        },
+    });
+
+    const b = try constant(f64, &graph, .{
+        .{.{
+            .{ 1, 2 },
+            .{ 3, 4 },
+            .{ 5, 6 },
+        }},
+        .{.{
+            .{ 7, 8 },
+            .{ 9, 10 },
+            .{ 11, 12 },
+        }},
+    });
+    const c = try divide(&graph, a, b);
+    const d = try mean(&graph, c);
+    const e = try divide(&graph, b, a);
+    const f = try mean(&graph, e);
+    const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
+    const gradients2 = try gradient(&graph, f, &[_]Tensor{ a, b });
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const actual2 = try session.run(gradients2, .{});
+    const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{.{ 0.0522, 0.0340 }},
+        .{.{ 0.0522, 0.0340 }},
+        .{.{ 0.0522, 0.0340 }},
+    });
+    const expected_b_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{.{
+            .{ -0.25, -0.0833 },
+            .{ -0.0278, -0.0208 },
+            .{ -0.01, -0.0093 },
+        }},
+        .{.{
+            .{ -0.0051, -0.0052 },
+            .{ -0.0031, -0.0033 },
+            .{ -0.0021, -0.0023 },
+        }},
+    });
+    const expected2_a_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{.{ -1.0, -0.2917 }},
+        .{.{ -0.1111, -0.0729 }},
+        .{.{ -0.04, -0.0324 }},
+    });
+    const expected2_b_gradient = try eager.constant(f64, &arena.allocator, .{
+        .{.{
+            .{ 0.0426, 0.0255 },
+            .{ 0.0426, 0.0255 },
+            .{ 0.0426, 0.0255 },
+        }},
+        .{.{
+            .{ 0.0426, 0.0255 },
+            .{ 0.0426, 0.0255 },
+            .{ 0.0426, 0.0255 },
+        }},
+    });
+    expectEqual(f64, actual[0].f64, expected_a_gradient);
+    expectEqual(f64, actual[1].f64, expected_b_gradient);
+    expectEqual(f64, actual2[0].f64, expected2_a_gradient);
+    expectEqual(f64, actual2[1].f64, expected2_b_gradient);
 }

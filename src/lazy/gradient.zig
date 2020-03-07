@@ -11,6 +11,7 @@ pub const Gradient = struct {
 };
 
 pub fn gradient(graph: *Graph, of: Tensor, with_respect_to: []const Tensor) ![]Tensor {
+    if (of.shape.len != 0) return error.requestingGradientOfNonScalar;
     try graph.gradients.append(Gradient{
         .of = of,
         .with_respect_to = with_respect_to,
