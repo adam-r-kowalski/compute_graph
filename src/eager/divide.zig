@@ -137,7 +137,7 @@ pub fn divideBackwardBroadcast(comptime T: type, context: backward.Context(T), o
     const gradient_stride = gradient_input.stride;
     const gradient_array = gradient_input.storage.array;
     const gradient_cartesian_index = try allocator.alloc(usize, gradient_shape.len);
-    errdefer allocator.free(gradient_cartesian_index);
+    defer allocator.free(gradient_cartesian_index);
     for (gradient_cartesian_index) |*e| e.* = 0;
     const x_shape = context.forward_inputs[0].shape;
     const x_stride = context.forward_inputs[0].stride;
@@ -145,14 +145,14 @@ pub fn divideBackwardBroadcast(comptime T: type, context: backward.Context(T), o
     errdefer allocator.free(x_array);
     for (x_array) |*e| e.* = 0;
     const x_cartesian_index = try allocator.alloc(usize, x_shape.len);
-    errdefer allocator.free(x_cartesian_index);
+    defer allocator.free(x_cartesian_index);
     const y_shape = context.forward_inputs[1].shape;
     const y_stride = context.forward_inputs[1].stride;
     const y_array = try allocator.alloc(T, context.forward_inputs[1].storage.array.len);
     errdefer allocator.free(y_array);
     for (y_array) |*e| e.* = 0;
     const y_cartesian_index = try allocator.alloc(usize, y_shape.len);
-    errdefer allocator.free(y_cartesian_index);
+    defer allocator.free(y_cartesian_index);
     const x_forward_array = context.forward_inputs[0].storage.array;
     const y_forward_array = context.forward_inputs[1].storage.array;
     while (true) {
