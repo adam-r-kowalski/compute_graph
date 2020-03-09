@@ -166,7 +166,8 @@ pub fn maximumBackward(comptime T: type, dimension: ?usize, context: backward.Co
 
     if (dimension) |d| {
         if (shape.len > 1) {
-            const array = try allocator.alloc(T, input.storage.array.len);
+            const forward_input = input.storage.array;
+            const array = try allocator.alloc(T, forward_input.len);
             errdefer allocator.free(array);
 
             const gradient_array = context.gradient_input.storage.array;
@@ -180,6 +181,8 @@ pub fn maximumBackward(comptime T: type, dimension: ?usize, context: backward.Co
 
             const gradient_shape = context.gradient_input.shape;
 
+            const forward_output = context.forward_output.storage.array;
+
             while (true) {
                 for (array_cartesian_index) |*e, i| {
                     if (i < d) {
@@ -192,12 +195,15 @@ pub fn maximumBackward(comptime T: type, dimension: ?usize, context: backward.Co
                 }
 
                 const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
+                const gradient_value = gradient_array[gradient_linear_index];
 
                 var i: usize = 0;
                 while (i < shape[d]) {
                     array_cartesian_index[d] = i;
                     const array_linear_index = linearIndex(stride, array_cartesian_index);
-                    array[array_linear_index] = gradient_array[gradient_linear_index];
+                    const is_max = forward_input[array_linear_index] == forward_output[gradient_linear_index];
+                    const contribution = if (is_max) gradient_value else 0;
+                    array[array_linear_index] = contribution;
                     i += 1;
                 }
 
@@ -226,7 +232,13 @@ pub fn maximumBackward(comptime T: type, dimension: ?usize, context: backward.Co
         .array => |array| {
             const new_array = try allocator.alloc(T, array.len);
             errdefer allocator.free(new_array);
-            for (new_array) |*e, i| e.* = gradient;
+            const forward_output = context.forward_output.storage.scalar;
+            var count: T = 0;
+            for (array) |e| {
+                if (e == forward_output) count += 1;
+            }
+            const contribution = gradient / count;
+            for (new_array) |*e, i| e.* = if (array[i] == forward_output) contribution else 0;
             outputs[0] = CpuTensor(T){
                 .shape = shape,
                 .stride = stride,
@@ -266,131 +278,170 @@ test "maximum backward rank 1" {
         .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{ 0, 0, 0, 0, 1 });
-    std.debug.warn("\n{}\n", .{actual[0]});
-    // expectEqual(f64, actual[0], expected);
+    expectEqual(f64, actual[0], expected);
 }
 
-// test "maximum backward rank 2" {
-//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//     const forward_input = try constant(f64, &arena.allocator, .{
-//         .{ 1, 2 },
-//         .{ 3, 4 },
-//     });
-//     const gradient_input = try constant(f64, &arena.allocator, 1);
-//     const actual = try maximumBackward(f64, null, backward.Context(f64){
-//         .allocator = &arena.allocator,
-//         .gradient_input = gradient_input,
-//         .forward_inputs = &[_]CpuTensor(f64){forward_input},
-//     });
-//     const expected = try constant(f64, &arena.allocator, .{
-//         .{ 1, 1 },
-//         .{ 1, 1 },
-//     });
-//     expectEqual(f64, actual[0], expected);
-// }
+test "maximum backward rank 1 repeated max" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{ 1, 5, 3, 4, 5 });
+    const gradient_input = try constant(f64, &arena.allocator, 1);
+    const forward_output = try maximum(f64, &arena.allocator, forward_input, null);
+    const actual = try maximumBackward(f64, null, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{ 0, 0.5, 0, 0, 0.5 });
+    expectEqual(f64, actual[0], expected);
+}
 
-// test "maximum backward rank 3 dimension 0" {
-//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//     const forward_input = try constant(f64, &arena.allocator, .{
-//         .{
-//             .{ 1, 2 },
-//             .{ -3, 4 },
-//         },
-//         .{
-//             .{ 5, 6 },
-//             .{ 7, 8 },
-//         },
-//     });
-//     const gradient_input = try constant(f64, &arena.allocator, .{
-//         .{ 0.25, 0.5 },
-//         .{ 0.75, 1 },
-//     });
-//     const actual = try maximumBackward(f64, 0, backward.Context(f64){
-//         .allocator = &arena.allocator,
-//         .gradient_input = gradient_input,
-//         .forward_inputs = &[_]CpuTensor(f64){forward_input},
-//     });
-//     const expected = try constant(f64, &arena.allocator, .{
-//         .{
-//             .{ 0.25, 0.5 },
-//             .{ 0.75, 1 },
-//         },
-//         .{
-//             .{ 0.25, 0.5 },
-//             .{ 0.75, 1 },
-//         },
-//     });
-//     expectEqual(f64, actual[0], expected);
-// }
+test "maximum backward rank 1 thrice repeated max" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{ 1, 5, 5, 4, 5 });
+    const gradient_input = try constant(f64, &arena.allocator, 1);
+    const forward_output = try maximum(f64, &arena.allocator, forward_input, null);
+    const actual = try maximumBackward(f64, null, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{ 0, 0.3333, 0.3333, 0, 0.3333 });
+    expectEqual(f64, actual[0], expected);
+}
 
-// test "maximum backward rank 3 dimension 1" {
-//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//     const forward_input = try constant(f64, &arena.allocator, .{
-//         .{
-//             .{ 1, 2 },
-//             .{ -3, 4 },
-//         },
-//         .{
-//             .{ 5, 6 },
-//             .{ 7, 8 },
-//         },
-//     });
-//     const gradient_input = try constant(f64, &arena.allocator, .{
-//         .{ 0.25, 0.5 },
-//         .{ 0.75, 1 },
-//     });
-//     const actual = try maximumBackward(f64, 1, backward.Context(f64){
-//         .allocator = &arena.allocator,
-//         .gradient_input = gradient_input,
-//         .forward_inputs = &[_]CpuTensor(f64){forward_input},
-//     });
-//     const expected = try constant(f64, &arena.allocator, .{
-//         .{
-//             .{ 0.25, 0.5 },
-//             .{ 0.25, 0.5 },
-//         },
-//         .{
-//             .{ 0.75, 1 },
-//             .{ 0.75, 1 },
-//         },
-//     });
-//     expectEqual(f64, actual[0], expected);
-// }
+test "maximum backward rank 2" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(f64, &arena.allocator, 1);
+    const forward_output = try maximum(f64, &arena.allocator, forward_input, null);
+    const actual = try maximumBackward(f64, null, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{
+        .{ 0, 0 },
+        .{ 0, 1 },
+    });
+    expectEqual(f64, actual[0], expected);
+}
 
-// test "maximum backward rank 3 dimension 2" {
-//     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-//     defer arena.deinit();
-//     const forward_input = try constant(f64, &arena.allocator, .{
-//         .{
-//             .{ 1, 2 },
-//             .{ -3, 4 },
-//         },
-//         .{
-//             .{ 5, 6 },
-//             .{ 7, 8 },
-//         },
-//     });
-//     const gradient_input = try constant(f64, &arena.allocator, .{
-//         .{ 0.25, 0.5 },
-//         .{ 0.75, 1 },
-//     });
-//     const actual = try maximumBackward(f64, 2, backward.Context(f64){
-//         .allocator = &arena.allocator,
-//         .gradient_input = gradient_input,
-//         .forward_inputs = &[_]CpuTensor(f64){forward_input},
-//     });
-//     const expected = try constant(f64, &arena.allocator, .{
-//         .{
-//             .{ 0.25, 0.25 },
-//             .{ 0.5, 0.5 },
-//         },
-//         .{
-//             .{ 0.75, 0.75 },
-//             .{ 1, 1 },
-//         },
-//     });
-//     expectEqual(f64, actual[0], expected);
-// }
+test "maximum backward rank 3 dimension 0" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 1, 12 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const gradient_input = try constant(f64, &arena.allocator, .{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    const forward_output = try maximum(f64, &arena.allocator, forward_input, 0);
+    const actual = try maximumBackward(f64, 0, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 0, 0.25 },
+            .{ 0, 0 },
+        },
+        .{
+            .{ 0.25, 0 },
+            .{ 0.25, 0.25 },
+        },
+    });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "maximum backward rank 3 dimension 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 1, 12 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const gradient_input = try constant(f64, &arena.allocator, .{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    const forward_output = try maximum(f64, &arena.allocator, forward_input, 1);
+    const actual = try maximumBackward(f64, 1, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 0.25, 0.25 },
+            .{ 0, 0 },
+        },
+        .{
+            .{ 0, 0 },
+            .{ 0.25, 0.25 },
+        },
+    });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "maximum backward rank 3 dimension 2" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 1, 12 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const gradient_input = try constant(f64, &arena.allocator, .{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    const forward_output = try maximum(f64, &arena.allocator, forward_input, 2);
+    const actual = try maximumBackward(f64, 2, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 0, 0.25 },
+            .{ 0, 0.25 },
+        },
+        .{
+            .{ 0, 0.25 },
+            .{ 0, 0.25 },
+        },
+    });
+    expectEqual(f64, actual[0], expected);
+}
