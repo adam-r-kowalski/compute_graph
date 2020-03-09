@@ -11,131 +11,14 @@ const backward = @import("backward.zig");
 const broadcast = @import("broadcast.zig");
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
-
-pub fn newShape(allocator: *Allocator, shape: []const usize, dimension: ?usize) ![]const usize {
-    if (dimension) |d| {
-        if (d >= shape.len) return error.InvalidDimension;
-        const new_shape = try allocator.alloc(usize, shape.len - 1);
-        errdefer allocator.free(new_shape);
-        for (shape) |s, i| {
-            if (i < d) {
-                new_shape[i] = shape[i];
-            } else if (i > d) {
-                new_shape[i - 1] = shape[i];
-            }
-        }
-        return new_shape;
-    } else {
-        return &[_]usize{};
-    }
-}
-
-test "newShape null" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, null);
-    std.testing.expect(std.mem.eql(usize, actual, &[_]usize{}));
-}
-
-test "newShape dimension 0" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, 0);
-    std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 2, 3 }));
-}
-
-test "newShape dimension 1" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, 1);
-    std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 1, 3 }));
-}
-
-test "newShape dimension 2" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, 2);
-    std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 1, 2 }));
-}
-
-test "newShape invalid dimension" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    _ = newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, 3) catch |err| switch (err) {
-        error.InvalidDimension => {},
-        else => unreachable,
-    };
-}
+const reduce = @import("reduce.zig").reduce;
 
 pub fn sum(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), dimension: ?usize) !CpuTensor(T) {
-    const shape = try newShape(allocator, tensor.shape, dimension);
-    errdefer allocator.free(shape);
-    const stride = try tensorStride(allocator, shape);
-    errdefer allocator.free(stride);
-    switch (tensor.storage) {
-        .scalar => |scalar| {
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = scalar },
-            };
-        },
-        .array => |array| {
-            if (dimension) |d| {
-                if (shape.len > 0) {
-                    const sum_array = try allocator.alloc(T, tensorLength(shape));
-                    errdefer allocator.free(sum_array);
-
-                    var sum_cartesian_index = try allocator.alloc(usize, shape.len);
-                    defer allocator.free(sum_cartesian_index);
-                    for (sum_cartesian_index) |*e| e.* = 0;
-
-                    var array_cartesian_index = try allocator.alloc(usize, shape.len + 1);
-                    defer allocator.free(array_cartesian_index);
-
-                    while (true) {
-                        for (array_cartesian_index) |*e, i| {
-                            if (i < d) {
-                                e.* = sum_cartesian_index[i];
-                            } else if (i > d) {
-                                e.* = sum_cartesian_index[i - 1];
-                            } else {
-                                e.* = 0;
-                            }
-                        }
-
-                        var total: T = 0;
-                        var i: usize = 0;
-                        while (i < tensor.shape[d]) {
-                            array_cartesian_index[d] = i;
-                            const array_linear_index = linearIndex(tensor.stride, array_cartesian_index);
-                            total += array[array_linear_index];
-                            i += 1;
-                        }
-                        const sum_linear_index = linearIndex(stride, sum_cartesian_index);
-                        sum_array[sum_linear_index] = total;
-
-                        if (maximumCartesianIndex(shape, sum_cartesian_index)) break;
-                        incrementCartesianIndex(shape, sum_cartesian_index);
-                    }
-
-                    return CpuTensor(T){
-                        .shape = shape,
-                        .stride = stride,
-                        .storage = .{ .array = sum_array },
-                    };
-                }
-            }
-
-            var total: T = 0;
-            for (array) |e| total += e;
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = total },
-            };
-        },
-    }
+    return try reduce(T, allocator, tensor, dimension, struct {
+        fn call(accumulator: T, value: T) T {
+            return accumulator + value;
+        }
+    }.call, 0);
 }
 
 test "sum rank 0" {
