@@ -234,11 +234,13 @@ test "sum backward rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, 4);
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try sumBackward(f64, null, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, 1);
     expectEqual(f64, actual[0], expected);
@@ -248,11 +250,13 @@ test "sum backward rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, .{ 1, 2, 3, 4, 5 });
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try sumBackward(f64, null, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{ 1, 1, 1, 1, 1 });
     expectEqual(f64, actual[0], expected);
@@ -265,11 +269,13 @@ test "sum backward rank 2" {
         .{ 1, 2 },
         .{ 3, 4 },
     });
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try sumBackward(f64, null, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{
         .{ 1, 1 },
@@ -291,6 +297,7 @@ test "sum backward rank 3 dimension 0" {
             .{ 7, 8 },
         },
     });
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 0.25, 0.5 },
         .{ 0.75, 1 },
@@ -299,6 +306,7 @@ test "sum backward rank 3 dimension 0" {
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{
         .{
@@ -326,6 +334,7 @@ test "sum backward rank 3 dimension 1" {
             .{ 7, 8 },
         },
     });
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 0.25, 0.5 },
         .{ 0.75, 1 },
@@ -334,6 +343,7 @@ test "sum backward rank 3 dimension 1" {
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{
         .{
@@ -361,6 +371,7 @@ test "sum backward rank 3 dimension 2" {
             .{ 7, 8 },
         },
     });
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 0.25, 0.5 },
         .{ 0.75, 1 },
@@ -369,6 +380,7 @@ test "sum backward rank 3 dimension 2" {
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{
         .{

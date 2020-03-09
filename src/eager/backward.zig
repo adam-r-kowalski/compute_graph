@@ -6,5 +6,6 @@ pub fn Context(comptime T: type) type {
         allocator: *Allocator,
         gradient_input: CpuTensor(T),
         forward_inputs: []const CpuTensor(T),
+        forward_output: CpuTensor(T),
     };
 }

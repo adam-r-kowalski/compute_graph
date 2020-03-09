@@ -82,10 +82,12 @@ test "cosine backward rank 0" {
     defer arena.deinit();
     const x = try constant(f64, &arena.allocator, -4);
     const gradient_input = try constant(f64, &arena.allocator, 1);
+    const forward_output = try cosine(f64, &arena.allocator, x);
     const actual = try cosineBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, -0.75680);
     expectEqual(f64, actual[0], expected);
@@ -95,11 +97,13 @@ test "cosine backward rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(f64, &arena.allocator, .{ 0, 2, -3, 4, -5 });
+    const forward_output = try cosine(f64, &arena.allocator, x);
     const gradient_input = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
     const actual = try cosineBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{ 0, -3.6371, 0.8467, 6.0544, -9.5892 });
     expectEqual(f64, actual[0], expected);
@@ -112,6 +116,7 @@ test "cosine backward rank 2" {
         .{ 0, -2 },
         .{ 3, -4 },
     });
+    const forward_output = try cosine(f64, &arena.allocator, x);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
@@ -120,6 +125,7 @@ test "cosine backward rank 2" {
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{
         .{ 0, 3.6371 },

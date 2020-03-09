@@ -293,12 +293,14 @@ fn runGradient(context: GradientContext) !void {
                     defer allocator.free(forward_inputs);
                     for (inputs) |input, j| forward_inputs[j] = try getValue(Cache, Tensor, CpuTensorUnion, context.cache.*, input);
                     const gradient_input = try getValue(Cache, Tensor, CpuTensorUnion, gradient_cache, current);
+                    const forward_output = try getValue(Cache, Tensor, CpuTensorUnion, context.cache.*, current);
                     if (operation.backward) |backward| {
                         const gradients = try backward(.{
                             .operation = operation,
                             .allocator = allocator,
                             .gradient_input = gradient_input,
                             .forward_inputs = forward_inputs,
+                            .forward_output = forward_output,
                         });
                         for (inputs) |input, j| {
                             const result = try gradient_cache.getOrPut(input);

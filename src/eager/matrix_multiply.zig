@@ -141,10 +141,12 @@ test "matrix multiply backward" {
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
     });
+    const forward_output = try matrixMultiply(f64, &arena.allocator, x, y);
     const actual = try matrixMultiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
     });
     const expected_x_gradient = try constant(f64, &arena.allocator, .{
         .{ 3.75, 4.75, 5.75 },

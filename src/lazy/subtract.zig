@@ -46,6 +46,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
                     context.forward_inputs[0].f64,
                     context.forward_inputs[1].f64,
                 },
+                .forward_output = context.forward_output.f64,
             });
             values[0] = .{ .f64 = gradients[0] };
             values[1] = .{ .f64 = gradients[1] };
@@ -58,6 +59,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
                     context.forward_inputs[0].f32,
                     context.forward_inputs[1].f32,
                 },
+                .forward_output = context.forward_output.f32,
             });
             values[0] = .{ .f32 = gradients[0] };
             values[1] = .{ .f32 = gradients[1] };
@@ -70,6 +72,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
                     context.forward_inputs[0].f16,
                     context.forward_inputs[1].f16,
                 },
+                .forward_output = context.forward_output.f16,
             });
             values[0] = .{ .f16 = gradients[0] };
             values[1] = .{ .f16 = gradients[1] };

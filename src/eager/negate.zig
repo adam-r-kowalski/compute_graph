@@ -124,10 +124,12 @@ test "negate backward rank 0" {
     defer arena.deinit();
     const x = try constant(f64, &arena.allocator, -4);
     const gradient_input = try constant(f64, &arena.allocator, 1);
+    const forward_output = try negate(f64, &arena.allocator, x);
     const actual = try negateBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, -1);
     expectEqual(f64, actual[0], expected);
@@ -138,10 +140,12 @@ test "negate backward rank 1" {
     defer arena.deinit();
     const x = try constant(f64, &arena.allocator, .{ 0, 2, -3, 4, -5 });
     const gradient_input = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
+    const forward_output = try negate(f64, &arena.allocator, x);
     const actual = try negateBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{ -2, -4, -6, -8, -10 });
     expectEqual(f64, actual[0], expected);
@@ -158,10 +162,12 @@ test "negate backward rank 2" {
         .{ 2, 4 },
         .{ 6, 8 },
     });
+    const forward_output = try negate(f64, &arena.allocator, x);
     const actual = try negateBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){x},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{
         .{ -2, -4 },
