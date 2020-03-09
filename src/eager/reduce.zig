@@ -8,6 +8,7 @@ const linearIndex = cpu_tensor.linearIndex;
 const broadcast = @import("broadcast.zig");
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
+const zeroBroadcastedIndex = broadcast.zeroBroadcastedIndex;
 
 pub fn newShape(allocator: *Allocator, shape: []const usize, dimension: ?usize) ![]const usize {
     if (dimension) |d| {
@@ -86,15 +87,7 @@ fn reduceAcrossDimension(
     defer allocator.free(array_cartesian_index);
 
     while (true) {
-        for (array_cartesian_index) |*e, i| {
-            if (i < dimension) {
-                e.* = reduce_cartesian_index[i];
-            } else if (i > dimension) {
-                e.* = reduce_cartesian_index[i - 1];
-            } else {
-                e.* = 0;
-            }
-        }
+        zeroBroadcastedIndex(reduce_cartesian_index, dimension, array_cartesian_index);
 
         var accumulator = identity;
         var i: usize = 0;

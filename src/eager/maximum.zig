@@ -10,6 +10,7 @@ const backward = @import("backward.zig");
 const broadcast = @import("broadcast.zig");
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
+const zeroBroadcastedIndex = broadcast.zeroBroadcastedIndex;
 
 fn minimumScalar(comptime T: type) T {
     return switch (T) {
@@ -184,26 +185,26 @@ pub fn maximumBackward(comptime T: type, dimension: ?usize, context: backward.Co
             const forward_output = context.forward_output.storage.array;
 
             while (true) {
-                for (array_cartesian_index) |*e, i| {
-                    if (i < d) {
-                        e.* = gradient_cartesian_index[i];
-                    } else if (i > d) {
-                        e.* = gradient_cartesian_index[i - 1];
-                    } else {
-                        e.* = 0;
-                    }
-                }
-
                 const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
-                const gradient_value = gradient_array[gradient_linear_index];
-
+                const maximum_value = forward_output[gradient_linear_index];
+                zeroBroadcastedIndex(gradient_cartesian_index, d, array_cartesian_index);
                 var i: usize = 0;
+                var count: T = 0;
                 while (i < shape[d]) {
                     array_cartesian_index[d] = i;
                     const array_linear_index = linearIndex(stride, array_cartesian_index);
-                    const is_max = forward_input[array_linear_index] == forward_output[gradient_linear_index];
-                    const contribution = if (is_max) gradient_value else 0;
-                    array[array_linear_index] = contribution;
+                    if (forward_input[array_linear_index] == maximum_value) count += 1;
+                    i += 1;
+                }
+
+                zeroBroadcastedIndex(gradient_cartesian_index, d, array_cartesian_index);
+                const contribution = gradient_array[gradient_linear_index] / count;
+                i = 0;
+                while (i < shape[d]) {
+                    array_cartesian_index[d] = i;
+                    const array_linear_index = linearIndex(stride, array_cartesian_index);
+                    const forward_value = forward_input[array_linear_index];
+                    array[array_linear_index] = if (forward_value == maximum_value) contribution else 0;
                     i += 1;
                 }
 
@@ -436,6 +437,43 @@ test "maximum backward rank 3 dimension 2" {
     const expected = try constant(f64, &arena.allocator, .{
         .{
             .{ 0, 0.25 },
+            .{ 0, 0.25 },
+        },
+        .{
+            .{ 0, 0.25 },
+            .{ 0, 0.25 },
+        },
+    });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "maximum backward rank 3 dimension 2 repeating max" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 12, 12 },
+            .{ -3, 4 },
+        },
+        .{
+            .{ 5, 6 },
+            .{ 7, 8 },
+        },
+    });
+    const gradient_input = try constant(f64, &arena.allocator, .{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    const forward_output = try maximum(f64, &arena.allocator, forward_input, 2);
+    const actual = try maximumBackward(f64, 2, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{
+        .{
+            .{ 0.125, 0.125 },
             .{ 0, 0.25 },
         },
         .{
