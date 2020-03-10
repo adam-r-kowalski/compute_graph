@@ -27,6 +27,8 @@ fn coerceToFloat(comptime T: type, x: var) T {
     };
 }
 
+// TODO(enhancement) mean should probably work across a particular dimension
+// TODO(refactor) mean should not be possible for int scalar type, implicit casting is a bad idea
 pub fn mean(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !TensorType(T) {
     const Tensor = TensorType(T);
     const shape = try allocator.alloc(usize, 0);
@@ -196,10 +198,12 @@ test "mean backward rank 0" {
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, 4);
     const gradient_input = try constant(f64, &arena.allocator, 1);
+    const forward_output = try mean(f64, &arena.allocator, forward_input);
     const actual = try meanBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, 1);
     expectEqual(f64, actual[0], expected);
@@ -210,10 +214,12 @@ test "mean backward rank 1" {
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, .{ 1, 2, 3, 4, 5 });
     const gradient_input = try constant(f64, &arena.allocator, @as(f64, 1));
+    const forward_output = try mean(f64, &arena.allocator, forward_input);
     const actual = try meanBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{ 0.2, 0.2, 0.2, 0.2, 0.2 });
     expectEqual(f64, actual[0], expected);
@@ -227,10 +233,12 @@ test "mean backward rank 2" {
         .{ 3, 4 },
     });
     const gradient_input = try constant(f64, &arena.allocator, 1);
+    const forward_output = try mean(f64, &arena.allocator, forward_input);
     const actual = try meanBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
     });
     const expected = try constant(f64, &arena.allocator, .{
         .{ 0.25, 0.25 },

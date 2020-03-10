@@ -169,10 +169,12 @@ test "multiply backward rank 0" {
     const x = try constant(f64, &arena.allocator, 4);
     const y = try constant(f64, &arena.allocator, 10);
     const gradient_input = try constant(f64, &arena.allocator, 2);
+    const forward_output = try multiply(f64, &arena.allocator, x, y);
     const actual = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
     });
     const expected_x_gradient = try constant(f64, &arena.allocator, 20);
     const expected_y_gradient = try constant(f64, &arena.allocator, 8);
@@ -186,10 +188,12 @@ test "multiply backward rank 1" {
     const x = try constant(f64, &arena.allocator, .{ 1, 2, 3, 4, 5 });
     const y = try constant(f64, &arena.allocator, .{ 6, 7, 8, 9, 10 });
     const gradient_input = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
+    const forward_output = try multiply(f64, &arena.allocator, x, y);
     const actual = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
     });
     const expected_x_gradient = try constant(f64, &arena.allocator, .{
         12, 28, 48, 72, 100,
@@ -216,10 +220,12 @@ test "multiply backward rank 2" {
         .{ 2, 4 },
         .{ 6, 8 },
     });
+    const forward_output = try multiply(f64, &arena.allocator, x, y);
     const actual = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
     });
     const expected_x_gradient = try constant(f64, &arena.allocator, .{
         .{ 10, 24 },
@@ -269,15 +275,19 @@ test "multiply backwards broadcast scalar rank 3" {
             },
         },
     });
+    const forward_output = try multiply(f64, &arena.allocator, scalar, tensor);
+    const forward_output2 = try multiply(f64, &arena.allocator, tensor, scalar);
     const actual = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ scalar, tensor },
+        .forward_output = forward_output,
     });
     const actual2 = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ tensor, scalar },
+        .forward_output = forward_output2,
     });
     const expected_scalar_gradient = try constant(f64, &arena.allocator, -0.5);
     const expected_tensor_gradient = try constant(f64, &arena.allocator, .{
@@ -359,10 +369,12 @@ test "multiply backwards broadcast rank 3 to rank 4" {
             },
         },
     });
+    const forward_output = try multiply(f64, &arena.allocator, rank3, rank4);
     const actual = try multiplyBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ rank3, rank4 },
+        .forward_output = forward_output,
     });
     const expected_rank_3_gradient = try constant(f64, &arena.allocator, .{
         .{.{ 1, 1.1667 }},

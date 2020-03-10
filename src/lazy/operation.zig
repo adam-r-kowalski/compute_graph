@@ -33,6 +33,7 @@ pub const Operation = struct {
         allocator: *Allocator,
         gradient_input: CpuTensorUnion,
         forward_inputs: []const CpuTensorUnion,
+        forward_output: CpuTensorUnion,
     };
 
     pub const ForwardResult = ForwardError!CpuTensorUnion;

@@ -266,3 +266,15 @@ pub fn zip(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTenso
     }
     return try zipBroadcast(T, allocator, x, y, f);
 }
+
+pub fn zeroBroadcastedIndex(cartesian_index: []const usize, dimension: usize, broadcasted_cartesian_index: []usize) void {
+    for (broadcasted_cartesian_index) |*e, i| {
+        if (i < dimension) {
+            e.* = cartesian_index[i];
+        } else if (i > dimension) {
+            e.* = cartesian_index[i - 1];
+        } else {
+            e.* = 0;
+        }
+    }
+}

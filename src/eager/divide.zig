@@ -124,10 +124,9 @@ fn outputs1(comptime T: type, context: backward.Context(T)) !CpuTensor(T) {
     const b = context.forward_inputs[1];
     const g = context.gradient_input;
     const allocator = context.allocator;
-    const c = try divide(T, allocator, a, b);
-    const d = try divide(T, allocator, c, b);
-    const e = try negate(T, allocator, d);
-    return try multiply(T, allocator, e, g);
+    const c = try divide(T, allocator, context.forward_output, b);
+    const d = try negate(T, allocator, c);
+    return try multiply(T, allocator, d, g);
 }
 
 pub fn divideBackwardBroadcast(comptime T: type, context: backward.Context(T), outputs: []CpuTensor(T)) !void {
@@ -208,11 +207,13 @@ test "divide backward rank 0" {
     defer arena.deinit();
     const x = try constant(f64, &arena.allocator, 4);
     const y = try constant(f64, &arena.allocator, 10);
+    const forward_output = try divide(f64, &arena.allocator, x, y);
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try divideBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
     });
     const expected_x_gradient = try constant(f64, &arena.allocator, 0.1);
     const expected_y_gradient = try constant(f64, &arena.allocator, -0.04);
@@ -225,11 +226,13 @@ test "divide backward rank 1" {
     defer arena.deinit();
     const x = try constant(f64, &arena.allocator, .{ 1, 2, 3, 4, 5 });
     const y = try constant(f64, &arena.allocator, .{ 6, 7, 8, 9, 10 });
+    const forward_output = try divide(f64, &arena.allocator, x, y);
     const gradient_input = try constant(f64, &arena.allocator, .{ 2, 4, 6, 8, 10 });
     const actual = try divideBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
     });
     const expected_x_gradient = try constant(f64, &arena.allocator, .{ 0.3333, 0.5714, 0.75, 0.8888, 1.0 });
     const expected_y_gradient = try constant(f64, &arena.allocator, .{ -0.0555, -0.1632, -0.2812, -0.3950, -0.50 });
@@ -248,6 +251,7 @@ test "divide backward rank 2" {
         .{ 5, 6 },
         .{ 7, 8 },
     });
+    const forward_output = try divide(f64, &arena.allocator, x, y);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
@@ -256,6 +260,7 @@ test "divide backward rank 2" {
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
     });
     const expected_x_gradient = try constant(f64, &arena.allocator, .{
         .{ 0.4, 0.6666 },
@@ -283,6 +288,8 @@ test "divide backwards broadcast scalar rank 3" {
             .{ 7, -8 },
         },
     });
+    const forward_output = try divide(f64, &arena.allocator, scalar, tensor);
+    const forward_output2 = try divide(f64, &arena.allocator, tensor, scalar);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{
             .{
@@ -309,11 +316,13 @@ test "divide backwards broadcast scalar rank 3" {
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ scalar, tensor },
+        .forward_output = forward_output,
     });
     const actual2 = try divideBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ tensor, scalar },
+        .forward_output = forward_output2,
     });
     const expected_scalar_gradient = try constant(f64, &arena.allocator, 0.0793);
     const expected_tensor_gradient = try constant(f64, &arena.allocator, .{
@@ -370,6 +379,8 @@ test "divide backwards broadcast rank 3 to rank 4" {
             .{ 11, 12 },
         }},
     });
+    const forward_output = try divide(f64, &arena.allocator, rank3, rank4);
+    const forward_output2 = try divide(f64, &arena.allocator, rank4, rank3);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{
             .{
@@ -410,11 +421,13 @@ test "divide backwards broadcast rank 3 to rank 4" {
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ rank3, rank4 },
+        .forward_output = forward_output,
     });
     const actual2 = try divideBackward(f64, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){ rank4, rank3 },
+        .forward_output = forward_output2,
     });
     const expected_rank_3_gradient = try constant(f64, &arena.allocator, .{
         .{.{ 0.0522, 0.0340 }},

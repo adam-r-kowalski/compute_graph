@@ -37,6 +37,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
+                .forward_output = context.forward_output.f64,
             });
             values[0] = .{ .f64 = gradients[0] };
         },
@@ -45,6 +46,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
+                .forward_output = context.forward_output.f32,
             });
             values[0] = .{ .f32 = gradients[0] };
         },
