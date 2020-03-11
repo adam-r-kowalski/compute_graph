@@ -11,6 +11,7 @@ pub const gradient = @import("lazy/gradient.zig").gradient;
 pub const multiply = @import("lazy/multiply.zig").multiply;
 pub const matrixMultiply = @import("lazy/matrix_multiply.zig").matrixMultiply;
 pub const maximum = @import("lazy/maximum.zig").maximum;
+pub const minimum = @import("lazy/minimum.zig").minimum;
 pub const mean = @import("lazy/mean.zig").mean;
 pub const negate = @import("lazy/negate.zig").negate;
 pub const placeholder = @import("lazy/placeholder.zig").placeholder;
