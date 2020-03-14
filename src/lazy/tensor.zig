@@ -27,23 +27,21 @@ pub const Tensor = struct {
         self: @This(),
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
-        context: var,
-        comptime Errors: type,
-        comptime output: fn (@TypeOf(context), []const u8) Errors!void,
-    ) Errors!void {
-        try std.fmt.format(context, Errors, output, "Tensor(", .{});
+        out_stream: var,
+    ) !void {
+        try std.fmt.format(out_stream, "Tensor(", .{});
         var i: usize = 0;
         const len = self.shape.len;
         while (i < len) : (i += 1)
-            try std.fmt.format(context, Errors, output, "[{}]", .{self.shape[i]});
+            try std.fmt.format(out_stream, "[{}]", .{self.shape[i]});
         switch (self.scalarType) {
-            .f64 => try std.fmt.format(context, Errors, output, "f64", .{}),
-            .f32 => try std.fmt.format(context, Errors, output, "f32", .{}),
-            .f16 => try std.fmt.format(context, Errors, output, "f16", .{}),
-            .i64 => try std.fmt.format(context, Errors, output, "i64", .{}),
-            .i32 => try std.fmt.format(context, Errors, output, "i32", .{}),
-            .i8 => try std.fmt.format(context, Errors, output, "i8", .{}),
+            .f64 => try std.fmt.format(out_stream, "f64", .{}),
+            .f32 => try std.fmt.format(out_stream, "f32", .{}),
+            .f16 => try std.fmt.format(out_stream, "f16", .{}),
+            .i64 => try std.fmt.format(out_stream, "i64", .{}),
+            .i32 => try std.fmt.format(out_stream, "i32", .{}),
+            .i8 => try std.fmt.format(out_stream, "i8", .{}),
         }
-        try std.fmt.format(context, Errors, output, ")", .{});
+        try std.fmt.format(out_stream, ")", .{});
     }
 };

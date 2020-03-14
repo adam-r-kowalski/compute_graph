@@ -13,6 +13,7 @@ const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const map = @import("map.zig").map;
 const sum = @import("sum.zig").sum;
+const ReduceParameters = @import("reduce.zig").ReduceParameters;
 
 pub fn multiply(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     return try zip(T, allocator, x, y, struct {
@@ -150,13 +151,13 @@ pub fn multiplyBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
     } else if (inputs[0].shape.len == 0) {
         // TODO(performance) fuse multiply and sum into single operation using map reduce
         const multiplied = try multiply(T, context.allocator, context.gradient_input, inputs[1]);
-        outputs[0] = try sum(T, context.allocator, multiplied, null, false);
+        outputs[0] = try sum(T, context.allocator, multiplied, ReduceParameters{});
         outputs[1] = try map(T, context.allocator, context.gradient_input, Closure{ .scalar = inputs[0].storage.scalar });
     } else if (inputs[1].shape.len == 0) {
         outputs[0] = try map(T, context.allocator, context.gradient_input, Closure{ .scalar = inputs[1].storage.scalar });
         // TODO(performance) fuse multiply and sum into single operation using map reduce
         const multiplied = try multiply(T, context.allocator, context.gradient_input, inputs[0]);
-        outputs[1] = try sum(T, context.allocator, multiplied, null, false);
+        outputs[1] = try sum(T, context.allocator, multiplied, ReduceParameters{});
     } else {
         try multiplyBackwardBroadcast(T, context, outputs);
     }

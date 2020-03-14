@@ -15,6 +15,7 @@ const zip = broadcast.zip;
 const debroadcastIndex = broadcast.debroadcastIndex;
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
+const ReduceParameters = @import("reduce.zig").ReduceParameters;
 
 fn divideScalar(comptime T: type, x: T, y: T) T {
     return switch (T) {
@@ -191,11 +192,11 @@ pub fn divideBackward(comptime T: type, context: backward.Context(T)) ![]CpuTens
         outputs[0] = try outputs0(T, context);
         outputs[1] = try outputs1(T, context);
     } else if (a.shape.len == 0) {
-        outputs[0] = try sum(T, allocator, try outputs0(T, context), null, false);
+        outputs[0] = try sum(T, allocator, try outputs0(T, context), ReduceParameters{});
         outputs[1] = try outputs1(T, context);
     } else if (b.shape.len == 0) {
         outputs[0] = try outputs0(T, context);
-        outputs[1] = try sum(T, allocator, try outputs1(T, context), null, false);
+        outputs[1] = try sum(T, allocator, try outputs1(T, context), ReduceParameters{});
     } else {
         try divideBackwardBroadcast(T, context, outputs);
     }

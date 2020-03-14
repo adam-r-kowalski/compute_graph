@@ -16,11 +16,12 @@ const constant = @import("constant.zig").constant;
 const Session = @import("session.zig").Session;
 const gradient = @import("gradient.zig").gradient;
 const mean = @import("mean.zig").mean;
+const ReduceParameters = @import("../eager/reduce.zig").ReduceParameters;
 
 const Minimum = struct {
     operation: Operation,
     inputs: [1]Tensor,
-    dimension: ?usize,
+    parameters: ReduceParameters,
 };
 
 fn inputs(operation: *const Operation) []const Tensor {
@@ -29,24 +30,24 @@ fn inputs(operation: *const Operation) []const Tensor {
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
-    const dimension = @fieldParentPtr(Minimum, "operation", context.operation).dimension;
+    const parameters = @fieldParentPtr(Minimum, "operation", context.operation).parameters;
     return switch (context.values[0]) {
-        .f64 => |t| .{ .f64 = try eager.minimum(f64, context.allocator, t, dimension) },
-        .f32 => |t| .{ .f32 = try eager.minimum(f32, context.allocator, t, dimension) },
-        .f16 => |t| .{ .f16 = try eager.minimum(f16, context.allocator, t, dimension) },
-        .i64 => |t| .{ .i64 = try eager.minimum(i64, context.allocator, t, dimension) },
-        .i32 => |t| .{ .i32 = try eager.minimum(i32, context.allocator, t, dimension) },
-        .i8 => |t| .{ .i8 = try eager.minimum(i8, context.allocator, t, dimension) },
+        .f64 => |t| .{ .f64 = try eager.minimum(f64, context.allocator, t, parameters) },
+        .f32 => |t| .{ .f32 = try eager.minimum(f32, context.allocator, t, parameters) },
+        .f16 => |t| .{ .f16 = try eager.minimum(f16, context.allocator, t, parameters) },
+        .i64 => |t| .{ .i64 = try eager.minimum(i64, context.allocator, t, parameters) },
+        .i32 => |t| .{ .i32 = try eager.minimum(i32, context.allocator, t, parameters) },
+        .i8 => |t| .{ .i8 = try eager.minimum(i8, context.allocator, t, parameters) },
     };
 }
 
 fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
-    const dimension = @fieldParentPtr(Minimum, "operation", context.operation).dimension;
+    const parameters = @fieldParentPtr(Minimum, "operation", context.operation).parameters;
     const values = try context.allocator.alloc(CpuTensorUnion, 1);
     errdefer context.allocator.free(values);
     switch (context.gradient_input) {
         .f64 => |gradient_input| {
-            const gradients = try minimumBackward(f64, dimension, EagerBackwardContext(f64){
+            const gradients = try minimumBackward(f64, parameters, EagerBackwardContext(f64){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
@@ -55,7 +56,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f64 = gradients[0] };
         },
         .f32 => |gradient_input| {
-            const gradients = try minimumBackward(f32, dimension, EagerBackwardContext(f32){
+            const gradients = try minimumBackward(f32, parameters, EagerBackwardContext(f32){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
@@ -64,7 +65,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f32 = gradients[0] };
         },
         .f16 => |gradient_input| {
-            const gradients = try minimumBackward(f16, dimension, EagerBackwardContext(f16){
+            const gradients = try minimumBackward(f16, parameters, EagerBackwardContext(f16){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
@@ -79,11 +80,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
-const MinimumParameters = struct {
-    dimension: ?usize = null,
-};
-
-pub fn minimum(graph: *Graph, x: Tensor, parameters: MinimumParameters) !Tensor {
+pub fn minimum(graph: *Graph, x: Tensor, parameters: ReduceParameters) !Tensor {
     var allocator = &graph.arena.allocator;
     var minimum_operation = try allocator.create(Minimum);
     minimum_operation.* = .{
@@ -93,7 +90,7 @@ pub fn minimum(graph: *Graph, x: Tensor, parameters: MinimumParameters) !Tensor 
             .backward = backward,
         },
         .inputs = .{x},
-        .dimension = parameters.dimension,
+        .parameters = parameters,
     };
     try graph.operations.append(&minimum_operation.operation);
     const shape = try newShape(allocator, x.shape, parameters.dimension);

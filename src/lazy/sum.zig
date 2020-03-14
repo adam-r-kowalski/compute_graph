@@ -12,12 +12,12 @@ const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const ReduceParameters = @import("../eager/reduce.zig").ReduceParameters;
 
 const Sum = struct {
     operation: Operation,
     inputs: [1]Tensor,
-    dimension: ?usize,
-    keep_dimensions: bool,
+    parameters: ReduceParameters,
 };
 
 fn inputs(operation: *const Operation) []const Tensor {
@@ -26,26 +26,24 @@ fn inputs(operation: *const Operation) []const Tensor {
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
-    const operation = @fieldParentPtr(Sum, "operation", context.operation);
-    const dimension = operation.dimension;
-    const keep_dimensions = operation.keep_dimensions;
+    const parameters = @fieldParentPtr(Sum, "operation", context.operation).parameters;
     return switch (context.values[0]) {
-        .f64 => |t| .{ .f64 = try eager.sum(f64, context.allocator, t, dimension, keep_dimensions) },
-        .f32 => |t| .{ .f32 = try eager.sum(f32, context.allocator, t, dimension, keep_dimensions) },
-        .f16 => |t| .{ .f16 = try eager.sum(f16, context.allocator, t, dimension, keep_dimensions) },
-        .i64 => |t| .{ .i64 = try eager.sum(i64, context.allocator, t, dimension, keep_dimensions) },
-        .i32 => |t| .{ .i32 = try eager.sum(i32, context.allocator, t, dimension, keep_dimensions) },
-        .i8 => |t| .{ .i8 = try eager.sum(i8, context.allocator, t, dimension, keep_dimensions) },
+        .f64 => |t| .{ .f64 = try eager.sum(f64, context.allocator, t, parameters) },
+        .f32 => |t| .{ .f32 = try eager.sum(f32, context.allocator, t, parameters) },
+        .f16 => |t| .{ .f16 = try eager.sum(f16, context.allocator, t, parameters) },
+        .i64 => |t| .{ .i64 = try eager.sum(i64, context.allocator, t, parameters) },
+        .i32 => |t| .{ .i32 = try eager.sum(i32, context.allocator, t, parameters) },
+        .i8 => |t| .{ .i8 = try eager.sum(i8, context.allocator, t, parameters) },
     };
 }
 
 fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
-    const dimension = @fieldParentPtr(Sum, "operation", context.operation).dimension;
+    const parameters = @fieldParentPtr(Sum, "operation", context.operation).parameters;
     const values = try context.allocator.alloc(CpuTensorUnion, 1);
     errdefer context.allocator.free(values);
     switch (context.gradient_input) {
         .f64 => |gradient_input| {
-            const gradients = try sumBackward(f64, dimension, EagerBackwardContext(f64){
+            const gradients = try sumBackward(f64, parameters, EagerBackwardContext(f64){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
@@ -54,7 +52,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f64 = gradients[0] };
         },
         .f32 => |gradient_input| {
-            const gradients = try sumBackward(f32, dimension, EagerBackwardContext(f32){
+            const gradients = try sumBackward(f32, parameters, EagerBackwardContext(f32){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
@@ -63,7 +61,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f32 = gradients[0] };
         },
         .f16 => |gradient_input| {
-            const gradients = try sumBackward(f16, dimension, EagerBackwardContext(f16){
+            const gradients = try sumBackward(f16, parameters, EagerBackwardContext(f16){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
@@ -78,12 +76,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
-const SumParameters = struct {
-    dimension: ?usize = null,
-    keep_dimensions: bool = false,
-};
-
-pub fn sum(graph: *Graph, x: Tensor, parameters: SumParameters) !Tensor {
+pub fn sum(graph: *Graph, x: Tensor, parameters: ReduceParameters) !Tensor {
     var allocator = &graph.arena.allocator;
     var sum_operation = try allocator.create(Sum);
     sum_operation.* = .{
@@ -93,8 +86,7 @@ pub fn sum(graph: *Graph, x: Tensor, parameters: SumParameters) !Tensor {
             .backward = backward,
         },
         .inputs = .{x},
-        .dimension = parameters.dimension,
-        .keep_dimensions = parameters.keep_dimensions,
+        .parameters = parameters,
     };
     try graph.operations.append(&sum_operation.operation);
     const shape = try newShape(allocator, x.shape, parameters.dimension);
