@@ -111,15 +111,20 @@ fn reduceAcrossDimension(
     };
 }
 
+pub const ReduceParameters = struct {
+    dimension: ?usize = null,
+    keep_dimensions: bool = false,
+};
+
 pub fn reduce(
     comptime T: type,
     allocator: *Allocator,
     tensor: CpuTensor(T),
-    dimension: ?usize,
     reducer: fn (T, T) T,
     identity: T,
+    parameters: ReduceParameters,
 ) !CpuTensor(T) {
-    const shape = try newShape(allocator, tensor.shape, dimension);
+    const shape = try newShape(allocator, tensor.shape, parameters.dimension);
     errdefer allocator.free(shape);
     const stride = try tensorStride(allocator, shape);
     errdefer allocator.free(stride);
@@ -132,7 +137,7 @@ pub fn reduce(
             };
         },
         .array => |array| {
-            if (dimension) |d|
+            if (parameters.dimension) |d|
                 if (shape.len > 0)
                     return reduceAcrossDimension(T, allocator, tensor, d, array, shape, stride, reducer, identity);
 

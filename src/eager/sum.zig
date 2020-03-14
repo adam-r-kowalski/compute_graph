@@ -14,7 +14,13 @@ const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const zeroBroadcastedIndex = broadcast.zeroBroadcastedIndex;
 const reduce = @import("reduce.zig").reduce;
 
-pub fn sum(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), dimension: ?usize) !CpuTensor(T) {
+pub fn sum(
+    comptime T: type,
+    allocator: *Allocator,
+    tensor: CpuTensor(T),
+    dimension: ?usize,
+    keep_dimensions: bool,
+) !CpuTensor(T) {
     return try reduce(T, allocator, tensor, dimension, struct {
         fn call(accumulator: T, value: T) T {
             return accumulator + value;
@@ -26,7 +32,7 @@ test "sum rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(f64, &arena.allocator, -5);
-    const actual = try sum(f64, &arena.allocator, x, null);
+    const actual = try sum(f64, &arena.allocator, x, null, false);
     const expected = try constant(f64, &arena.allocator, -5);
     expectEqual(f64, actual, expected);
 }
@@ -35,7 +41,7 @@ test "sum rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const x = try constant(i32, &arena.allocator, .{ 5, 10, 7, 8, 10 });
-    const actual = try sum(i32, &arena.allocator, x, null);
+    const actual = try sum(i32, &arena.allocator, x, null, false);
     const expected = try constant(i32, &arena.allocator, 40);
     expectEqual(i32, actual, expected);
 }
@@ -48,7 +54,7 @@ test "sum rank 2" {
         .{ 7, 8 },
         .{ 10, 8 },
     });
-    const actual = try sum(f16, &arena.allocator, x, null);
+    const actual = try sum(f16, &arena.allocator, x, null, false);
     const expected = try constant(f16, &arena.allocator, 48);
     expectEqual(f16, actual, expected);
 }
@@ -61,7 +67,7 @@ test "sum rank 2 across 0 dimension" {
         .{ -3, 4 },
         .{ 5, 6 },
     });
-    const actual = try sum(f16, &arena.allocator, x, 0);
+    const actual = try sum(f16, &arena.allocator, x, 0, false);
     const expected = try constant(f16, &arena.allocator, .{ 3, 12 });
     expectEqual(f16, actual, expected);
 }
@@ -79,7 +85,7 @@ test "sum rank 3" {
             .{ 2, 6 },
         },
     });
-    const actual = try sum(i8, &arena.allocator, x, null);
+    const actual = try sum(i8, &arena.allocator, x, null, false);
     const expected = try constant(i8, &arena.allocator, 56);
     expectEqual(i8, actual, expected);
 }
@@ -97,7 +103,7 @@ test "sum rank 3 accross 0 dimension" {
             .{ 7, 8 },
         },
     });
-    const actual = try sum(i64, &arena.allocator, x, 0);
+    const actual = try sum(i64, &arena.allocator, x, 0, false);
     const expected = try constant(i64, &arena.allocator, .{
         .{ 6, 8 },
         .{ 4, 12 },
@@ -118,7 +124,7 @@ test "sum rank 3 accross 1 dimension" {
             .{ 7, 8 },
         },
     });
-    const actual = try sum(i64, &arena.allocator, x, 1);
+    const actual = try sum(i64, &arena.allocator, x, 1, false);
     const expected = try constant(i64, &arena.allocator, .{
         .{ -2, 6 },
         .{ 12, 14 },
@@ -139,7 +145,7 @@ test "sum rank 3 accross 2 dimension" {
             .{ 7, 8 },
         },
     });
-    const actual = try sum(i64, &arena.allocator, x, 2);
+    const actual = try sum(i64, &arena.allocator, x, 2, false);
     const expected = try constant(i64, &arena.allocator, .{
         .{ 3, 1 },
         .{ 11, 15 },
@@ -226,7 +232,7 @@ test "sum backward rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, 4);
-    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null, false);
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try sumBackward(f64, null, backward.Context(f64){
         .allocator = &arena.allocator,
@@ -242,7 +248,7 @@ test "sum backward rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, .{ 1, 2, 3, 4, 5 });
-    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null, false);
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try sumBackward(f64, null, backward.Context(f64){
         .allocator = &arena.allocator,
@@ -261,7 +267,7 @@ test "sum backward rank 2" {
         .{ 1, 2 },
         .{ 3, 4 },
     });
-    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null, false);
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const actual = try sumBackward(f64, null, backward.Context(f64){
         .allocator = &arena.allocator,
@@ -289,7 +295,7 @@ test "sum backward rank 3 dimension 0" {
             .{ 7, 8 },
         },
     });
-    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null, false);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 0.25, 0.5 },
         .{ 0.75, 1 },
@@ -326,7 +332,7 @@ test "sum backward rank 3 dimension 1" {
             .{ 7, 8 },
         },
     });
-    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null, false);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 0.25, 0.5 },
         .{ 0.75, 1 },
@@ -363,7 +369,7 @@ test "sum backward rank 3 dimension 2" {
             .{ 7, 8 },
         },
     });
-    const forward_output = try sum(f64, &arena.allocator, forward_input, null);
+    const forward_output = try sum(f64, &arena.allocator, forward_input, null, false);
     const gradient_input = try constant(f64, &arena.allocator, .{
         .{ 0.25, 0.5 },
         .{ 0.75, 1 },

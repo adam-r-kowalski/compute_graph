@@ -17,6 +17,7 @@ const Sum = struct {
     operation: Operation,
     inputs: [1]Tensor,
     dimension: ?usize,
+    keep_dimensions: bool,
 };
 
 fn inputs(operation: *const Operation) []const Tensor {
@@ -25,14 +26,16 @@ fn inputs(operation: *const Operation) []const Tensor {
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
-    const dimension = @fieldParentPtr(Sum, "operation", context.operation).dimension;
+    const operation = @fieldParentPtr(Sum, "operation", context.operation);
+    const dimension = operation.dimension;
+    const keep_dimensions = operation.keep_dimensions;
     return switch (context.values[0]) {
-        .f64 => |t| .{ .f64 = try eager.sum(f64, context.allocator, t, dimension) },
-        .f32 => |t| .{ .f32 = try eager.sum(f32, context.allocator, t, dimension) },
-        .f16 => |t| .{ .f16 = try eager.sum(f16, context.allocator, t, dimension) },
-        .i64 => |t| .{ .i64 = try eager.sum(i64, context.allocator, t, dimension) },
-        .i32 => |t| .{ .i32 = try eager.sum(i32, context.allocator, t, dimension) },
-        .i8 => |t| .{ .i8 = try eager.sum(i8, context.allocator, t, dimension) },
+        .f64 => |t| .{ .f64 = try eager.sum(f64, context.allocator, t, dimension, keep_dimensions) },
+        .f32 => |t| .{ .f32 = try eager.sum(f32, context.allocator, t, dimension, keep_dimensions) },
+        .f16 => |t| .{ .f16 = try eager.sum(f16, context.allocator, t, dimension, keep_dimensions) },
+        .i64 => |t| .{ .i64 = try eager.sum(i64, context.allocator, t, dimension, keep_dimensions) },
+        .i32 => |t| .{ .i32 = try eager.sum(i32, context.allocator, t, dimension, keep_dimensions) },
+        .i8 => |t| .{ .i8 = try eager.sum(i8, context.allocator, t, dimension, keep_dimensions) },
     };
 }
 
@@ -77,6 +80,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
 
 const SumParameters = struct {
     dimension: ?usize = null,
+    keep_dimensions: bool = false,
 };
 
 pub fn sum(graph: *Graph, x: Tensor, parameters: SumParameters) !Tensor {
@@ -90,6 +94,7 @@ pub fn sum(graph: *Graph, x: Tensor, parameters: SumParameters) !Tensor {
         },
         .inputs = .{x},
         .dimension = parameters.dimension,
+        .keep_dimensions = parameters.keep_dimensions,
     };
     try graph.operations.append(&sum_operation.operation);
     const shape = try newShape(allocator, x.shape, parameters.dimension);
