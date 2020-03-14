@@ -10,8 +10,13 @@ const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const zeroBroadcastedIndex = broadcast.zeroBroadcastedIndex;
 
-pub fn newShape(allocator: *Allocator, shape: []const usize, dimension: ?usize) ![]const usize {
-    if (dimension) |d| {
+pub const ReduceParameters = struct {
+    dimension: ?usize = null,
+    keep_dimensions: bool = false,
+};
+
+pub fn newShape(allocator: *Allocator, shape: []const usize, parameters: ReduceParameters) ![]const usize {
+    if (parameters.dimension) |d| {
         if (d >= shape.len) return error.InvalidDimension;
         const new_shape = try allocator.alloc(usize, shape.len - 1);
         errdefer allocator.free(new_shape);
@@ -31,35 +36,35 @@ pub fn newShape(allocator: *Allocator, shape: []const usize, dimension: ?usize) 
 test "newShape null" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, null);
+    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, .{});
     std.testing.expect(std.mem.eql(usize, actual, &[_]usize{}));
 }
 
 test "newShape dimension 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, 0);
+    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, .{ .dimension = 0 });
     std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 2, 3 }));
 }
 
 test "newShape dimension 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, 1);
+    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, .{ .dimension = 1 });
     std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 1, 3 }));
 }
 
 test "newShape dimension 2" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, 2);
+    const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, .{ .dimension = 2 });
     std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 1, 2 }));
 }
 
 test "newShape invalid dimension" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    _ = newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, 3) catch |err| switch (err) {
+    _ = newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, .{ .dimension = 3 }) catch |err| switch (err) {
         error.InvalidDimension => {},
         else => unreachable,
     };
@@ -111,11 +116,6 @@ fn reduceAcrossDimension(
     };
 }
 
-pub const ReduceParameters = struct {
-    dimension: ?usize = null,
-    keep_dimensions: bool = false,
-};
-
 pub fn reduce(
     comptime T: type,
     allocator: *Allocator,
@@ -124,7 +124,7 @@ pub fn reduce(
     identity: T,
     parameters: ReduceParameters,
 ) !CpuTensor(T) {
-    const shape = try newShape(allocator, tensor.shape, parameters.dimension);
+    const shape = try newShape(allocator, tensor.shape, parameters);
     errdefer allocator.free(shape);
     const stride = try tensorStride(allocator, shape);
     errdefer allocator.free(stride);

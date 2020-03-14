@@ -94,7 +94,7 @@ pub fn maximum(graph: *Graph, x: Tensor, parameters: ReduceParameters) !Tensor {
         .parameters = parameters,
     };
     try graph.operations.append(&maximum_operation.operation);
-    const shape = try newShape(allocator, x.shape, parameters.dimension);
+    const shape = try newShape(allocator, x.shape, parameters);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = shape,
