@@ -6,7 +6,7 @@ const CpuTensor = cpu_tensor.CpuTensor;
 const ReduceParameters = @import("reduce.zig").ReduceParameters;
 const reduce = @import("reduce.zig").reduce;
 const expectEqual = @import("../testing.zig").expectEqual;
-const minimumBackward = @import("minimum_maximum_backward.zig").backward;
+pub const minimumBackward = @import("minimum_maximum_backward.zig").backward;
 const Context = @import("backward.zig").Context;
 
 fn minimumScalar(comptime T: type) T {

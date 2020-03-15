@@ -36,14 +36,14 @@ fn backwardAcrossDimension(comptime T: type, dimension: usize, context: Context(
 
     while (true) {
         const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
-        const maximum_value = forward_output[gradient_linear_index];
+        const value = forward_output[gradient_linear_index];
         zeroBroadcastedIndex(gradient_cartesian_index, dimension, array_cartesian_index);
         var i: usize = 0;
         var count: T = 0;
         while (i < shape[dimension]) {
             array_cartesian_index[dimension] = i;
             const array_linear_index = linearIndex(stride, array_cartesian_index);
-            if (forward_input[array_linear_index] == maximum_value) count += 1;
+            if (forward_input[array_linear_index] == value) count += 1;
             i += 1;
         }
 
@@ -54,7 +54,7 @@ fn backwardAcrossDimension(comptime T: type, dimension: usize, context: Context(
             array_cartesian_index[dimension] = i;
             const array_linear_index = linearIndex(stride, array_cartesian_index);
             const forward_value = forward_input[array_linear_index];
-            array[array_linear_index] = if (forward_value == maximum_value) contribution else 0;
+            array[array_linear_index] = if (forward_value == value) contribution else 0;
             i += 1;
         }
 
@@ -96,14 +96,14 @@ fn backwardAcrossKeepDimensions(comptime T: type, dimension: usize, context: Con
 
     while (true) {
         const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
-        const maximum_value = forward_output[gradient_linear_index];
+        const value = forward_output[gradient_linear_index];
         zeroBroadcastedIndexKeepDimension(gradient_cartesian_index, dimension, array_cartesian_index);
         var i: usize = 0;
         var count: T = 0;
         while (i < shape[dimension]) {
             array_cartesian_index[dimension] = i;
             const array_linear_index = linearIndex(stride, array_cartesian_index);
-            if (forward_input[array_linear_index] == maximum_value) count += 1;
+            if (forward_input[array_linear_index] == value) count += 1;
             i += 1;
         }
 
@@ -114,7 +114,7 @@ fn backwardAcrossKeepDimensions(comptime T: type, dimension: usize, context: Con
             array_cartesian_index[dimension] = i;
             const array_linear_index = linearIndex(stride, array_cartesian_index);
             const forward_value = forward_input[array_linear_index];
-            array[array_linear_index] = if (forward_value == maximum_value) contribution else 0;
+            array[array_linear_index] = if (forward_value == value) contribution else 0;
             i += 1;
         }
 
