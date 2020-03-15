@@ -9,6 +9,10 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const matrixMultiplyBackward = @import("../eager/matrix_multiply.zig").matrixMultiplyBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
 
 const MatrixMultiply = struct {
     operation: Operation,
@@ -108,8 +112,6 @@ pub fn matrixMultiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
 }
 
 test "matrixMultiply identity" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -139,8 +141,6 @@ test "matrixMultiply identity" {
 }
 
 test "matrixMultiply flip" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -170,8 +170,6 @@ test "matrixMultiply flip" {
 }
 
 test "matrixMultiply flip" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -203,10 +201,6 @@ test "matrixMultiply flip" {
 }
 
 test "gradient matrix multiply" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -242,8 +236,6 @@ test "gradient matrix multiply" {
 }
 
 test "matrixMultiply shape mismatch" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

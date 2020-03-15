@@ -1,36 +1,41 @@
 const std = @import("std");
-// TODO(Adam): Clean up circular dependency
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 const Session = @import("session.zig").Session;
 const expectEqual = @import("../testing.zig").expectEqual;
+const add = @import("add.zig").add;
+const constant = @import("constant.zig").constant;
+const variable = @import("variable.zig").variable;
+const eager = @import("../eager.zig");
+const absolute = @import("absolute.zig").absolute;
+const multiply = @import("multiply.zig").multiply;
+const subtract = @import("subtract.zig").subtract;
+const placeholder = @import("placeholder.zig").placeholder;
+const gradient = @import("gradient.zig").gradient;
+const Environment = @import("session.zig").Environment;
 
 pub const Assign = struct {
     variable: Tensor,
     value: Tensor,
 };
 
-pub fn assign(graph: *Graph, variable: Tensor, value: Tensor) !Tensor {
-    if (!std.mem.eql(usize, variable.shape, value.shape))
+pub fn assign(graph: *Graph, target: Tensor, value: Tensor) !Tensor {
+    if (!std.mem.eql(usize, target.shape, value.shape))
         return error.ShapeMismatch;
-    if (variable.scalarType != value.scalarType)
+    if (target.scalarType != value.scalarType)
         return error.ScalarTypeMismatch;
     try graph.assigns.append(Assign{
-        .variable = variable,
+        .variable = target,
         .value = value,
     });
     return Tensor{
         .tensorType = .{ .assign = graph.assigns.len - 1 },
-        .shape = variable.shape,
-        .scalarType = variable.scalarType,
+        .shape = target.shape,
+        .scalarType = target.scalarType,
     };
 }
 
 test "assign" {
-    const add = @import("add.zig").add;
-    const constant = @import("constant.zig").constant;
-    const variable = @import("variable.zig").variable;
-    const eager = @import("../eager.zig");
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -80,16 +85,6 @@ test "assign" {
 }
 
 test "linear regression" {
-    const add = @import("add.zig").add;
-    const absolute = @import("absolute.zig").absolute;
-    const multiply = @import("multiply.zig").multiply;
-    const subtract = @import("subtract.zig").subtract;
-    const constant = @import("constant.zig").constant;
-    const variable = @import("variable.zig").variable;
-    const placeholder = @import("placeholder.zig").placeholder;
-    const gradient = @import("gradient.zig").gradient;
-    const eager = @import("../eager.zig");
-    const Environment = @import("session.zig").Environment;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

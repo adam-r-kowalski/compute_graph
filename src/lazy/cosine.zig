@@ -9,6 +9,10 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const cosineBackward = @import("../eager/cosine.zig").cosineBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
 
 const Cosine = struct {
     operation: Operation,
@@ -75,8 +79,6 @@ pub fn cosine(graph: *Graph, x: Tensor) !Tensor {
 }
 
 test "cosine scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -93,8 +95,6 @@ test "cosine scalar" {
 }
 
 test "cosine matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -119,10 +119,6 @@ test "cosine matrix" {
 }
 
 test "gradient cosine" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

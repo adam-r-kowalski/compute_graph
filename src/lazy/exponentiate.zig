@@ -9,6 +9,10 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const exponentiateBackward = @import("../eager/exponentiate.zig").exponentiateBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
 
 const Exponentiate = struct {
     operation: Operation,
@@ -75,8 +79,6 @@ pub fn exponentiate(graph: *Graph, x: Tensor) !Tensor {
 }
 
 test "exponentiate scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -93,8 +95,6 @@ test "exponentiate scalar" {
 }
 
 test "exponentiate matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -119,10 +119,6 @@ test "exponentiate matrix" {
 }
 
 test "gradient exponentiate" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

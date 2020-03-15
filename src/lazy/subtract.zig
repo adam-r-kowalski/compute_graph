@@ -10,6 +10,10 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const subtractBackward = @import("../eager/subtract.zig").subtractBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
 const broadcastShape = @import("broadcast.zig").broadcastShape;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
 
 const Subtract = struct {
     operation: Operation,
@@ -106,8 +110,6 @@ pub fn subtract(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
 }
 
 test "subtract scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -125,8 +127,6 @@ test "subtract scalar" {
 }
 
 test "subtract matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -156,8 +156,6 @@ test "subtract matrix" {
 }
 
 test "subtract matrix i32" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -187,8 +185,6 @@ test "subtract matrix i32" {
 }
 
 test "subtract broadcast scalar rank 2" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -220,8 +216,6 @@ test "subtract broadcast scalar rank 2" {
 }
 
 test "subtract broadcast rank 3 to rank 4" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -294,10 +288,6 @@ test "subtract broadcast rank 3 to rank 4" {
 }
 
 test "gradient subtract" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -331,10 +321,6 @@ test "gradient subtract" {
 }
 
 test "subtract backwards broadcast rank 3 to rank 4" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -373,10 +359,6 @@ test "subtract backwards broadcast rank 3 to rank 4" {
 }
 
 test "subtract backwards broadcast rank 3 to rank 4" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

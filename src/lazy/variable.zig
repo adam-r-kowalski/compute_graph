@@ -1,4 +1,3 @@
-// TODO(Adam): Clean up circular dependency
 const Graph = @import("graph.zig").Graph;
 const Tensor = @import("tensor.zig").Tensor;
 

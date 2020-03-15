@@ -9,6 +9,10 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const negateBackward = @import("../eager/negate.zig").negateBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
 
 const Negate = struct {
     operation: Operation,
@@ -88,8 +92,6 @@ pub fn negate(graph: *Graph, x: Tensor) !Tensor {
 }
 
 test "negate scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -106,8 +108,6 @@ test "negate scalar" {
 }
 
 test "negate matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -132,8 +132,6 @@ test "negate matrix" {
 }
 
 test "negate matrix i32" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -158,10 +156,6 @@ test "negate matrix i32" {
 }
 
 test "gradient negate" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

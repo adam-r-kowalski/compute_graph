@@ -10,6 +10,10 @@ const expectEqual = @import("../testing.zig").expectEqual;
 const divideBackward = @import("../eager/divide.zig").divideBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
 const broadcastShape = @import("broadcast.zig").broadcastShape;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
 
 const Divide = struct {
     operation: Operation,
@@ -106,8 +110,6 @@ pub fn divide(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
 }
 
 test "divide scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -126,8 +128,6 @@ test "divide scalar" {
 }
 
 test "divide matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -158,8 +158,6 @@ test "divide matrix" {
 }
 
 test "divide matrix i32" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -190,10 +188,6 @@ test "divide matrix i32" {
 }
 
 test "gradient divide" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -228,10 +222,6 @@ test "gradient divide" {
 }
 
 test "gradient divide broadcast scalar rank 3" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -287,10 +277,6 @@ test "gradient divide broadcast scalar rank 3" {
 }
 
 test "gradient divide broadcast rank 3 to rank 4" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

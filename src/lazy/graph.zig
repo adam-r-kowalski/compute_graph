@@ -1,13 +1,9 @@
 const std = @import("std");
 const Operation = @import("operation.zig").Operation;
 const CpuTensorUnion = @import("../eager.zig").CpuTensorUnion;
-// TODO(Adam): Clean up circular dependency
 const Gradient = @import("gradient.zig").Gradient;
-// TODO(Adam): Clean up circular dependency
 const Variable = @import("variable.zig").Variable;
-// TODO(Adam): Clean up circular dependency
 const Assign = @import("assign.zig").Assign;
-// TODO(Adam): Clean up circular dependency
 const Placeholder = @import("placeholder.zig").Placeholder;
 
 pub const Graph = struct {

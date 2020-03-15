@@ -7,6 +7,15 @@ const GradientHandle = @import("tensor.zig").GradientHandle;
 const eager = @import("../eager.zig");
 const expectEqual = @import("../testing.zig").expectEqual;
 const CpuTensorUnion = eager.CpuTensorUnion;
+const constant = @import("constant.zig").constant;
+const add = @import("add.zig").add;
+const multiply = @import("multiply.zig").multiply;
+const mean = @import("mean.zig").mean;
+const matrixMultiply = @import("matrix_multiply.zig").matrixMultiply;
+const subtract = @import("subtract.zig").subtract;
+const absolute = @import("absolute.zig").absolute;
+const variable = @import("variable.zig").variable;
+const assign = @import("assign.zig").assign;
 
 const Cache = std.AutoHashMap(Tensor, CpuTensorUnion);
 const GradientCaches = std.AutoHashMap(usize, Cache);
@@ -39,16 +48,16 @@ const ExecutionOrder = struct {
                     try recurse(execution_order, visited, graph, environment, of);
             },
             .variable => |index| {
-                const variable = graph.variables.at(index);
-                if (!visited.contains(variable.current_value))
-                    try recurse(execution_order, visited, graph, environment, variable.current_value);
+                const variable_tensor = graph.variables.at(index);
+                if (!visited.contains(variable_tensor.current_value))
+                    try recurse(execution_order, visited, graph, environment, variable_tensor.current_value);
             },
             .assign => |index| {
-                const assign = graph.assigns.at(index);
-                if (!visited.contains(assign.variable))
-                    try recurse(execution_order, visited, graph, environment, assign.variable);
-                if (!visited.contains(assign.value))
-                    try recurse(execution_order, visited, graph, environment, assign.value);
+                const assign_tensor = graph.assigns.at(index);
+                if (!visited.contains(assign_tensor.variable))
+                    try recurse(execution_order, visited, graph, environment, assign_tensor.variable);
+                if (!visited.contains(assign_tensor.value))
+                    try recurse(execution_order, visited, graph, environment, assign_tensor.value);
             },
             .placeholder => {
                 const desired_tensor = try getValue(Environment, Tensor, Tensor, environment, tensor);
@@ -74,10 +83,6 @@ fn executionOrder(session: Session, tensors: []const Tensor, environment: Enviro
 }
 
 test "execution order" {
-    const constant = @import("constant.zig").constant;
-    const add = @import("add.zig").add;
-    const multiply = @import("multiply.zig").multiply;
-    const subtract = @import("subtract.zig").subtract;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -105,8 +110,6 @@ test "execution order" {
 }
 
 test "execution order gradient" {
-    const constant = @import("constant.zig").constant;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -126,8 +129,6 @@ test "execution order gradient" {
 }
 
 test "execution order variable" {
-    const constant = @import("constant.zig").constant;
-    const variable = @import("variable.zig").variable;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -145,9 +146,6 @@ test "execution order variable" {
 }
 
 test "execution order assign" {
-    const constant = @import("constant.zig").constant;
-    const variable = @import("variable.zig").variable;
-    const assign = @import("assign.zig").assign;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -169,8 +167,6 @@ test "execution order assign" {
 }
 
 test "execution order repeated tensors" {
-    const constant = @import("constant.zig").constant;
-    const add = @import("add.zig").add;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -192,7 +188,6 @@ test "execution order repeated tensors" {
 }
 
 test "execution order placeholder" {
-    const constant = @import("constant.zig").constant;
     const placeholder = @import("placeholder.zig").placeholder;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -228,8 +223,8 @@ fn indexOf(needle: Tensor, haystack: []const Tensor) !usize {
 }
 
 fn runConstant(session: Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
-    const constant = session.graph.constants.at(index);
-    try cache.putNoClobber(current_tensor, constant);
+    const constant_tensor = session.graph.constants.at(index);
+    try cache.putNoClobber(current_tensor, constant_tensor);
 }
 
 fn runOperation(session: Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
@@ -325,18 +320,18 @@ fn runVariable(session: Session, cache: *Cache, index: usize, current_tensor: Te
     if (session.variableCache.getValue(current_tensor)) |current_value| {
         try cache.putNoClobber(current_tensor, current_value);
     } else {
-        const variable = session.graph.variables.at(index);
-        const current_value = try getValue(Cache, Tensor, CpuTensorUnion, cache.*, variable.current_value);
+        const variable_tensor = session.graph.variables.at(index);
+        const current_value = try getValue(Cache, Tensor, CpuTensorUnion, cache.*, variable_tensor.current_value);
         try cache.putNoClobber(current_tensor, current_value);
     }
 }
 
 fn runAssign(session: *Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
-    const assign = session.graph.assigns.at(index);
-    const value = try getValue(Cache, Tensor, CpuTensorUnion, cache.*, assign.value);
+    const assign_tensor = session.graph.assigns.at(index);
+    const value = try getValue(Cache, Tensor, CpuTensorUnion, cache.*, assign_tensor.value);
     try cache.putNoClobber(current_tensor, value);
-    _ = try cache.put(assign.variable, value);
-    _ = try session.variableCache.put(assign.variable, value);
+    _ = try cache.put(assign_tensor.variable, value);
+    _ = try session.variableCache.put(assign_tensor.variable, value);
 }
 
 fn runPlaceholder(session: Session, cache: *Cache, environment: Environment, current_tensor: Tensor) !void {
@@ -403,12 +398,6 @@ pub const Session = struct {
 };
 
 test "session run" {
-    const constant = @import("constant.zig").constant;
-    const add = @import("add.zig").add;
-    const matrixMultiply = @import("matrix_multiply.zig").matrixMultiply;
-    const subtract = @import("subtract.zig").subtract;
-    const absolute = @import("absolute.zig").absolute;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -460,8 +449,6 @@ test "session run" {
 }
 
 test "variable" {
-    const constant = @import("constant.zig").constant;
-    const variable = @import("variable.zig").variable;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -483,10 +470,6 @@ test "variable" {
 }
 
 test "duplicate" {
-    const constant = @import("constant.zig").constant;
-    const add = @import("add.zig").add;
-    const multiply = @import("multiply.zig").multiply;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
