@@ -13,6 +13,7 @@ const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const debroadcastIndex = broadcast.debroadcastIndex;
 const map = @import("map.zig").map;
+const ReduceParameters = @import("reduce.zig").ReduceParameters;
 
 pub fn subtract(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     return try zip(T, allocator, x, y, struct {
@@ -304,13 +305,13 @@ pub fn subtractBackward(comptime T: type, context: backward.Context(T)) ![]CpuTe
         outputs[0] = context.gradient_input;
         outputs[1] = try map(T, context.allocator, context.gradient_input, negate);
     } else if (inputs[0].shape.len == 0) {
-        outputs[0] = try sum(T, context.allocator, context.gradient_input, null);
+        outputs[0] = try sum(T, context.allocator, context.gradient_input, ReduceParameters{});
         outputs[1] = try map(T, context.allocator, context.gradient_input, negate);
     } else if (inputs[1].shape.len == 0) {
         outputs[0] = context.gradient_input;
         // TODO(performance) fuse scale and sum into single operation using map reduce
         const scaled = try map(T, context.allocator, context.gradient_input, negate);
-        outputs[1] = try sum(T, context.allocator, scaled, null);
+        outputs[1] = try sum(T, context.allocator, scaled, ReduceParameters{});
     } else {
         try subtractBackwardBroadcast(T, context, outputs);
     }

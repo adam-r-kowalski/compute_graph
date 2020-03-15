@@ -7,7 +7,9 @@ const ScalarType = tensor.ScalarType;
 const Operation = @import("operation.zig").Operation;
 const eager = @import("../eager.zig");
 const maximumBackward = @import("../eager/maximum.zig").maximumBackward;
-const newShape = @import("../eager/reduce.zig").newShape;
+const reduce = @import("../eager/reduce.zig");
+const newShape = reduce.newShape;
+const ReduceParameters = reduce.ReduceParameters;
 const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
@@ -20,7 +22,7 @@ const mean = @import("mean.zig").mean;
 const Maximum = struct {
     operation: Operation,
     inputs: [1]Tensor,
-    dimension: ?usize,
+    parameters: ReduceParameters,
 };
 
 fn inputs(operation: *const Operation) []const Tensor {
@@ -29,24 +31,24 @@ fn inputs(operation: *const Operation) []const Tensor {
 
 fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
     std.debug.assert(context.values.len == 1);
-    const dimension = @fieldParentPtr(Maximum, "operation", context.operation).dimension;
+    const parameters = @fieldParentPtr(Maximum, "operation", context.operation).parameters;
     return switch (context.values[0]) {
-        .f64 => |t| .{ .f64 = try eager.maximum(f64, context.allocator, t, dimension) },
-        .f32 => |t| .{ .f32 = try eager.maximum(f32, context.allocator, t, dimension) },
-        .f16 => |t| .{ .f16 = try eager.maximum(f16, context.allocator, t, dimension) },
-        .i64 => |t| .{ .i64 = try eager.maximum(i64, context.allocator, t, dimension) },
-        .i32 => |t| .{ .i32 = try eager.maximum(i32, context.allocator, t, dimension) },
-        .i8 => |t| .{ .i8 = try eager.maximum(i8, context.allocator, t, dimension) },
+        .f64 => |t| .{ .f64 = try eager.maximum(f64, context.allocator, t, parameters) },
+        .f32 => |t| .{ .f32 = try eager.maximum(f32, context.allocator, t, parameters) },
+        .f16 => |t| .{ .f16 = try eager.maximum(f16, context.allocator, t, parameters) },
+        .i64 => |t| .{ .i64 = try eager.maximum(i64, context.allocator, t, parameters) },
+        .i32 => |t| .{ .i32 = try eager.maximum(i32, context.allocator, t, parameters) },
+        .i8 => |t| .{ .i8 = try eager.maximum(i8, context.allocator, t, parameters) },
     };
 }
 
 fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
-    const dimension = @fieldParentPtr(Maximum, "operation", context.operation).dimension;
+    const parameters = @fieldParentPtr(Maximum, "operation", context.operation).parameters;
     const values = try context.allocator.alloc(CpuTensorUnion, 1);
     errdefer context.allocator.free(values);
     switch (context.gradient_input) {
         .f64 => |gradient_input| {
-            const gradients = try maximumBackward(f64, dimension, EagerBackwardContext(f64){
+            const gradients = try maximumBackward(f64, parameters, EagerBackwardContext(f64){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f64){context.forward_inputs[0].f64},
@@ -55,7 +57,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f64 = gradients[0] };
         },
         .f32 => |gradient_input| {
-            const gradients = try maximumBackward(f32, dimension, EagerBackwardContext(f32){
+            const gradients = try maximumBackward(f32, parameters, EagerBackwardContext(f32){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f32){context.forward_inputs[0].f32},
@@ -64,7 +66,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
             values[0] = .{ .f32 = gradients[0] };
         },
         .f16 => |gradient_input| {
-            const gradients = try maximumBackward(f16, dimension, EagerBackwardContext(f16){
+            const gradients = try maximumBackward(f16, parameters, EagerBackwardContext(f16){
                 .allocator = context.allocator,
                 .gradient_input = gradient_input,
                 .forward_inputs = &[_]CpuTensor(f16){context.forward_inputs[0].f16},
@@ -79,11 +81,7 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
-const MaximumParameters = struct {
-    dimension: ?usize = null,
-};
-
-pub fn maximum(graph: *Graph, x: Tensor, parameters: MaximumParameters) !Tensor {
+pub fn maximum(graph: *Graph, x: Tensor, parameters: ReduceParameters) !Tensor {
     var allocator = &graph.arena.allocator;
     var maximum_operation = try allocator.create(Maximum);
     maximum_operation.* = .{
@@ -93,10 +91,10 @@ pub fn maximum(graph: *Graph, x: Tensor, parameters: MaximumParameters) !Tensor 
             .backward = backward,
         },
         .inputs = .{x},
-        .dimension = parameters.dimension,
+        .parameters = parameters,
     };
     try graph.operations.append(&maximum_operation.operation);
-    const shape = try newShape(allocator, x.shape, parameters.dimension);
+    const shape = try newShape(allocator, x.shape, parameters);
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = shape,

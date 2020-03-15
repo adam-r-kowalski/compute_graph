@@ -15,6 +15,7 @@ const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const debroadcastIndex = broadcast.debroadcastIndex;
 const zip = broadcast.zip;
 const sum = @import("sum.zig").sum;
+const ReduceParameters = @import("reduce.zig").ReduceParameters;
 
 pub fn add(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: CpuTensor(T)) !CpuTensor(T) {
     return try zip(T, allocator, x, y, struct {
@@ -308,11 +309,11 @@ pub fn addBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(
         outputs[0] = context.gradient_input;
         outputs[1] = context.gradient_input;
     } else if (inputs[0].shape.len == 0) {
-        outputs[0] = try sum(T, context.allocator, context.gradient_input, null);
+        outputs[0] = try sum(T, context.allocator, context.gradient_input, ReduceParameters{});
         outputs[1] = context.gradient_input;
     } else if (inputs[1].shape.len == 0) {
         outputs[0] = context.gradient_input;
-        outputs[1] = try sum(T, context.allocator, context.gradient_input, null);
+        outputs[1] = try sum(T, context.allocator, context.gradient_input, ReduceParameters{});
     } else {
         try addBackwardBroadcast(T, context, outputs);
     }
