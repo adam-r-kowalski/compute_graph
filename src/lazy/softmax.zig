@@ -97,7 +97,7 @@ test "softmax matrix dimension 1" {
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    const actual = try session.run(&[_]Tensor{ b, c, gradients[0] }, .{});
+    // const actual = try session.run(&[_]Tensor{ b, c, gradients[0] }, .{});
     // std.debug.warn("\n{}\n", .{actual[0]});
     // const expected = try eager.constant(f64, &arena.allocator, .{
     //     .{ 0.5498, 0.5986, 0.6456, 0.6899, 0.7310 },
