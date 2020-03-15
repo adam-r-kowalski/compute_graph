@@ -18,7 +18,10 @@ const SoftmaxParameters = struct {
 };
 
 fn softmax(graph: *Graph, x: Tensor, parameters: SoftmaxParameters) !Tensor {
-    const a = try maximum(graph, x, .{ .dimension = parameters.dimension });
+    const a = try maximum(graph, x, .{
+        .dimension = parameters.dimension,
+        .keep_dimensions = true,
+    });
     const b = try subtract(graph, x, a);
     const c = try exponentiate(graph, b);
     const d = try sum(graph, c, .{
@@ -97,18 +100,17 @@ test "softmax matrix dimension 1" {
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
-    // const actual = try session.run(&[_]Tensor{ b, c, gradients[0] }, .{});
-    // std.debug.warn("\n{}\n", .{actual[0]});
-    // const expected = try eager.constant(f64, &arena.allocator, .{
-    //     .{ 0.5498, 0.5986, 0.6456, 0.6899, 0.7310 },
-    //     .{ 0.4501, 0.4013, 0.3543, 0.3100, 0.2689 },
-    // });
-    // const expected1 = try eager.constant(f64, &arena.allocator, 0.4999);
-    // const expected2 = try eager.constant(f64, &arena.allocator, .{
-    //     .{ 0, -4.6512e-18, 0, 0, 5.1053e-18 },
-    //     .{ 0, 4.6512e-18, 0, 0, -5.1053e-18 },
-    // });
-    // expectEqual(f64, actual[0].f64, expected);
-    // expectEqual(f64, actual[1].f64, expected1);
-    // expectEqual(f64, actual[2].f64, expected2);
+    const actual = try session.run(&[_]Tensor{ b, c, gradients[0] }, .{});
+    const expected = try eager.constant(f64, &arena.allocator, .{
+        .{ 0.1621, 0.1791, 0.1980, 0.2188, 0.2418 },
+        .{ 0.2418, 0.2188, 0.1980, 0.1791, 0.1621 },
+    });
+    const expected1 = try eager.constant(f64, &arena.allocator, 0.2);
+    const expected2 = try eager.constant(f64, &arena.allocator, .{
+        .{ -2.3256e-18, -2.5702e-18, -2.8405e-18, -3.1392e-18, 1.0875e-17 },
+        .{ -3.1392e-18, -2.8405e-18, -2.5702e-18, -2.3256e-18, -2.1043e-18 },
+    });
+    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual[1].f64, expected1);
+    expectEqual(f64, actual[2].f64, expected2);
 }
