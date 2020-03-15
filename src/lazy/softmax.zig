@@ -21,7 +21,10 @@ fn softmax(graph: *Graph, x: Tensor, parameters: SoftmaxParameters) !Tensor {
     const a = try maximum(graph, x, .{ .dimension = parameters.dimension });
     const b = try subtract(graph, x, a);
     const c = try exponentiate(graph, b);
-    const d = try sum(graph, c, .{ .dimension = parameters.dimension });
+    const d = try sum(graph, c, .{
+        .dimension = parameters.dimension,
+        .keep_dimensions = true,
+    });
     return try divide(graph, c, d);
 }
 
@@ -89,16 +92,12 @@ test "softmax matrix dimension 1" {
         .{ 0.1, 0.2, 0.3, 0.4, 0.5 },
         .{ -0.1, -0.2, -0.3, -0.4, -0.5 },
     });
-    // TODO: need to keep dimensions when summing to fix this
-    _ = softmax(&graph, a, .{ .dimension = 1 }) catch |err| switch (err) {
-        error.CouldNotBroadcastShapes => {},
-        else => unreachable,
-    };
-    // const c = try mean(&graph, b);
-    // const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    // var session = try Session.init(allocator, &graph);
-    // defer session.deinit();
-    // const actual = try session.run(&[_]Tensor{ b, c, gradients[0] }, .{});
+    const b = try softmax(&graph, a, .{ .dimension = 1 });
+    const c = try mean(&graph, b);
+    const gradients = try gradient(&graph, c, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{ b, c, gradients[0] }, .{});
     // std.debug.warn("\n{}\n", .{actual[0]});
     // const expected = try eager.constant(f64, &arena.allocator, .{
     //     .{ 0.5498, 0.5986, 0.6456, 0.6899, 0.7310 },
@@ -106,8 +105,8 @@ test "softmax matrix dimension 1" {
     // });
     // const expected1 = try eager.constant(f64, &arena.allocator, 0.4999);
     // const expected2 = try eager.constant(f64, &arena.allocator, .{
-    //     .{ 7.6686e-18, -1.6950e-17, 9.3665e-18, 0, 0 },
-    //     .{ 6.2785e-18, -1.1362e-17, 5.1404e-18, 0, 0 },
+    //     .{ 0, -4.6512e-18, 0, 0, 5.1053e-18 },
+    //     .{ 0, 4.6512e-18, 0, 0, -5.1053e-18 },
     // });
     // expectEqual(f64, actual[0].f64, expected);
     // expectEqual(f64, actual[1].f64, expected1);
