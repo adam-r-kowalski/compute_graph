@@ -12,6 +12,7 @@ const broadcast = @import("broadcast.zig");
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const zeroBroadcastedIndex = broadcast.zeroBroadcastedIndex;
+const zeroBroadcastedIndexKeepDimension = broadcast.zeroBroadcastedIndexKeepDimension;
 const reduce = @import("reduce.zig").reduce;
 const ReduceParameters = @import("reduce.zig").ReduceParameters;
 
@@ -201,58 +202,113 @@ test "sum keep dimensions 1" {
     expectEqual(i64, actual, expected);
 }
 
-pub fn sumBackward(comptime T: type, parameters: ReduceParameters, context: backward.Context(T)) ![]CpuTensor(T) {
-    std.debug.assert(context.forward_inputs.len == 1);
+fn sumBackwardAcrossDimension(comptime T: type, dimension: usize, context: backward.Context(T)) ![]CpuTensor(T) {
     const allocator = context.allocator;
-
     const input = context.forward_inputs[0];
-    const outputs = try allocator.alloc(CpuTensor(T), 1);
-    errdefer context.allocator.free(outputs);
-
     const shape = input.shape;
     const stride = input.stride;
+    const outputs = try allocator.alloc(CpuTensor(T), 1);
+    errdefer context.allocator.free(outputs);
+    const array = try allocator.alloc(T, input.storage.array.len);
+    errdefer allocator.free(array);
+
+    const gradient_array = context.gradient_input.storage.array;
+
+    var gradient_cartesian_index = try allocator.alloc(usize, shape.len - 1);
+    defer allocator.free(gradient_cartesian_index);
+    for (gradient_cartesian_index) |*e| e.* = 0;
+
+    var array_cartesian_index = try allocator.alloc(usize, shape.len);
+    defer allocator.free(array_cartesian_index);
+
+    const gradient_shape = context.gradient_input.shape;
+
+    while (true) {
+        zeroBroadcastedIndex(gradient_cartesian_index, dimension, array_cartesian_index);
+        const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
+
+        var i: usize = 0;
+        while (i < shape[dimension]) {
+            array_cartesian_index[dimension] = i;
+            const array_linear_index = linearIndex(stride, array_cartesian_index);
+            array[array_linear_index] = gradient_array[gradient_linear_index];
+            i += 1;
+        }
+
+        if (maximumCartesianIndex(gradient_shape, gradient_cartesian_index)) break;
+        incrementCartesianIndex(gradient_shape, gradient_cartesian_index);
+    }
+
+    outputs[0] = CpuTensor(T){
+        .shape = shape,
+        .stride = stride,
+        .storage = .{ .array = array },
+    };
+    return outputs;
+}
+
+fn sumBackwardAcrossKeepDimensions(comptime T: type, dimension: usize, context: backward.Context(T)) ![]CpuTensor(T) {
+    const allocator = context.allocator;
+    const input = context.forward_inputs[0];
+    const shape = input.shape;
+    const stride = input.stride;
+    const outputs = try allocator.alloc(CpuTensor(T), 1);
+    errdefer context.allocator.free(outputs);
+    const array = try allocator.alloc(T, input.storage.array.len);
+    errdefer allocator.free(array);
+
+    const gradient_array = context.gradient_input.storage.array;
+
+    var gradient_cartesian_index = try allocator.alloc(usize, shape.len);
+    defer allocator.free(gradient_cartesian_index);
+    for (gradient_cartesian_index) |*e| e.* = 0;
+
+    var array_cartesian_index = try allocator.alloc(usize, shape.len);
+    defer allocator.free(array_cartesian_index);
+
+    const gradient_shape = context.gradient_input.shape;
+
+    while (true) {
+        zeroBroadcastedIndexKeepDimension(gradient_cartesian_index, dimension, array_cartesian_index);
+        const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
+
+        var i: usize = 0;
+        while (i < shape[dimension]) {
+            array_cartesian_index[dimension] = i;
+            const array_linear_index = linearIndex(stride, array_cartesian_index);
+            array[array_linear_index] = gradient_array[gradient_linear_index];
+            i += 1;
+        }
+
+        if (maximumCartesianIndex(gradient_shape, gradient_cartesian_index)) break;
+        incrementCartesianIndex(gradient_shape, gradient_cartesian_index);
+    }
+
+    outputs[0] = CpuTensor(T){
+        .shape = shape,
+        .stride = stride,
+        .storage = .{ .array = array },
+    };
+    return outputs;
+}
+
+pub fn sumBackward(comptime T: type, parameters: ReduceParameters, context: backward.Context(T)) ![]CpuTensor(T) {
+    std.debug.assert(context.forward_inputs.len == 1);
+    const input = context.forward_inputs[0];
+    const shape = input.shape;
 
     if (parameters.dimension) |d| {
         if (shape.len > 1) {
-            const array = try allocator.alloc(T, input.storage.array.len);
-            errdefer allocator.free(array);
-
-            const gradient_array = context.gradient_input.storage.array;
-
-            var gradient_cartesian_index = try allocator.alloc(usize, shape.len - 1);
-            defer allocator.free(gradient_cartesian_index);
-            for (gradient_cartesian_index) |*e| e.* = 0;
-
-            var array_cartesian_index = try allocator.alloc(usize, shape.len);
-            defer allocator.free(array_cartesian_index);
-
-            const gradient_shape = context.gradient_input.shape;
-
-            while (true) {
-                zeroBroadcastedIndex(gradient_cartesian_index, d, array_cartesian_index);
-                const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
-
-                var i: usize = 0;
-                while (i < shape[d]) {
-                    array_cartesian_index[d] = i;
-                    const array_linear_index = linearIndex(stride, array_cartesian_index);
-                    array[array_linear_index] = gradient_array[gradient_linear_index];
-                    i += 1;
-                }
-
-                if (maximumCartesianIndex(gradient_shape, gradient_cartesian_index)) break;
-                incrementCartesianIndex(gradient_shape, gradient_cartesian_index);
-            }
-
-            outputs[0] = CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = array },
-            };
-            return outputs;
+            if (parameters.keep_dimensions)
+                return try sumBackwardAcrossKeepDimensions(T, d, context);
+            return try sumBackwardAcrossDimension(T, d, context);
         }
     }
 
+    const allocator = context.allocator;
+    const outputs = try allocator.alloc(CpuTensor(T), 1);
+    errdefer context.allocator.free(outputs);
+    const stride = input.stride;
     const gradient = context.gradient_input.storage.scalar;
     switch (input.storage) {
         .scalar => |scalar| {
@@ -443,6 +499,81 @@ test "sum backward rank 3 dimension 2" {
             .{ 0.75, 0.75 },
             .{ 1, 1 },
         },
+    });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "sum backward keep dimensions" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const parameters = ReduceParameters{ .keep_dimensions = true };
+    const forward_output = try sum(f64, &arena.allocator, forward_input, parameters);
+    const gradient_input = try constant(f64, &arena.allocator, 1);
+    const actual = try sumBackward(f64, parameters, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{
+        .{ 1, 1, 1 },
+        .{ 1, 1, 1 },
+    });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "sum keep dimensions 0" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const parameters = ReduceParameters{
+        .dimension = 0,
+        .keep_dimensions = true,
+    };
+    const forward_output = try sum(f64, &arena.allocator, forward_input, parameters);
+    const gradient_input = try constant(f64, &arena.allocator, .{.{ 1. / 3., 1. / 3., 1. / 3. }});
+    const actual = try sumBackward(f64, parameters, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{
+        .{ 1. / 3., 1. / 3., 1. / 3. },
+        .{ 1. / 3., 1. / 3., 1. / 3. },
+    });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "sum keep dimensions 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const forward_input = try constant(f64, &arena.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const parameters = ReduceParameters{
+        .dimension = 1,
+        .keep_dimensions = true,
+    };
+    const forward_output = try sum(f64, &arena.allocator, forward_input, parameters);
+    const gradient_input = try constant(f64, &arena.allocator, .{ .{0.5}, .{0.5} });
+    const actual = try sumBackward(f64, parameters, backward.Context(f64){
+        .allocator = &arena.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    const expected = try constant(f64, &arena.allocator, .{
+        .{ 0.5, 0.5, 0.5 },
+        .{ 0.5, 0.5, 0.5 },
     });
     expectEqual(f64, actual[0], expected);
 }
