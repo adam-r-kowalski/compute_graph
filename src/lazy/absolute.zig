@@ -9,6 +9,10 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const absoluteBackward = @import("../eager/absolute.zig").absoluteBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
 
 const Absolute = struct {
     operation: Operation,
@@ -88,8 +92,6 @@ pub fn absolute(graph: *Graph, x: Tensor) !Tensor {
 }
 
 test "absolute scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -107,8 +109,6 @@ test "absolute scalar" {
 }
 
 test "absolute matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -134,8 +134,6 @@ test "absolute matrix" {
 }
 
 test "absolute matrix i32" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -161,10 +159,6 @@ test "absolute matrix i32" {
 }
 
 test "gradient absolute" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

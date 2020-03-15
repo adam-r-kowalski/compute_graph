@@ -10,6 +10,10 @@ const expectEqual = @import("../testing.zig").expectEqual;
 const addBackward = @import("../eager/add.zig").addBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
 const broadcastShape = @import("broadcast.zig").broadcastShape;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
 
 const Add = struct {
     operation: Operation,
@@ -106,8 +110,6 @@ pub fn add(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
 }
 
 test "add scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -126,8 +128,6 @@ test "add scalar" {
 }
 
 test "add matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -153,8 +153,6 @@ test "add matrix" {
 }
 
 test "add matrix i32" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -180,8 +178,6 @@ test "add matrix i32" {
 }
 
 test "add broadcast scalar rank 3" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -218,8 +214,6 @@ test "add broadcast scalar rank 3" {
 }
 
 test "add broadcast rank 3 to rank 4" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -294,10 +288,6 @@ test "add broadcast rank 3 to rank 4" {
 }
 
 test "gradient add" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -330,10 +320,6 @@ test "gradient add" {
 }
 
 test "gradient add broadcast scalar rank 3" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -388,8 +374,6 @@ test "gradient add broadcast scalar rank 3" {
 }
 
 test "add matrix shape mismatch" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -411,8 +395,6 @@ test "add matrix shape mismatch" {
 }
 
 test "add matrix scalar type mismatch" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

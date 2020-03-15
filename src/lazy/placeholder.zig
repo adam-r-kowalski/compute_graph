@@ -7,6 +7,8 @@ const ScalarType = tensor.ScalarType;
 const Session = @import("session.zig").Session;
 const Environment = @import("session.zig").Environment;
 const expectEqual = @import("../testing.zig").expectEqual;
+const constant = @import("constant.zig").constant;
+const eager = @import("../eager.zig");
 
 pub const Placeholder = struct {
     shape: []const usize,
@@ -26,8 +28,6 @@ pub fn placeholder(graph: *Graph, shape: []const usize, scalarType: ScalarType) 
 }
 
 test "placeholder" {
-    const constant = @import("constant.zig").constant;
-    const eager = @import("../eager.zig");
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

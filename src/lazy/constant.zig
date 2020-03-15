@@ -8,6 +8,7 @@ const eager = @import("../eager.zig");
 const CpuTensorUnion = eager.CpuTensorUnion;
 const arrayInfo = @import("../util/array_info.zig").arrayInfo;
 const expectEqual = @import("../testing.zig").expectEqual;
+const Session = @import("session.zig").Session;
 
 fn tensorScalarType(comptime T: type) ScalarType {
     return switch (T) {
@@ -32,7 +33,6 @@ pub fn constant(comptime T: type, graph: *Graph, literal: var) !Tensor {
 }
 
 test "constant scalar" {
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -51,7 +51,6 @@ test "constant scalar" {
 }
 
 test "constant array" {
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

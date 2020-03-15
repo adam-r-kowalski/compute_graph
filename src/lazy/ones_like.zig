@@ -9,6 +9,8 @@ const CpuTensorUnion = eager.CpuTensorUnion;
 const expectEqual = @import("../testing.zig").expectEqual;
 const onesLikeBackward = @import("../eager/onesLike.zig").onesLikeBackward;
 const EagerBackwardContext = @import("../eager/backward.zig").Context;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
 
 const OnesLike = struct {
     operation: Operation,
@@ -50,8 +52,6 @@ pub fn onesLike(graph: *Graph, x: Tensor) !Tensor {
 }
 
 test "onesLike scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -68,8 +68,6 @@ test "onesLike scalar" {
 }
 
 test "onesLike matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -94,8 +92,6 @@ test "onesLike matrix" {
 }
 
 test "onesLike matrix i32" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

@@ -7,6 +7,11 @@ const divide = @import("divide.zig").divide;
 const exponentiate = @import("exponentiate.zig").exponentiate;
 const onesLike = @import("ones_like.zig").onesLike;
 const negate = @import("negate.zig").negate;
+const constant = @import("constant.zig").constant;
+const Session = @import("session.zig").Session;
+const gradient = @import("gradient.zig").gradient;
+const mean = @import("mean.zig").mean;
+const eager = @import("../eager.zig");
 
 pub fn sigmoid(graph: *Graph, x: Tensor) !Tensor {
     const a = try onesLike(graph, x);
@@ -17,9 +22,6 @@ pub fn sigmoid(graph: *Graph, x: Tensor) !Tensor {
 }
 
 test "sigmoid scalar" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const eager = @import("../eager.zig");
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -36,9 +38,6 @@ test "sigmoid scalar" {
 }
 
 test "sigmoid matrix" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const eager = @import("../eager.zig");
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -63,11 +62,6 @@ test "sigmoid matrix" {
 }
 
 test "gradient sigmoid" {
-    const constant = @import("constant.zig").constant;
-    const Session = @import("session.zig").Session;
-    const gradient = @import("gradient.zig").gradient;
-    const mean = @import("mean.zig").mean;
-    const eager = @import("../eager.zig");
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
