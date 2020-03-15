@@ -15,8 +15,28 @@ pub const ReduceParameters = struct {
     keep_dimensions: bool = false,
 };
 
-pub fn newShape(allocator: *Allocator, shape: []const usize, parameters: ReduceParameters) ![]const usize {
-    if (parameters.dimension) |d| {
+fn newShapeKeepDimensions(allocator: *Allocator, shape: []const usize, dimension: ?usize) ![]const usize {
+    const new_shape = try allocator.alloc(usize, shape.len);
+    if (dimension) |d| {
+        if (d >= shape.len) return error.InvalidDimension;
+        errdefer allocator.free(new_shape);
+        for (shape) |s, i| {
+            if (i < d) {
+                new_shape[i] = shape[i];
+            } else if (i > d) {
+                new_shape[i] = shape[i];
+            } else {
+                new_shape[i] = 1;
+            }
+        }
+    } else {
+        for (new_shape) |*e| e.* = 1;
+    }
+    return new_shape;
+}
+
+fn newShapeDontKeepDimensions(allocator: *Allocator, shape: []const usize, dimension: ?usize) ![]const usize {
+    if (dimension) |d| {
         if (d >= shape.len) return error.InvalidDimension;
         const new_shape = try allocator.alloc(usize, shape.len - 1);
         errdefer allocator.free(new_shape);
@@ -31,6 +51,12 @@ pub fn newShape(allocator: *Allocator, shape: []const usize, parameters: ReduceP
     } else {
         return &[_]usize{};
     }
+}
+
+pub fn newShape(allocator: *Allocator, shape: []const usize, parameters: ReduceParameters) ![]const usize {
+    if (parameters.keep_dimensions)
+        return try newShapeKeepDimensions(allocator, shape, parameters.dimension);
+    return try newShapeDontKeepDimensions(allocator, shape, parameters.dimension);
 }
 
 test "newShape null" {
@@ -59,6 +85,33 @@ test "newShape dimension 2" {
     defer arena.deinit();
     const actual = try newShape(&arena.allocator, &[_]usize{ 1, 2, 3 }, .{ .dimension = 2 });
     std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 1, 2 }));
+}
+
+test "newShape keep dimensions" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const actual = try newShape(&arena.allocator, &[_]usize{ 2, 3 }, .{ .keep_dimensions = true });
+    std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 1, 1 }));
+}
+
+test "newShape keep dimensions 0" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const actual = try newShape(&arena.allocator, &[_]usize{ 2, 3 }, .{
+        .keep_dimensions = true,
+        .dimension = 0,
+    });
+    std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 1, 3 }));
+}
+
+test "newShape keep dimensions 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const actual = try newShape(&arena.allocator, &[_]usize{ 2, 3 }, .{
+        .keep_dimensions = true,
+        .dimension = 1,
+    });
+    std.testing.expect(std.mem.eql(usize, actual, &[_]usize{ 2, 1 }));
 }
 
 test "newShape invalid dimension" {
