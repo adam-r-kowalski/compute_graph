@@ -3,16 +3,11 @@ const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const cpu_tensor = @import("cpu_tensor.zig");
 const CpuTensor = cpu_tensor.CpuTensor;
-const linearIndex = cpu_tensor.linearIndex;
 const reduce = @import("reduce.zig").reduce;
 const ReduceParameters = @import("reduce.zig").ReduceParameters;
 const expectEqual = @import("../testing.zig").expectEqual;
-const backward = @import("backward.zig");
-const broadcast = @import("broadcast.zig");
-const maximumCartesianIndex = broadcast.maximumCartesianIndex;
-const incrementCartesianIndex = broadcast.incrementCartesianIndex;
-const zeroBroadcastedIndex = broadcast.zeroBroadcastedIndex;
-const zeroBroadcastedIndexKeepDimension = broadcast.zeroBroadcastedIndexKeepDimension;
+const maximumBackward = @import("minimum_maximum_backward.zig").backward;
+const Context = @import("backward.zig").Context;
 
 fn minimumScalar(comptime T: type) T {
     return switch (T) {
@@ -204,186 +199,13 @@ test "maximum keep dimensions 1" {
     expectEqual(i64, actual, expected);
 }
 
-fn maximumBackwardAcrossDimension(comptime T: type, dimension: usize, context: backward.Context(T)) ![]CpuTensor(T) {
-    const allocator = context.allocator;
-    const input = context.forward_inputs[0];
-    const shape = input.shape;
-    const stride = input.stride;
-    const forward_input = input.storage.array;
-    const outputs = try allocator.alloc(CpuTensor(T), 1);
-    errdefer context.allocator.free(outputs);
-    const array = try allocator.alloc(T, forward_input.len);
-    errdefer allocator.free(array);
-
-    const gradient_array = context.gradient_input.storage.array;
-
-    var gradient_cartesian_index = try allocator.alloc(usize, shape.len - 1);
-    defer allocator.free(gradient_cartesian_index);
-    for (gradient_cartesian_index) |*e| e.* = 0;
-
-    var array_cartesian_index = try allocator.alloc(usize, shape.len);
-    defer allocator.free(array_cartesian_index);
-
-    const gradient_shape = context.gradient_input.shape;
-
-    const forward_output = context.forward_output.storage.array;
-
-    while (true) {
-        const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
-        const maximum_value = forward_output[gradient_linear_index];
-        zeroBroadcastedIndex(gradient_cartesian_index, dimension, array_cartesian_index);
-        var i: usize = 0;
-        var count: T = 0;
-        while (i < shape[dimension]) {
-            array_cartesian_index[dimension] = i;
-            const array_linear_index = linearIndex(stride, array_cartesian_index);
-            if (forward_input[array_linear_index] == maximum_value) count += 1;
-            i += 1;
-        }
-
-        zeroBroadcastedIndex(gradient_cartesian_index, dimension, array_cartesian_index);
-        const contribution = gradient_array[gradient_linear_index] / count;
-        i = 0;
-        while (i < shape[dimension]) {
-            array_cartesian_index[dimension] = i;
-            const array_linear_index = linearIndex(stride, array_cartesian_index);
-            const forward_value = forward_input[array_linear_index];
-            array[array_linear_index] = if (forward_value == maximum_value) contribution else 0;
-            i += 1;
-        }
-
-        if (maximumCartesianIndex(gradient_shape, gradient_cartesian_index)) break;
-        incrementCartesianIndex(gradient_shape, gradient_cartesian_index);
-    }
-
-    outputs[0] = CpuTensor(T){
-        .shape = shape,
-        .stride = stride,
-        .storage = .{ .array = array },
-    };
-    return outputs;
-}
-
-fn maximumBackwardAcrossKeepDimensions(comptime T: type, dimension: usize, context: backward.Context(T)) ![]CpuTensor(T) {
-    const allocator = context.allocator;
-    const input = context.forward_inputs[0];
-    const shape = input.shape;
-    const stride = input.stride;
-    const forward_input = input.storage.array;
-    const outputs = try allocator.alloc(CpuTensor(T), 1);
-    errdefer context.allocator.free(outputs);
-    const array = try allocator.alloc(T, forward_input.len);
-    errdefer allocator.free(array);
-
-    const gradient_array = context.gradient_input.storage.array;
-
-    var gradient_cartesian_index = try allocator.alloc(usize, shape.len);
-    defer allocator.free(gradient_cartesian_index);
-    for (gradient_cartesian_index) |*e| e.* = 0;
-
-    var array_cartesian_index = try allocator.alloc(usize, shape.len);
-    defer allocator.free(array_cartesian_index);
-
-    const gradient_shape = context.gradient_input.shape;
-
-    const forward_output = context.forward_output.storage.array;
-
-    while (true) {
-        const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
-        const maximum_value = forward_output[gradient_linear_index];
-        zeroBroadcastedIndexKeepDimension(gradient_cartesian_index, dimension, array_cartesian_index);
-        var i: usize = 0;
-        var count: T = 0;
-        while (i < shape[dimension]) {
-            array_cartesian_index[dimension] = i;
-            const array_linear_index = linearIndex(stride, array_cartesian_index);
-            if (forward_input[array_linear_index] == maximum_value) count += 1;
-            i += 1;
-        }
-
-        zeroBroadcastedIndexKeepDimension(gradient_cartesian_index, dimension, array_cartesian_index);
-        const contribution = gradient_array[gradient_linear_index] / count;
-        i = 0;
-        while (i < shape[dimension]) {
-            array_cartesian_index[dimension] = i;
-            const array_linear_index = linearIndex(stride, array_cartesian_index);
-            const forward_value = forward_input[array_linear_index];
-            array[array_linear_index] = if (forward_value == maximum_value) contribution else 0;
-            i += 1;
-        }
-
-        if (maximumCartesianIndex(gradient_shape, gradient_cartesian_index)) break;
-        incrementCartesianIndex(gradient_shape, gradient_cartesian_index);
-    }
-
-    outputs[0] = CpuTensor(T){
-        .shape = shape,
-        .stride = stride,
-        .storage = .{ .array = array },
-    };
-    return outputs;
-}
-
-pub fn maximumBackward(comptime T: type, parameters: ReduceParameters, context: backward.Context(T)) ![]CpuTensor(T) {
-    std.debug.assert(context.forward_inputs.len == 1);
-    const input = context.forward_inputs[0];
-    const shape = input.shape;
-
-    if (parameters.dimension) |d| {
-        if (shape.len > 1) {
-            if (parameters.keep_dimensions)
-                return try maximumBackwardAcrossKeepDimensions(T, d, context);
-            return try maximumBackwardAcrossDimension(T, d, context);
-        }
-    }
-
-    const allocator = context.allocator;
-    const outputs = try allocator.alloc(CpuTensor(T), 1);
-    errdefer context.allocator.free(outputs);
-    const stride = input.stride;
-    switch (input.storage) {
-        .scalar => |scalar| {
-            const gradient = context.gradient_input.storage.scalar;
-            outputs[0] = CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = gradient },
-            };
-        },
-        .array => |array| {
-            const gradient = switch (context.gradient_input.storage) {
-                .scalar => |s| s,
-                .array => |a| a[0],
-            };
-            const new_array = try allocator.alloc(T, array.len);
-            errdefer allocator.free(new_array);
-            const forward_output = switch (context.forward_output.storage) {
-                .scalar => |s| s,
-                .array => |a| a[0],
-            };
-            var count: T = 0;
-            for (array) |e| {
-                if (e == forward_output) count += 1;
-            }
-            const contribution = gradient / count;
-            for (new_array) |*e, i| e.* = if (array[i] == forward_output) contribution else 0;
-            outputs[0] = CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
-    return outputs;
-}
-
 test "maximum backward rank 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, 4);
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const forward_output = try maximum(f64, &arena.allocator, forward_input, ReduceParameters{});
-    const actual = try maximumBackward(f64, ReduceParameters{}, backward.Context(f64){
+    const actual = try maximumBackward(f64, ReduceParameters{}, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -399,7 +221,7 @@ test "maximum backward rank 1" {
     const forward_input = try constant(f64, &arena.allocator, .{ 1, 2, 3, 4, 5 });
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const forward_output = try maximum(f64, &arena.allocator, forward_input, ReduceParameters{});
-    const actual = try maximumBackward(f64, ReduceParameters{}, backward.Context(f64){
+    const actual = try maximumBackward(f64, ReduceParameters{}, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -415,7 +237,7 @@ test "maximum backward rank 1 repeated max" {
     const forward_input = try constant(f64, &arena.allocator, .{ 1, 5, 3, 4, 5 });
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const forward_output = try maximum(f64, &arena.allocator, forward_input, ReduceParameters{});
-    const actual = try maximumBackward(f64, ReduceParameters{}, backward.Context(f64){
+    const actual = try maximumBackward(f64, ReduceParameters{}, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -431,7 +253,7 @@ test "maximum backward rank 1 thrice repeated max" {
     const forward_input = try constant(f64, &arena.allocator, .{ 1, 5, 5, 4, 5 });
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const forward_output = try maximum(f64, &arena.allocator, forward_input, ReduceParameters{});
-    const actual = try maximumBackward(f64, ReduceParameters{}, backward.Context(f64){
+    const actual = try maximumBackward(f64, ReduceParameters{}, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -450,7 +272,7 @@ test "maximum backward rank 2" {
     });
     const gradient_input = try constant(f64, &arena.allocator, 1);
     const forward_output = try maximum(f64, &arena.allocator, forward_input, ReduceParameters{});
-    const actual = try maximumBackward(f64, ReduceParameters{}, backward.Context(f64){
+    const actual = try maximumBackward(f64, ReduceParameters{}, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -482,7 +304,7 @@ test "maximum backward rank 3 dimension 0" {
     });
     const parameters = ReduceParameters{ .dimension = 0 };
     const forward_output = try maximum(f64, &arena.allocator, forward_input, parameters);
-    const actual = try maximumBackward(f64, parameters, backward.Context(f64){
+    const actual = try maximumBackward(f64, parameters, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -520,7 +342,7 @@ test "maximum backward rank 3 dimension 1" {
     });
     const parameters = ReduceParameters{ .dimension = 1 };
     const forward_output = try maximum(f64, &arena.allocator, forward_input, parameters);
-    const actual = try maximumBackward(f64, parameters, backward.Context(f64){
+    const actual = try maximumBackward(f64, parameters, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -558,7 +380,7 @@ test "maximum backward rank 3 dimension 2" {
     });
     const parameters = ReduceParameters{ .dimension = 2 };
     const forward_output = try maximum(f64, &arena.allocator, forward_input, parameters);
-    const actual = try maximumBackward(f64, parameters, backward.Context(f64){
+    const actual = try maximumBackward(f64, parameters, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -596,7 +418,7 @@ test "maximum backward rank 3 dimension 2 repeating max" {
     });
     const parameters = ReduceParameters{ .dimension = 2 };
     const forward_output = try maximum(f64, &arena.allocator, forward_input, parameters);
-    const actual = try maximumBackward(f64, parameters, backward.Context(f64){
+    const actual = try maximumBackward(f64, parameters, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -625,7 +447,7 @@ test "maximum backward keep dimensions" {
     const parameters = ReduceParameters{ .keep_dimensions = true };
     const forward_output = try maximum(f64, &arena.allocator, forward_input, parameters);
     const gradient_input = try constant(f64, &arena.allocator, .{.{1}});
-    const actual = try maximumBackward(f64, parameters, backward.Context(f64){
+    const actual = try maximumBackward(f64, parameters, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -651,7 +473,7 @@ test "maximum backward keep dimensions 0" {
     };
     const forward_output = try maximum(f64, &arena.allocator, forward_input, parameters);
     const gradient_input = try constant(f64, &arena.allocator, .{.{ 1. / 3., 1. / 3., 1. / 3. }});
-    const actual = try maximumBackward(f64, parameters, backward.Context(f64){
+    const actual = try maximumBackward(f64, parameters, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
@@ -677,7 +499,7 @@ test "maximum bacward keep dimensions 1" {
     };
     const forward_output = try maximum(f64, &arena.allocator, forward_input, parameters);
     const gradient_input = try constant(f64, &arena.allocator, .{ .{0.5}, .{0.5} });
-    const actual = try maximumBackward(f64, parameters, backward.Context(f64){
+    const actual = try maximumBackward(f64, parameters, Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
         .forward_inputs = &[_]CpuTensor(f64){forward_input},
