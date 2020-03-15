@@ -282,6 +282,75 @@ test "minimum rank 3 accross 2 dimension" {
     expectEqual(i64, actual[0].i64, expected);
 }
 
+test "minimum keep dimensions" {
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(i64, &graph, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const y = try minimum(&graph, x, .{ .keep_dimensions = true });
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 1 }));
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{y}, .{});
+    const expected = try eager.constant(i64, &arena.allocator, .{
+        .{1},
+    });
+    expectEqual(i64, actual[0].i64, expected);
+}
+
+test "minimum keep dimensions 0" {
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(i64, &graph, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const y = try minimum(&graph, x, .{
+        .keep_dimensions = true,
+        .dimension = 0,
+    });
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 3 }));
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{y}, .{});
+    const expected = try eager.constant(i64, &arena.allocator, .{
+        .{ 1, 2, 3 },
+    });
+    expectEqual(i64, actual[0].i64, expected);
+}
+
+test "minimum keep dimensions 1" {
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const x = try constant(i64, &graph, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const y = try minimum(&graph, x, .{
+        .keep_dimensions = true,
+        .dimension = 1,
+    });
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 1 }));
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(&[_]Tensor{y}, .{});
+    const expected = try eager.constant(i64, &arena.allocator, .{
+        .{1}, .{4},
+    });
+    expectEqual(i64, actual[0].i64, expected);
+}
+
 test "gradient minimum rank 0" {
     const allocator = std.heap.page_allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -504,6 +573,81 @@ test "minimum backward rank 3 dimension 2 repeating min" {
             .{ 0.25, 0 },
             .{ 0.25, 0 },
         },
+    });
+    expectEqual(f64, actual[0].f64, expected);
+}
+
+test "gradient minimum keep dimensions" {
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const b = try minimum(&graph, a, .{ .keep_dimensions = true });
+    const c = try mean(&graph, b);
+    const gradients = try gradient(&graph, c, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const expected = try eager.constant(f64, &arena.allocator, .{
+        .{ 1, 0, 0 },
+        .{ 0, 0, 0 },
+    });
+    expectEqual(f64, actual[0].f64, expected);
+}
+
+test "gradient minimum keep dimensions 0" {
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const b = try minimum(&graph, a, .{
+        .dimension = 0,
+        .keep_dimensions = true,
+    });
+    const c = try mean(&graph, b);
+    const gradients = try gradient(&graph, c, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const expected = try eager.constant(f64, &arena.allocator, .{
+        .{ 1. / 3., 1. / 3., 1. / 3. },
+        .{ 0, 0, 0 },
+    });
+    expectEqual(f64, actual[0].f64, expected);
+}
+
+test "gradient minimum keep dimensions 1" {
+    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var graph = try Graph.init(allocator);
+    defer graph.deinit();
+    const a = try constant(f64, &graph, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const b = try minimum(&graph, a, .{
+        .dimension = 1,
+        .keep_dimensions = true,
+    });
+    const c = try mean(&graph, b);
+    const gradients = try gradient(&graph, c, &[_]Tensor{a});
+    var session = try Session.init(allocator, &graph);
+    defer session.deinit();
+    const actual = try session.run(gradients, .{});
+    const expected = try eager.constant(f64, &arena.allocator, .{
+        .{ 0.5, 0, 0 },
+        .{ 0.5, 0, 0 },
     });
     expectEqual(f64, actual[0].f64, expected);
 }
