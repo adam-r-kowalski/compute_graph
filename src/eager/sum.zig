@@ -309,9 +309,9 @@ pub fn sumBackward(comptime T: type, parameters: ReduceParameters, context: back
     const outputs = try allocator.alloc(CpuTensor(T), 1);
     errdefer context.allocator.free(outputs);
     const stride = input.stride;
-    const gradient = context.gradient_input.storage.scalar;
     switch (input.storage) {
         .scalar => |scalar| {
+            const gradient = context.gradient_input.storage.scalar;
             outputs[0] = CpuTensor(T){
                 .shape = shape,
                 .stride = stride,
@@ -319,14 +319,27 @@ pub fn sumBackward(comptime T: type, parameters: ReduceParameters, context: back
             };
         },
         .array => |array| {
-            const new_array = try allocator.alloc(T, array.len);
-            errdefer allocator.free(new_array);
-            for (new_array) |*e, i| e.* = gradient;
-            outputs[0] = CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = new_array },
-            };
+            if (parameters.keep_dimensions) {
+                const gradient = context.gradient_input.storage.array[0];
+                const new_array = try allocator.alloc(T, array.len);
+                errdefer allocator.free(new_array);
+                for (new_array) |*e, i| e.* = gradient;
+                outputs[0] = CpuTensor(T){
+                    .shape = shape,
+                    .stride = stride,
+                    .storage = .{ .array = new_array },
+                };
+            } else {
+                const gradient = context.gradient_input.storage.scalar;
+                const new_array = try allocator.alloc(T, array.len);
+                errdefer allocator.free(new_array);
+                for (new_array) |*e, i| e.* = gradient;
+                outputs[0] = CpuTensor(T){
+                    .shape = shape,
+                    .stride = stride,
+                    .storage = .{ .array = new_array },
+                };
+            }
         },
     }
     return outputs;
@@ -512,7 +525,7 @@ test "sum backward keep dimensions" {
     });
     const parameters = ReduceParameters{ .keep_dimensions = true };
     const forward_output = try sum(f64, &arena.allocator, forward_input, parameters);
-    const gradient_input = try constant(f64, &arena.allocator, 1);
+    const gradient_input = try constant(f64, &arena.allocator, .{.{1}});
     const actual = try sumBackward(f64, parameters, backward.Context(f64){
         .allocator = &arena.allocator,
         .gradient_input = gradient_input,
@@ -526,7 +539,7 @@ test "sum backward keep dimensions" {
     expectEqual(f64, actual[0], expected);
 }
 
-test "sum keep dimensions 0" {
+test "sum backward keep dimensions 0" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, .{
@@ -552,7 +565,7 @@ test "sum keep dimensions 0" {
     expectEqual(f64, actual[0], expected);
 }
 
-test "sum keep dimensions 1" {
+test "sum bacward keep dimensions 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, .{
