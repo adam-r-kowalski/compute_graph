@@ -319,27 +319,18 @@ pub fn sumBackward(comptime T: type, parameters: ReduceParameters, context: back
             };
         },
         .array => |array| {
-            if (parameters.keep_dimensions) {
-                const gradient = context.gradient_input.storage.array[0];
-                const new_array = try allocator.alloc(T, array.len);
-                errdefer allocator.free(new_array);
-                for (new_array) |*e, i| e.* = gradient;
-                outputs[0] = CpuTensor(T){
-                    .shape = shape,
-                    .stride = stride,
-                    .storage = .{ .array = new_array },
-                };
-            } else {
-                const gradient = context.gradient_input.storage.scalar;
-                const new_array = try allocator.alloc(T, array.len);
-                errdefer allocator.free(new_array);
-                for (new_array) |*e, i| e.* = gradient;
-                outputs[0] = CpuTensor(T){
-                    .shape = shape,
-                    .stride = stride,
-                    .storage = .{ .array = new_array },
-                };
-            }
+            const gradient = switch (context.gradient_input.storage) {
+                .scalar => |s| s,
+                .array => |a| a[0],
+            };
+            const new_array = try allocator.alloc(T, array.len);
+            errdefer allocator.free(new_array);
+            for (new_array) |*e, i| e.* = gradient;
+            outputs[0] = CpuTensor(T){
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .array = new_array },
+            };
         },
     }
     return outputs;
