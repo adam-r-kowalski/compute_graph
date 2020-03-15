@@ -9,6 +9,7 @@ const broadcast = @import("broadcast.zig");
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const zeroBroadcastedIndex = broadcast.zeroBroadcastedIndex;
+const zeroBroadcastedIndexKeepDimension = broadcast.zeroBroadcastedIndexKeepDimension;
 
 pub const ReduceParameters = struct {
     dimension: ?usize = null,
@@ -123,6 +124,52 @@ test "newShape invalid dimension" {
     };
 }
 
+fn reduceAcrossKeepDimensions(
+    comptime T: type,
+    allocator: *Allocator,
+    tensor: CpuTensor(T),
+    dimension: usize,
+    array: []const T,
+    shape: []const usize,
+    stride: []const usize,
+    reducer: fn (T, T) T,
+    identity: T,
+) !CpuTensor(T) {
+    const reduce_array = try allocator.alloc(T, tensorLength(shape));
+    errdefer allocator.free(reduce_array);
+
+    var reduce_cartesian_index = try allocator.alloc(usize, shape.len);
+    defer allocator.free(reduce_cartesian_index);
+    for (reduce_cartesian_index) |*e| e.* = 0;
+
+    var array_cartesian_index = try allocator.alloc(usize, shape.len);
+    defer allocator.free(array_cartesian_index);
+
+    while (true) {
+        zeroBroadcastedIndexKeepDimension(reduce_cartesian_index, dimension, array_cartesian_index);
+
+        var accumulator = identity;
+        var i: usize = 0;
+        while (i < tensor.shape[dimension]) {
+            array_cartesian_index[dimension] = i;
+            const array_linear_index = linearIndex(tensor.stride, array_cartesian_index);
+            accumulator = reducer(accumulator, array[array_linear_index]);
+            i += 1;
+        }
+        const reduce_linear_index = linearIndex(stride, reduce_cartesian_index);
+        reduce_array[reduce_linear_index] = accumulator;
+
+        if (maximumCartesianIndex(shape, reduce_cartesian_index)) break;
+        incrementCartesianIndex(shape, reduce_cartesian_index);
+    }
+
+    return CpuTensor(T){
+        .shape = shape,
+        .stride = stride,
+        .storage = .{ .array = reduce_array },
+    };
+}
+
 fn reduceAcrossDimension(
     comptime T: type,
     allocator: *Allocator,
@@ -190,17 +237,34 @@ pub fn reduce(
             };
         },
         .array => |array| {
-            if (parameters.dimension) |d|
-                if (shape.len > 0)
-                    return reduceAcrossDimension(T, allocator, tensor, d, array, shape, stride, reducer, identity);
+            if (parameters.dimension) |d| {
+                if (shape.len > 0) {
+                    if (parameters.keep_dimensions) {
+                        return reduceAcrossKeepDimensions(T, allocator, tensor, d, array, shape, stride, reducer, identity);
+                    } else {
+                        return reduceAcrossDimension(T, allocator, tensor, d, array, shape, stride, reducer, identity);
+                    }
+                }
+            }
 
             var accumulator = identity;
             for (array) |e| accumulator = reducer(accumulator, e);
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = accumulator },
-            };
+            if (parameters.keep_dimensions) {
+                const new_array = try allocator.alloc(T, 1);
+                errdefer allocator.free(new_array);
+                new_array[0] = accumulator;
+                return CpuTensor(T){
+                    .shape = shape,
+                    .stride = stride,
+                    .storage = .{ .array = new_array },
+                };
+            } else {
+                return CpuTensor(T){
+                    .shape = shape,
+                    .stride = stride,
+                    .storage = .{ .scalar = accumulator },
+                };
+            }
         },
     }
 }

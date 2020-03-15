@@ -278,3 +278,8 @@ pub fn zeroBroadcastedIndex(cartesian_index: []const usize, dimension: usize, br
         }
     }
 }
+
+pub fn zeroBroadcastedIndexKeepDimension(cartesian_index: []const usize, dimension: usize, broadcasted_cartesian_index: []usize) void {
+    for (broadcasted_cartesian_index) |*e, i|
+        e.* = if (i < dimension or i > dimension) cartesian_index[i] else 0;
+}

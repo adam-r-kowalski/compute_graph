@@ -153,6 +153,54 @@ test "sum rank 3 accross 2 dimension" {
     expectEqual(i64, actual, expected);
 }
 
+test "sum keep dimensions" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const x = try constant(i64, &arena.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const actual = try sum(i64, &arena.allocator, x, ReduceParameters{ .keep_dimensions = true });
+    const expected = try constant(i64, &arena.allocator, .{
+        .{21},
+    });
+    expectEqual(i64, actual, expected);
+}
+
+test "sum keep dimensions 0" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const x = try constant(i64, &arena.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const actual = try sum(i64, &arena.allocator, x, ReduceParameters{
+        .keep_dimensions = true,
+        .dimension = 0,
+    });
+    const expected = try constant(i64, &arena.allocator, .{
+        .{ 5, 7, 9 },
+    });
+    expectEqual(i64, actual, expected);
+}
+
+test "sum keep dimensions 1" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const x = try constant(i64, &arena.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const actual = try sum(i64, &arena.allocator, x, ReduceParameters{
+        .keep_dimensions = true,
+        .dimension = 1,
+    });
+    const expected = try constant(i64, &arena.allocator, .{
+        .{6}, .{15},
+    });
+    expectEqual(i64, actual, expected);
+}
+
 pub fn sumBackward(comptime T: type, parameters: ReduceParameters, context: backward.Context(T)) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 1);
     const allocator = context.allocator;
