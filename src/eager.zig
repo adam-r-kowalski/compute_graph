@@ -10,6 +10,7 @@ pub const mean = @import("eager/mean.zig").mean;
 pub const maximum = @import("eager/maximum.zig").maximum;
 pub const minimum = @import("eager/minimum.zig").minimum;
 pub const negate = @import("eager/negate.zig").negate;
+pub const naturalLogarithm = @import("eager/natural_logarithm.zig").naturalLogarithm;
 pub const subtract = @import("eager/subtract.zig").subtract;
 pub const sine = @import("eager/sine.zig").sine;
 pub const sum = @import("eager/sum.zig").sum;
