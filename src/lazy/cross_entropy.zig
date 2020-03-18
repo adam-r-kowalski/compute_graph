@@ -11,7 +11,7 @@ const gradient = @import("gradient.zig").gradient;
 const eager = @import("../eager.zig");
 const expectEqual = @import("../testing.zig").expectEqual;
 
-fn crossEntropy(graph: *Graph, p: Tensor, q: Tensor) !Tensor {
+pub fn crossEntropy(graph: *Graph, p: Tensor, q: Tensor) !Tensor {
     const a = try logarithm(graph, q, .{ .base = 2 });
     const b = try multiply(graph, p, a);
     const c = try sum(graph, b, .{});

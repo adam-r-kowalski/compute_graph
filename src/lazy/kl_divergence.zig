@@ -11,7 +11,7 @@ const gradient = @import("gradient.zig").gradient;
 const eager = @import("../eager.zig");
 const expectEqual = @import("../testing.zig").expectEqual;
 
-fn klDivergence(graph: *Graph, p: Tensor, q: Tensor) !Tensor {
+pub fn klDivergence(graph: *Graph, p: Tensor, q: Tensor) !Tensor {
     const a = try divide(graph, p, q);
     const b = try logarithm(graph, a, .{ .base = 2 });
     const c = try multiply(graph, p, b);
