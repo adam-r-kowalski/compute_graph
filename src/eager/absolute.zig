@@ -4,6 +4,8 @@ const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
+const map = @import("map.zig").map;
+const mapBackward = @import("map.zig").mapBackward;
 
 fn absoluteScalar(comptime T: type, x: T) error{Overflow}!T {
     return switch (T) {
@@ -14,6 +16,12 @@ fn absoluteScalar(comptime T: type, x: T) error{Overflow}!T {
 }
 
 pub fn absolute(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !CpuTensor(T) {
+    // TODO: make this work
+    // return try map(T, allocator, tensor, struct {
+    //     fn call(input: T) T {
+    //         return try absoluteScalar(T, input);
+    //     }
+    // }.call);
     const shape = tensor.shape;
     const stride = tensor.stride;
     switch (tensor.storage) {
@@ -100,41 +108,15 @@ test "absolute rank 3" {
 }
 
 pub fn absoluteBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
-    std.debug.assert(context.forward_inputs.len == 1);
-    const input = context.forward_inputs[0];
-    const outputs = try context.allocator.alloc(CpuTensor(T), 1);
-    errdefer context.allocator.free(outputs);
-
-    const transferSign = struct {
-        fn apply(from: T, to: T) T {
-            if (from > 0)
-                return to;
-            if (from < 0)
-                return -to;
+    return mapBackward(T, context, struct {
+        fn call(input: T, gradient: T) T {
+            if (input > 0)
+                return gradient;
+            if (input < 0)
+                return -gradient;
             return 0;
         }
-    }.apply;
-
-    switch (context.gradient_input.storage) {
-        .scalar => |scalar| {
-            outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
-                .storage = .{ .scalar = transferSign(input.storage.scalar, scalar) },
-            };
-        },
-        .array => |array| {
-            const input_array = input.storage.array;
-            var new_array = try context.allocator.alloc(T, input_array.len);
-            for (new_array) |*e, i| e.* = transferSign(input_array[i], array[i]);
-            outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
-    return outputs;
+    }.call);
 }
 
 test "absolute backward rank 0" {
