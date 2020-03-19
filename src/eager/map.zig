@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const invoke = @import("invoke.zig").invoke;
+const backward = @import("backward.zig");
 
 pub fn map(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), invokable: var) !CpuTensor(T) {
     const shape = tensor.shape;
@@ -25,4 +26,32 @@ pub fn map(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), invoka
             };
         },
     }
+}
+
+pub fn mapBackward(comptime T: type, context: backward.Context(T), invokable: var) ![]CpuTensor(T) {
+    std.debug.assert(context.forward_inputs.len == 1);
+    const input = context.forward_inputs[0];
+    const outputs = try context.allocator.alloc(CpuTensor(T), 1);
+    errdefer context.allocator.free(outputs);
+
+    switch (context.gradient_input.storage) {
+        .scalar => |scalar| {
+            outputs[0] = CpuTensor(T){
+                .shape = input.shape,
+                .stride = input.stride,
+                .storage = .{ .scalar = invoke(invokable, .{ input.storage.scalar, scalar }) },
+            };
+        },
+        .array => |array| {
+            const input_array = input.storage.array;
+            var new_array = try context.allocator.alloc(T, input_array.len);
+            for (new_array) |*e, i| e.* = invoke(invokable, .{ input_array[i], array[i] });
+            outputs[0] = CpuTensor(T){
+                .shape = input.shape,
+                .stride = input.stride,
+                .storage = .{ .array = new_array },
+            };
+        },
+    }
+    return outputs;
 }
