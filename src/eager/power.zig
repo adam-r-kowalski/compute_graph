@@ -8,11 +8,14 @@ const map = @import("map.zig").map;
 const mapBackward = @import("map.zig").mapBackward;
 
 pub fn power(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), n: var) !CpuTensor(T) {
-    return try map(T, allocator, tensor, struct {
-        fn call(t: T) T {
-            return std.math.pow(T, t, n);
+    const Closure = struct {
+        n_: T,
+
+        pub fn call(self: @This(), input: T) T {
+            return std.math.pow(T, input, self.n_);
         }
-    }.call);
+    };
+    return try map(T, allocator, tensor, Closure{ .n_ = n });
 }
 
 test "power rank 0" {
@@ -72,7 +75,7 @@ pub fn powerBackward(comptime T: type, n: var, context: backward.Context(T)) ![]
         n_: T,
 
         pub fn call(self: @This(), input: T, gradient: T) T {
-            return self.n_ * std.math.pow(T, input, n - 1.0) * gradient;
+            return self.n_ * std.math.pow(T, input, self.n_ - 1.0) * gradient;
         }
     };
     return try mapBackward(T, context, Closure{ .n_ = n });
