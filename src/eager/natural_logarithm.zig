@@ -5,6 +5,7 @@ const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
 const map = @import("map.zig").map;
+const mapBackward = @import("map.zig").mapBackward;
 
 pub fn naturalLogarithm(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !CpuTensor(T) {
     return try map(T, allocator, tensor, struct {
@@ -50,31 +51,11 @@ test "naturalLogarithm rank 2" {
 }
 
 pub fn naturalLogarithmBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
-    std.debug.assert(context.forward_inputs.len == 1);
-    const input = context.forward_inputs[0];
-    const outputs = try context.allocator.alloc(CpuTensor(T), 1);
-    errdefer context.allocator.free(outputs);
-
-    switch (context.gradient_input.storage) {
-        .scalar => |scalar| {
-            outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
-                .storage = .{ .scalar = 1 / input.storage.scalar * scalar },
-            };
-        },
-        .array => |array| {
-            const input_array = input.storage.array;
-            var new_array = try context.allocator.alloc(T, input_array.len);
-            for (new_array) |*e, i| e.* = 1 / input_array[i] * array[i];
-            outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
-    return outputs;
+    return try mapBackward(T, context, struct {
+        fn call(input: T, gradient: T) T {
+            return 1 / input * gradient;
+        }
+    }.call);
 }
 
 test "naturalLogarithm backward rank 0" {

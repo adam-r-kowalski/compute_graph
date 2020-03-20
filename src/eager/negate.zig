@@ -4,29 +4,15 @@ const constant = @import("constant.zig").constant;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
+const map = @import("map.zig").map;
+const mapBackward = @import("map.zig").mapBackward;
 
 pub fn negate(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !CpuTensor(T) {
-    const shape = tensor.shape;
-    const stride = tensor.stride;
-    switch (tensor.storage) {
-        .scalar => |scalar| {
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .scalar = -scalar },
-            };
-        },
-        .array => |array| {
-            const new_array = try allocator.alloc(T, array.len);
-            errdefer allocator.free(new_array);
-            for (array) |e, i| new_array[i] = -e;
-            return CpuTensor(T){
-                .shape = shape,
-                .stride = stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
+    return try map(T, allocator, tensor, struct {
+        fn call(input: T) T {
+            return -input;
+        }
+    }.call);
 }
 
 test "negate rank 0" {
@@ -92,31 +78,11 @@ test "negate rank 3" {
 }
 
 pub fn negateBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
-    std.debug.assert(context.forward_inputs.len == 1);
-    const input = context.forward_inputs[0];
-    const outputs = try context.allocator.alloc(CpuTensor(T), 1);
-    errdefer context.allocator.free(outputs);
-
-    switch (context.gradient_input.storage) {
-        .scalar => |scalar| {
-            outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
-                .storage = .{ .scalar = -scalar },
-            };
-        },
-        .array => |array| {
-            const input_array = input.storage.array;
-            var new_array = try context.allocator.alloc(T, input_array.len);
-            for (new_array) |*e, i| e.* = -array[i];
-            outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
-                .storage = .{ .array = new_array },
-            };
-        },
-    }
-    return outputs;
+    return try mapBackward(T, context, struct {
+        fn call(input: T, gradient: T) T {
+            return -gradient;
+        }
+    }.call);
 }
 
 test "negate backward rank 0" {
