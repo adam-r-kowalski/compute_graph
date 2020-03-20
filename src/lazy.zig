@@ -19,6 +19,7 @@ pub const mean = @import("lazy/mean.zig").mean;
 pub const negate = @import("lazy/negate.zig").negate;
 pub const logarithm = @import("lazy/logarithm.zig").logarithm;
 pub const placeholder = @import("lazy/placeholder.zig").placeholder;
+pub const power = @import("lazy/power.zig").power;
 pub const onesLike = @import("lazy/ones_like.zig").onesLike;
 pub const Session = @import("lazy/session.zig").Session;
 pub const subtract = @import("lazy/subtract.zig").subtract;
