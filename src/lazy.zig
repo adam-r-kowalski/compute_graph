@@ -16,6 +16,7 @@ pub const matrixMultiply = @import("lazy/matrix_multiply.zig").matrixMultiply;
 pub const maximum = @import("lazy/maximum.zig").maximum;
 pub const minimum = @import("lazy/minimum.zig").minimum;
 pub const mean = @import("lazy/mean.zig").mean;
+pub const meanSquaredError = @import("lazy/mean_squared_error.zig").meanSquaredError;
 pub const negate = @import("lazy/negate.zig").negate;
 pub const logarithm = @import("lazy/logarithm.zig").logarithm;
 pub const placeholder = @import("lazy/placeholder.zig").placeholder;
