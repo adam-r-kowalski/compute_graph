@@ -79,65 +79,56 @@ pub fn exponentiate(graph: *Graph, x: Tensor) !Tensor {
 }
 
 test "exponentiate scalar" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, -5);
     const y = try exponentiate(&graph, x);
-    std.testing.expectEqual(y.shape, &[_]usize{});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(f64, &arena.allocator, 0.00673);
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
 test "exponentiate matrix" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
     const y = try exponentiate(&graph, x);
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 2.7182, 0.1353 },
         .{ 20.0855, 0.0183 },
         .{ 0.00673, 403.4287 },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
 }
 
 test "gradient exponentiate" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
     const b = try exponentiate(&graph, a);
-    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.6795, 1.8472 },
         .{ 5.0213, 13.6495 },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
 }

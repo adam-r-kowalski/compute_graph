@@ -103,67 +103,56 @@ pub fn sum(graph: *Graph, x: Tensor, parameters: ReduceParameters) !Tensor {
 }
 
 test "sum scalar" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, -5);
     const y = try sum(&graph, x, .{});
-    std.testing.expectEqual(y.shape, &[_]usize{});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(f64, &arena.allocator, -5);
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
 test "sum matrix" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 5, 10 },
         .{ 7, 8 },
         .{ 10, 8 },
     });
     const y = try sum(&graph, x, .{});
-    std.testing.expectEqual(y.shape, &[_]usize{});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(f64, &arena.allocator, 48);
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
 test "sum matrix i32" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i32, &graph, .{
         .{ 5, 10 },
         .{ 7, 8 },
         .{ 10, 8 },
     });
     const y = try sum(&graph, x, .{});
-    std.testing.expectEqual(y.shape, &[_]usize{});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(i32, &arena.allocator, 48);
     expectEqual(i32, actual[0].i32, expected);
+    std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
 test "sum rank 3 accross 0 dimension" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i64, &graph, .{
         .{
             .{ 1, 2 },
@@ -175,23 +164,20 @@ test "sum rank 3 accross 0 dimension" {
         },
     });
     const y = try sum(&graph, x, .{ .dimension = 0 });
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 6, 8 },
         .{ 4, 12 },
     });
     expectEqual(i64, actual[0].i64, expected);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
 test "sum rank 3 accross 1 dimension" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i64, &graph, .{
         .{
             .{ 1, 2 },
@@ -203,23 +189,20 @@ test "sum rank 3 accross 1 dimension" {
         },
     });
     const y = try sum(&graph, x, .{ .dimension = 1 });
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ -2, 6 },
         .{ 12, 14 },
     });
     expectEqual(i64, actual[0].i64, expected);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
 test "sum rank 3 accross 2 dimension" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i64, &graph, .{
         .{
             .{ 1, 2 },
@@ -231,44 +214,38 @@ test "sum rank 3 accross 2 dimension" {
         },
     });
     const y = try sum(&graph, x, .{ .dimension = 2 });
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 3, 1 },
         .{ 11, 15 },
     });
     expectEqual(i64, actual[0].i64, expected);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
 test "sum keep dimensions" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
     });
     const y = try sum(&graph, x, .{ .keep_dimensions = true });
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 1 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{21},
     });
     expectEqual(i64, actual[0].i64, expected);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 1 }));
 }
 
 test "sum keep dimensions 0" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
@@ -277,22 +254,19 @@ test "sum keep dimensions 0" {
         .keep_dimensions = true,
         .dimension = 0,
     });
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 3 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 5, 7, 9 },
     });
     expectEqual(i64, actual[0].i64, expected);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 3 }));
 }
 
 test "sum keep dimensions 1" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
@@ -301,45 +275,39 @@ test "sum keep dimensions 1" {
         .keep_dimensions = true,
         .dimension = 1,
     });
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 1 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{6}, .{15},
     });
     expectEqual(i64, actual[0].i64, expected);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 1 }));
 }
 
 test "gradient sum" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
     const b = try sum(&graph, a, .{});
-    std.testing.expectEqual(b.shape, &[_]usize{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 1 },
         .{ 1, 1 },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expectEqual(b.shape, &[_]usize{});
 }
 
 test "gradient sum with multiply" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -347,62 +315,53 @@ test "gradient sum with multiply" {
     const b = try sum(&graph, a, .{});
     const c = try constant(f64, &graph, 5);
     const d = try multiply(&graph, b, c);
-    std.testing.expectEqual(b.shape, &[_]usize{});
     const gradients = try gradient(&graph, d, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 5, 5 },
         .{ 5, 5 },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expectEqual(b.shape, &[_]usize{});
 }
 
 test "gradient sum rank 1 with multiply" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{ 1, 2, 3, 4 });
     const b = try sum(&graph, a, .{});
     const c = try constant(f64, &graph, 5);
     const d = try multiply(&graph, b, c);
-    std.testing.expectEqual(b.shape, &[_]usize{});
     const gradients = try gradient(&graph, d, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{ 5, 5, 5, 5 });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expectEqual(b.shape, &[_]usize{});
 }
 
 test "gradient sum rank 1 dimension 0 with multiply" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{ 1, 2, 3, 4 });
     const b = try sum(&graph, a, .{ .dimension = 0 });
     const c = try constant(f64, &graph, 5);
     const d = try multiply(&graph, b, c);
-    std.testing.expectEqual(b.shape, &[_]usize{});
     const gradients = try gradient(&graph, d, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{ 5, 5, 5, 5 });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expectEqual(b.shape, &[_]usize{});
 }
 
 test "gradient sum rank 3 dimension 0 with multiply" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{
             .{ 1, 2 },
@@ -420,11 +379,9 @@ test "gradient sum rank 3 dimension 0 with multiply" {
     });
     const d = try multiply(&graph, b, c);
     const e = try mean(&graph, d);
-    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
     const gradients = try gradient(&graph, e, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{
             .{ 0.25, 0.5 },
@@ -436,14 +393,13 @@ test "gradient sum rank 3 dimension 0 with multiply" {
         },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
 }
 
 test "gradient sum rank 3 dimension 1 with multiply" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{
             .{ 1, 2 },
@@ -461,11 +417,9 @@ test "gradient sum rank 3 dimension 1 with multiply" {
     });
     const d = try multiply(&graph, b, c);
     const e = try mean(&graph, d);
-    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
     const gradients = try gradient(&graph, e, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{
             .{ 0.25, 0.5 },
@@ -477,14 +431,13 @@ test "gradient sum rank 3 dimension 1 with multiply" {
         },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
 }
 
 test "gradient sum rank 3 dimension 2 with multiply" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{
             .{ 1, 2 },
@@ -502,11 +455,9 @@ test "gradient sum rank 3 dimension 2 with multiply" {
     });
     const d = try multiply(&graph, b, c);
     const e = try mean(&graph, d);
-    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
     const gradients = try gradient(&graph, e, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{
             .{ 0.25, 0.25 },
@@ -518,14 +469,13 @@ test "gradient sum rank 3 dimension 2 with multiply" {
         },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 2, 2 }));
 }
 
 test "gradient sum keep dimensions" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
@@ -533,9 +483,8 @@ test "gradient sum keep dimensions" {
     const b = try sum(&graph, a, .{ .keep_dimensions = true });
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 1, 1 },
         .{ 1, 1, 1 },
@@ -544,11 +493,9 @@ test "gradient sum keep dimensions" {
 }
 
 test "gradient sum keep dimensions 0" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
@@ -559,9 +506,8 @@ test "gradient sum keep dimensions 0" {
     });
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1. / 3., 1. / 3., 1. / 3. },
         .{ 1. / 3., 1. / 3., 1. / 3. },
@@ -570,11 +516,9 @@ test "gradient sum keep dimensions 0" {
 }
 
 test "gradient sum keep dimensions 1" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
@@ -585,9 +529,8 @@ test "gradient sum keep dimensions 1" {
     });
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.5, 0.5, 0.5 },
         .{ 0.5, 0.5, 0.5 },

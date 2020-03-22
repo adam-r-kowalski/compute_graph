@@ -110,76 +110,65 @@ pub fn multiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
 }
 
 test "multiply scalar" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, 5);
     const y = try constant(f64, &graph, 10);
     const z = try multiply(&graph, x, y);
-    std.testing.expectEqual(z.shape, &[_]usize{});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
     const expected = try eager.constant(f64, &arena.allocator, 50);
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expectEqual(z.shape, &[_]usize{});
 }
 
 test "multiply matrix" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
     const z = try multiply(&graph, x, x);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 4 },
         .{ 9, 16 },
         .{ 25, 36 },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
 }
 
 test "multiply matrix i32" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i32, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
     const z = try multiply(&graph, x, x);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 1, 4 },
         .{ 9, 16 },
         .{ 25, 36 },
     });
     expectEqual(i32, actual[0].i32, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
 }
 
 test "multiply broadcast scalar rank 3" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i8, &graph, -5);
     const y = try constant(i8, &graph, .{
         .{
@@ -192,11 +181,8 @@ test "multiply broadcast scalar rank 3" {
         },
     });
     const z = try multiply(&graph, x, y);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 2, 2 }));
-    std.testing.expectEqual(z.scalarType, .i8);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
     const expected = try eager.constant(i8, &arena.allocator, .{
         .{
             .{ -5, 10 },
@@ -208,14 +194,14 @@ test "multiply broadcast scalar rank 3" {
         },
     });
     expectEqual(i8, actual[0].i8, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 2, 2 }));
+    std.testing.expectEqual(z.scalarType, .i8);
 }
 
 test "multiply broadcast rank 3 to rank 4" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i64, &graph, .{
         .{
             .{ 1, 2 },
@@ -240,11 +226,8 @@ test "multiply broadcast rank 3 to rank 4" {
         }},
     });
     const z = try multiply(&graph, x, y);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 3, 3, 2 }));
-    std.testing.expectEqual(z.scalarType, .i64);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{
             .{
@@ -282,14 +265,14 @@ test "multiply broadcast rank 3 to rank 4" {
         },
     });
     expectEqual(i64, actual[0].i64, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 3, 3, 2 }));
+    std.testing.expectEqual(z.scalarType, .i64);
 }
 
 test "gradient multiply" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -299,12 +282,10 @@ test "gradient multiply" {
         .{ 7, 8 },
     });
     const c = try multiply(&graph, a, b);
-    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 5 * 0.25, 6 * 0.25 },
         .{ 7 * 0.25, 8 * 0.25 },
@@ -315,14 +296,13 @@ test "gradient multiply" {
     });
     expectEqual(f64, actual[0].f64, expected_a_gradient);
     expectEqual(f64, actual[1].f64, expected_b_gradient);
+    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
 }
 
 test "gradient multiply broadcast scalar rank 3" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, -5);
     const b = try constant(f64, &graph, .{
         .{
@@ -337,9 +317,8 @@ test "gradient multiply broadcast scalar rank 3" {
     const c = try multiply(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected_scalar_gradient = try eager.constant(f64, &arena.allocator, -0.5);
     const expected_tensor_gradient = try eager.constant(f64, &arena.allocator, .{
         .{
@@ -356,11 +335,9 @@ test "gradient multiply broadcast scalar rank 3" {
 }
 
 test "gradient multiply broadcast rank 3 to rank 4" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{
             .{ 1, 2 },
@@ -387,9 +364,8 @@ test "gradient multiply broadcast rank 3 to rank 4" {
     const c = try multiply(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected_rank_3_gradient = try eager.constant(f64, &arena.allocator, .{
         .{.{ 1, 1.1667 }},
         .{.{ 1, 1.1667 }},

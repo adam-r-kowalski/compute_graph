@@ -361,18 +361,15 @@ pub const Session = struct {
         child_allocator.destroy(self.arena);
     }
 
-    const RunParameters = struct {
-        environment: Environment = Environment.init(std.heap.page_allocator),
-    };
-
-    pub fn run(self: *Session, tensors: []const Tensor, parameters: RunParameters) ![]CpuTensorUnion {
+    pub fn run(self: *Session, parameters: var) ![]CpuTensorUnion {
         const allocator = &self.arena.allocator;
         const graph = self.graph;
         var cache = Cache.init(allocator);
         defer cache.deinit();
         var gradient_caches = GradientCaches.init(allocator);
         defer gradient_caches.deinit();
-        const execution_order = try executionOrder(self.*, tensors, parameters.environment);
+        const environment = if (@hasField(@TypeOf(parameters), "environment")) parameters.environment else Environment.init(&self.arena.allocator);
+        const execution_order = try executionOrder(self.*, parameters.tensors, environment);
         for (execution_order) |current_tensor| {
             switch (current_tensor.tensorType) {
                 .constant => |index| try runConstant(self.*, &cache, index, current_tensor),
@@ -387,22 +384,20 @@ pub const Session = struct {
                 }),
                 .variable => |index| try runVariable(self.*, &cache, index, current_tensor),
                 .assign => |index| try runAssign(self, &cache, index, current_tensor),
-                .placeholder => try runPlaceholder(self.*, &cache, parameters.environment, current_tensor),
+                .placeholder => try runPlaceholder(self.*, &cache, environment, current_tensor),
             }
         }
-        const outputs = try self.arena.allocator.alloc(CpuTensorUnion, tensors.len);
+        const outputs = try self.arena.allocator.alloc(CpuTensorUnion, parameters.tensors.len);
         errdefer self.arena.allocator.free(outputs);
-        for (tensors) |tensor, index| outputs[index] = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
+        for (parameters.tensors) |tensor, index| outputs[index] = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
         return outputs;
     }
 };
 
 test "session run" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const m = try constant(f64, &graph, .{
         .{ 0, 7, 3 },
         .{ 4, 5, 6 },
@@ -429,9 +424,8 @@ test "session run" {
     const magnitude = try absolute(&graph, delta);
     const loss = try mean(&graph, magnitude);
     const gradients = try gradient(&graph, loss, &[_]Tensor{ m, b });
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{ loss, gradients[0], gradients[1] }, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{ loss, gradients[0], gradients[1] } });
     const expected_loss = try eager.constant(f64, &arena.allocator, 26);
     const expected_m_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 1 / 3., 2 / 3., 1 },
@@ -449,19 +443,16 @@ test "session run" {
 }
 
 test "variable" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
     });
     const b = try variable(&graph, a);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{b}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{b} });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -470,11 +461,9 @@ test "variable" {
 }
 
 test "duplicate" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -492,9 +481,8 @@ test "duplicate" {
     const f = try add(&graph, d, e);
     const g = try mean(&graph, f);
     const gradients = try gradient(&graph, g, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = gradients });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 3.5, 4 },
         .{ 4.5, 5 },

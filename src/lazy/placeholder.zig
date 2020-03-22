@@ -1,5 +1,4 @@
 const std = @import("std");
-// TODO(Adam): Clean up circular dependency
 const Graph = @import("graph.zig").Graph;
 const tensor = @import("tensor.zig");
 const Tensor = tensor.Tensor;
@@ -28,11 +27,9 @@ pub fn placeholder(graph: *Graph, shape: []const usize, scalarType: ScalarType) 
 }
 
 test "placeholder" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -43,12 +40,12 @@ test "placeholder" {
     });
     const c = try placeholder(&graph, &[_]usize{ 2, 2 }, .f64);
     std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
+    var session = try Session.init(&arena.allocator, &graph);
 
     var environment = Environment.init(&session.arena.allocator);
     try environment.putNoClobber(c, a);
-    const actual = try session.run(&[_]Tensor{c}, .{
+    const actual = try session.run(.{
+        .tensors = &[_]Tensor{c},
         .environment = environment,
     });
     const expected = try eager.constant(f64, &arena.allocator, .{
@@ -59,7 +56,8 @@ test "placeholder" {
 
     var environment2 = Environment.init(&session.arena.allocator);
     try environment2.putNoClobber(c, b);
-    const actual2 = try session.run(&[_]Tensor{c}, .{
+    const actual2 = try session.run(.{
+        .tensors = &[_]Tensor{c},
         .environment = environment2,
     });
     const expected2 = try eager.constant(f64, &arena.allocator, .{

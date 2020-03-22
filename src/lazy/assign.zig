@@ -59,7 +59,7 @@ test "assign" {
     var session = try Session.init(allocator, &graph);
     defer session.deinit();
 
-    const actual1 = try session.run(&[_]Tensor{ e, b }, .{});
+    const actual1 = try session.run(.{ .tensors = &[_]Tensor{ e, b } });
     const expected1 = try eager.constant(f64, &arena.allocator, .{
         .{ 2, 3 },
         .{ 4, 5 },
@@ -67,7 +67,7 @@ test "assign" {
     expectEqual(f64, actual1[0].f64, expected1);
     expectEqual(f64, actual1[1].f64, expected1);
 
-    const actual2 = try session.run(&[_]Tensor{ e, b }, .{});
+    const actual2 = try session.run(.{ .tensors = &[_]Tensor{ e, b } });
     const expected2 = try eager.constant(f64, &arena.allocator, .{
         .{ 3, 4 },
         .{ 5, 6 },
@@ -75,7 +75,7 @@ test "assign" {
     expectEqual(f64, actual2[0].f64, expected2);
     expectEqual(f64, actual2[1].f64, expected2);
 
-    const actual3 = try session.run(&[_]Tensor{ e, b }, .{});
+    const actual3 = try session.run(.{ .tensors = &[_]Tensor{ e, b } });
     const expected3 = try eager.constant(f64, &arena.allocator, .{
         .{ 4, 5 },
         .{ 6, 7 },
@@ -129,7 +129,8 @@ test "linear regression" {
         try environment.putNoClobber(y, ys[i]);
     }
 
-    const actual = try session.run(&[_]Tensor{loss}, .{
+    const actual = try session.run(.{
+        .tensors = &[_]Tensor{loss},
         .environment = environments[2],
     });
     const actual_loss = actual[0];
@@ -138,13 +139,15 @@ test "linear regression" {
     var i: usize = 0;
     var j: usize = 0;
     while (i < 1000) : (i += 1) {
-        _ = try session.run(&[_]Tensor{ improve_m, improve_b }, .{
+        _ = try session.run(.{
+            .tensors = &[_]Tensor{ improve_m, improve_b },
             .environment = environments[j],
         });
         j = (j + 1) % environments.len;
     }
 
-    const actual1 = try session.run(&[_]Tensor{ loss, m, b }, .{
+    const actual1 = try session.run(.{
+        .tensors = &[_]Tensor{ loss, m, b },
         .environment = environments[0],
     });
     const actual_loss1 = actual1[0];

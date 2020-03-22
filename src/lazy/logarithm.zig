@@ -29,30 +29,25 @@ pub fn logarithm(graph: *Graph, x: Tensor, parameters: var) !Tensor {
 }
 
 test "logarithm scalar" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, 5);
     const y = try logarithm(&graph, x, .{});
     const gradients = try gradient(&graph, y, &[_]Tensor{x});
-    std.testing.expectEqual(y.shape, &[_]usize{});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{ y, gradients[0] }, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{ y, gradients[0] } });
     const expected_y = try eager.constant(f64, &arena.allocator, 1.6094);
     const expected_gradients = try eager.constant(f64, &arena.allocator, 0.2);
     expectEqual(f64, actual[0].f64, expected_y);
     expectEqual(f64, actual[1].f64, expected_gradients);
+    std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
 test "logarithm matrix" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -61,10 +56,8 @@ test "logarithm matrix" {
     const y = try logarithm(&graph, x, .{});
     const z = try mean(&graph, y);
     const gradients = try gradient(&graph, z, &[_]Tensor{x});
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{ y, gradients[0] }, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{ y, gradients[0] } });
     const expected_y = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0.6931 },
         .{ 1.0986, 1.3862 },
@@ -75,35 +68,31 @@ test "logarithm matrix" {
         .{ 0.0555, 0.0416 },
         .{ 0.0333, 0.0277 },
     });
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     expectEqual(f64, actual[0].f64, expected_y);
     expectEqual(f64, actual[1].f64, expected_gradients);
 }
 
 test "logarithm base 2 scalar" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, 5);
     const y = try logarithm(&graph, x, .{ .base = 2 });
     const gradients = try gradient(&graph, y, &[_]Tensor{x});
-    std.testing.expectEqual(y.shape, &[_]usize{});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{ y, gradients[0] }, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{ y, gradients[0] } });
     const expected_y = try eager.constant(f64, &arena.allocator, 2.3219);
     const expected_gradients = try eager.constant(f64, &arena.allocator, 0.2885);
     expectEqual(f64, actual[0].f64, expected_y);
     expectEqual(f64, actual[1].f64, expected_gradients);
+    std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
 test "logarithm base 2 matrix" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -112,10 +101,8 @@ test "logarithm base 2 matrix" {
     const y = try logarithm(&graph, x, .{ .base = 2 });
     const z = try mean(&graph, y);
     const gradients = try gradient(&graph, z, &[_]Tensor{x});
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{ y, gradients[0] }, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(.{ .tensors = &[_]Tensor{ y, gradients[0] } });
     const expected_y = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 1 },
         .{ 1.5849, 2 },
@@ -128,4 +115,5 @@ test "logarithm base 2 matrix" {
     });
     expectEqual(f64, actual[0].f64, expected_y);
     expectEqual(f64, actual[1].f64, expected_gradients);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
 }
