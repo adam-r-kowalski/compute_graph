@@ -117,9 +117,9 @@ test "add scalar" {
     const y = try constant(f64, &graph, 10);
     const z = try add(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, 15);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(z.shape, &[_]usize{});
     std.testing.expectEqual(z.scalarType, .f64);
 }
@@ -135,13 +135,13 @@ test "add matrix" {
     });
     const z = try add(&graph, x, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     std.testing.expectEqual(z.scalarType, .f64);
 }
@@ -157,13 +157,13 @@ test "add matrix i32" {
     });
     const z = try add(&graph, x, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(i32, actual[0].i32, expected);
+    expectEqual(i32, actual.i32, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     std.testing.expectEqual(z.scalarType, .i32);
 }
@@ -185,7 +185,7 @@ test "add broadcast scalar rank 3" {
     });
     const z = try add(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(i8, &arena.allocator, .{
         .{
             .{ -4, -7 },
@@ -196,7 +196,7 @@ test "add broadcast scalar rank 3" {
             .{ 2, -13 },
         },
     });
-    expectEqual(i8, actual[0].i8, expected);
+    expectEqual(i8, actual.i8, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 2, 2 }));
     std.testing.expectEqual(z.scalarType, .i8);
 }
@@ -230,7 +230,7 @@ test "add broadcast rank 3 to rank 4" {
     });
     const z = try add(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{
             .{
@@ -267,7 +267,7 @@ test "add broadcast rank 3 to rank 4" {
             },
         },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 3, 3, 2 }));
     std.testing.expectEqual(z.scalarType, .i64);
 }

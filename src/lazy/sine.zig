@@ -85,9 +85,9 @@ test "sine scalar" {
     const x = try constant(f64, &graph, -5);
     const y = try sine(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 0.95892);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -102,13 +102,13 @@ test "sine matrix" {
     });
     const y = try sine(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.84147, -0.90929 },
         .{ 0.14112, 0.75680 },
         .{ 0.95892, -0.27941 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
 }
 

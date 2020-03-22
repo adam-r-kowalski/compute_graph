@@ -109,9 +109,9 @@ test "maximum rank 0" {
     const x = try constant(f64, &graph, -5);
     const y = try maximum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, -5);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -122,9 +122,9 @@ test "maximum rank 1" {
     const x = try constant(i32, &graph, .{ 5, 10, 7, 8, 10 });
     const y = try maximum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i32, &arena.allocator, 10);
-    expectEqual(i32, actual[0].i32, expected);
+    expectEqual(i32, actual.i32, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -139,9 +139,9 @@ test "maximum rank 2" {
     });
     const y = try maximum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f16, &arena.allocator, 10);
-    expectEqual(f16, actual[0].f16, expected);
+    expectEqual(f16, actual.f16, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -156,9 +156,9 @@ test "maximum rank 2 across 0 dimension" {
     });
     const y = try maximum(&graph, x, .{ .dimension = 0 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f16, &arena.allocator, .{ 5, 6 });
-    expectEqual(f16, actual[0].f16, expected);
+    expectEqual(f16, actual.f16, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{2}));
 }
 
@@ -178,9 +178,9 @@ test "maximum rank 3" {
     });
     const y = try maximum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i8, &arena.allocator, 10);
-    expectEqual(i8, actual[0].i8, expected);
+    expectEqual(i8, actual.i8, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{}));
 }
 
@@ -200,12 +200,12 @@ test "maximum rank 3 accross 0 dimension" {
     });
     const y = try maximum(&graph, x, .{ .dimension = 0 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 5, 6 },
         .{ 7, 8 },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
@@ -225,12 +225,12 @@ test "maximum rank 3 accross 1 dimension" {
     });
     const y = try maximum(&graph, x, .{ .dimension = 1 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 1, 4 },
         .{ 7, 8 },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
@@ -250,12 +250,12 @@ test "maximum rank 3 accross 2 dimension" {
     });
     const y = try maximum(&graph, x, .{ .dimension = 2 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
@@ -269,11 +269,11 @@ test "maximum keep dimensions" {
     });
     const y = try maximum(&graph, x, .{ .keep_dimensions = true });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{6},
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 1 }));
 }
 
@@ -290,11 +290,11 @@ test "maximum keep dimensions 0" {
         .dimension = 0,
     });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 4, 5, 6 },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 3 }));
 }
 
@@ -311,11 +311,11 @@ test "maximum keep dimensions 1" {
         .dimension = 1,
     });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{3}, .{6},
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 1 }));
 }
 

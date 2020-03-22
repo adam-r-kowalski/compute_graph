@@ -39,9 +39,9 @@ test "constant scalar" {
     const x = try constant(f64, &graph, 5);
     const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{x});
+    const actual = try session.run(x);
     const expected = try eager.constant(f64, &arena.allocator, 5);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(x.shape, &[_]usize{});
     std.testing.expectEqual(x.scalarType, .f64);
     expect(std.mem.eql(u8, actualString, "Tensor(f64)"));
@@ -58,13 +58,13 @@ test "constant array" {
     });
     const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{x});
+    const actual = try session.run(x);
     const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expectEqual(f32, actual[0].f32, expected);
+    expectEqual(f32, actual.f32, expected);
     std.testing.expect(std.mem.eql(usize, x.shape, &[_]usize{ 3, 2 }));
     std.testing.expectEqual(x.scalarType, .f32);
     expect(std.mem.eql(u8, actualString, "Tensor([3][2]f32)"));

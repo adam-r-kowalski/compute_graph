@@ -28,9 +28,9 @@ test "sigmoid scalar" {
     const x = try constant(f64, &graph, -5);
     const y = try sigmoid(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 0.0066);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -45,13 +45,13 @@ test "sigmoid matrix" {
     });
     const y = try sigmoid(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.7310, 0.1192 },
         .{ 0.9525, 0.0179 },
         .{ 0.0066, 0.9975 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
 }
 

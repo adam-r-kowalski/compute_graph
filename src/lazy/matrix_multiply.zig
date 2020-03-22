@@ -127,13 +127,13 @@ test "matrixMultiply identity" {
     });
     const z = try matrixMultiply(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{1},
         .{2},
         .{3},
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
 }
 
@@ -153,13 +153,13 @@ test "matrixMultiply flip" {
     });
     const z = try matrixMultiply(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{1},
         .{-2},
         .{3},
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
 }
 
@@ -180,14 +180,14 @@ test "matrixMultiply big" {
     });
     const z = try matrixMultiply(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 18, 41 },
         .{ 27, 65 },
         .{ 53, 102 },
         .{ 35, 69 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 4, 2 }));
 }
 

@@ -85,9 +85,9 @@ test "cosine scalar" {
     const x = try constant(f64, &graph, -5);
     const y = try cosine(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 0.28366);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -102,13 +102,13 @@ test "cosine matrix" {
     });
     const y = try cosine(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.54030, -0.4161 },
         .{ -0.98999, -0.6536 },
         .{ 0.28366, 0.96017 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
 }
 

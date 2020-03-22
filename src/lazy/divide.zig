@@ -117,9 +117,9 @@ test "divide scalar" {
     const y = try constant(f64, &graph, 10);
     const z = try divide(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, 0.5);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(z.shape, &[_]usize{});
     std.testing.expectEqual(z.scalarType, .f64);
 }
@@ -140,13 +140,13 @@ test "divide matrix" {
     });
     const z = try divide(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.1666, 0.4 },
         .{ 0.75, 1.3333 },
         .{ 2.5, 6 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(z.scalarType, .f64);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
 }
@@ -167,13 +167,13 @@ test "divide matrix i32" {
     });
     const z = try divide(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 0, 0 },
         .{ 0, 1 },
         .{ 2, 6 },
     });
-    expectEqual(i32, actual[0].i32, expected);
+    expectEqual(i32, actual.i32, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
     std.testing.expectEqual(z.scalarType, .i32);
 }

@@ -109,9 +109,9 @@ test "sum scalar" {
     const x = try constant(f64, &graph, -5);
     const y = try sum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, -5);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -126,9 +126,9 @@ test "sum matrix" {
     });
     const y = try sum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 48);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -143,9 +143,9 @@ test "sum matrix i32" {
     });
     const y = try sum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i32, &arena.allocator, 48);
-    expectEqual(i32, actual[0].i32, expected);
+    expectEqual(i32, actual.i32, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -165,12 +165,12 @@ test "sum rank 3 accross 0 dimension" {
     });
     const y = try sum(&graph, x, .{ .dimension = 0 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 6, 8 },
         .{ 4, 12 },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
@@ -190,12 +190,12 @@ test "sum rank 3 accross 1 dimension" {
     });
     const y = try sum(&graph, x, .{ .dimension = 1 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ -2, 6 },
         .{ 12, 14 },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
@@ -215,12 +215,12 @@ test "sum rank 3 accross 2 dimension" {
     });
     const y = try sum(&graph, x, .{ .dimension = 2 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 3, 1 },
         .{ 11, 15 },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 2 }));
 }
 
@@ -234,11 +234,11 @@ test "sum keep dimensions" {
     });
     const y = try sum(&graph, x, .{ .keep_dimensions = true });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{21},
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 1 }));
 }
 
@@ -255,11 +255,11 @@ test "sum keep dimensions 0" {
         .dimension = 0,
     });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 5, 7, 9 },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 1, 3 }));
 }
 
@@ -276,11 +276,11 @@ test "sum keep dimensions 1" {
         .dimension = 1,
     });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{6}, .{15},
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 2, 1 }));
 }
 

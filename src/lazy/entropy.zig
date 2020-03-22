@@ -25,9 +25,9 @@ test "entropy" {
     const p = try constant(f64, &graph, .{ 0.1, 0.4, 0.5 });
     const e = try entropy(&graph, p);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{e});
+    const actual = try session.run(e);
     const expected = try eager.constant(f64, &arena.allocator, 1.361);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "gradient cross entropy" {

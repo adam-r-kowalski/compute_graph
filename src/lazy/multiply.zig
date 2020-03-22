@@ -117,9 +117,9 @@ test "multiply scalar" {
     const y = try constant(f64, &graph, 10);
     const z = try multiply(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, 50);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(z.shape, &[_]usize{});
 }
 
@@ -134,13 +134,13 @@ test "multiply matrix" {
     });
     const z = try multiply(&graph, x, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 4 },
         .{ 9, 16 },
         .{ 25, 36 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
 }
 
@@ -155,13 +155,13 @@ test "multiply matrix i32" {
     });
     const z = try multiply(&graph, x, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 1, 4 },
         .{ 9, 16 },
         .{ 25, 36 },
     });
-    expectEqual(i32, actual[0].i32, expected);
+    expectEqual(i32, actual.i32, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
 }
 
@@ -182,7 +182,7 @@ test "multiply broadcast scalar rank 3" {
     });
     const z = try multiply(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(i8, &arena.allocator, .{
         .{
             .{ -5, 10 },
@@ -193,7 +193,7 @@ test "multiply broadcast scalar rank 3" {
             .{ -35, 40 },
         },
     });
-    expectEqual(i8, actual[0].i8, expected);
+    expectEqual(i8, actual.i8, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 2, 2 }));
     std.testing.expectEqual(z.scalarType, .i8);
 }
@@ -227,7 +227,7 @@ test "multiply broadcast rank 3 to rank 4" {
     });
     const z = try multiply(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{z});
+    const actual = try session.run(z);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{
             .{
@@ -264,7 +264,7 @@ test "multiply broadcast rank 3 to rank 4" {
             },
         },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
     std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 3, 3, 2 }));
     std.testing.expectEqual(z.scalarType, .i64);
 }

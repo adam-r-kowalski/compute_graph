@@ -110,9 +110,9 @@ test "mean scalar" {
     const x = try constant(f64, &graph, -5);
     const y = try mean(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, -5);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -127,9 +127,9 @@ test "mean matrix" {
     });
     const y = try mean(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 8);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
@@ -144,9 +144,9 @@ test "mean matrix i32" {
     });
     const y = try mean(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f32, &arena.allocator, 8);
-    expectEqual(f32, actual[0].f32, expected);
+    expectEqual(f32, actual.f32, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 

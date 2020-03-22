@@ -98,9 +98,9 @@ test "absolute scalar" {
     const x = try constant(f64, &graph, -5);
     const y = try absolute(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 5);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
     std.testing.expectEqual(y.scalarType, .f64);
 }
@@ -116,13 +116,13 @@ test "absolute matrix" {
     });
     const y = try absolute(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
     std.testing.expectEqual(y.scalarType, .f64);
 }
@@ -138,13 +138,13 @@ test "absolute matrix i32" {
     });
     const y = try absolute(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y});
+    const actual = try session.run(y);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expectEqual(i32, actual[0].i32, expected);
+    expectEqual(i32, actual.i32, expected);
     std.testing.expectEqual(y.scalarType, .i32);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
 }
