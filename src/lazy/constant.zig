@@ -33,45 +33,39 @@ pub fn constant(comptime T: type, graph: *Graph, literal: var) !Tensor {
 }
 
 test "constant scalar" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, 5);
+    const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(x);
+    const expected = try eager.constant(f64, &arena.allocator, 5);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(x.shape, &[_]usize{});
     std.testing.expectEqual(x.scalarType, .f64);
-    const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
     expect(std.mem.eql(u8, actualString, "Tensor(f64)"));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{x}, .{});
-    const expected = try eager.constant(f64, &arena.allocator, 5);
-    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "constant array" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f32, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    std.testing.expect(std.mem.eql(usize, x.shape, &[_]usize{ 3, 2 }));
-    std.testing.expectEqual(x.scalarType, .f32);
     const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
-    expect(std.mem.eql(u8, actualString, "Tensor([3][2]f32)"));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{x}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(x);
     const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
-    expectEqual(f32, actual[0].f32, expected);
+    expectEqual(f32, actual.f32, expected);
+    std.testing.expect(std.mem.eql(usize, x.shape, &[_]usize{ 3, 2 }));
+    std.testing.expectEqual(x.scalarType, .f32);
+    expect(std.mem.eql(u8, actualString, "Tensor([3][2]f32)"));
 }

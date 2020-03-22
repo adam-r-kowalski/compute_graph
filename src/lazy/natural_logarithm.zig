@@ -79,67 +79,58 @@ pub fn naturalLogarithm(graph: *Graph, x: Tensor) !Tensor {
 }
 
 test "naturalLogarithm scalar" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, 5);
     const y = try naturalLogarithm(&graph, x);
-    std.testing.expectEqual(y.shape, &[_]usize{});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 1.6094);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
+    std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
 test "naturalLogarithm matrix" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
     const y = try naturalLogarithm(&graph, x);
-    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0.6931 },
         .{ 1.0986, 1.3862 },
         .{ 1.6094, 1.7917 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
+    std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{ 3, 2 }));
 }
 
 test "gradient naturalLogarithm" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
         .{ 5, 6 },
     });
     const b = try naturalLogarithm(&graph, a);
-    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 3, 2 }));
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.1666, 0.0833 },
         .{ 0.0555, 0.0416 },
         .{ 0.0333, 0.0277 },
     });
     expectEqual(f64, actual[0].f64, expected);
+    std.testing.expect(std.mem.eql(usize, b.shape, &[_]usize{ 3, 2 }));
 }

@@ -110,79 +110,68 @@ pub fn add(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
 }
 
 test "add scalar" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, 5);
     const y = try constant(f64, &graph, 10);
     const z = try add(&graph, x, y);
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(z);
+    const expected = try eager.constant(f64, &arena.allocator, 15);
+    expectEqual(f64, actual.f64, expected);
     std.testing.expectEqual(z.shape, &[_]usize{});
     std.testing.expectEqual(z.scalarType, .f64);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
-    const expected = try eager.constant(f64, &arena.allocator, 15);
-    expectEqual(f64, actual[0].f64, expected);
 }
 
 test "add matrix" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
     const z = try add(&graph, x, x);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
-    std.testing.expectEqual(z.scalarType, .f64);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
+    std.testing.expectEqual(z.scalarType, .f64);
 }
 
 test "add matrix i32" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i32, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
         .{ -5, 6 },
     });
     const z = try add(&graph, x, x);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
-    std.testing.expectEqual(z.scalarType, .i32);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(z);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
         .{ -10, 12 },
     });
-    expectEqual(i32, actual[0].i32, expected);
+    expectEqual(i32, actual.i32, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 2 }));
+    std.testing.expectEqual(z.scalarType, .i32);
 }
 
 test "add broadcast scalar rank 3" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i8, &graph, -5);
     const y = try constant(i8, &graph, .{
         .{
@@ -195,11 +184,8 @@ test "add broadcast scalar rank 3" {
         },
     });
     const z = try add(&graph, x, y);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 2, 2 }));
-    std.testing.expectEqual(z.scalarType, .i8);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(z);
     const expected = try eager.constant(i8, &arena.allocator, .{
         .{
             .{ -4, -7 },
@@ -210,15 +196,15 @@ test "add broadcast scalar rank 3" {
             .{ 2, -13 },
         },
     });
-    expectEqual(i8, actual[0].i8, expected);
+    expectEqual(i8, actual.i8, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 2, 2 }));
+    std.testing.expectEqual(z.scalarType, .i8);
 }
 
 test "add broadcast rank 3 to rank 4" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(i64, &graph, .{
         .{
             .{ 1, 2 },
@@ -243,11 +229,8 @@ test "add broadcast rank 3 to rank 4" {
         }},
     });
     const z = try add(&graph, x, y);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 3, 3, 2 }));
-    std.testing.expectEqual(z.scalarType, .i64);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(z);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{
             .{
@@ -284,15 +267,15 @@ test "add broadcast rank 3 to rank 4" {
             },
         },
     });
-    expectEqual(i64, actual[0].i64, expected);
+    expectEqual(i64, actual.i64, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 2, 3, 3, 2 }));
+    std.testing.expectEqual(z.scalarType, .i64);
 }
 
 test "gradient add" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -302,29 +285,26 @@ test "gradient add" {
         .{ 7, 8 },
     });
     const c = try add(&graph, a, b);
-    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
-    std.testing.expectEqual(c.scalarType, .f64);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{ 2, 2 }));
-    std.testing.expect(std.mem.eql(usize, gradients[1].shape, &[_]usize{ 2, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
     });
     expectEqual(f64, actual[0].f64, expected);
     expectEqual(f64, actual[1].f64, expected);
+    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
+    std.testing.expectEqual(c.scalarType, .f64);
+    std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{ 2, 2 }));
+    std.testing.expect(std.mem.eql(usize, gradients[1].shape, &[_]usize{ 2, 2 }));
 }
 
 test "gradient add broadcast scalar rank 3" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f32, &graph, -5);
     const b = try constant(f32, &graph, .{
         .{
@@ -339,13 +319,8 @@ test "gradient add broadcast scalar rank 3" {
     const c = try add(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{}));
-    std.testing.expect(std.mem.eql(usize, gradients[1].shape, &[_]usize{ 2, 2, 2 }));
-    std.testing.expectEqual(gradients[0].scalarType, .f32);
-    std.testing.expectEqual(gradients[1].scalarType, .f32);
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(gradients);
     const expected_a_gradient = try eager.constant(f32, &arena.allocator, 1);
     const expected_b_gradient = try eager.constant(f32, &arena.allocator, .{
         .{
@@ -371,14 +346,16 @@ test "gradient add broadcast scalar rank 3" {
     });
     expectEqual(f32, actual[0].f32, expected_a_gradient);
     expectEqual(f32, actual[1].f32, expected_b_gradient);
+    std.testing.expect(std.mem.eql(usize, gradients[0].shape, &[_]usize{}));
+    std.testing.expect(std.mem.eql(usize, gradients[1].shape, &[_]usize{ 2, 2, 2 }));
+    std.testing.expectEqual(gradients[0].scalarType, .f32);
+    std.testing.expectEqual(gradients[1].scalarType, .f32);
 }
 
 test "add matrix shape mismatch" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },
@@ -395,11 +372,9 @@ test "add matrix shape mismatch" {
 }
 
 test "add matrix scalar type mismatch" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, -2 },
         .{ 3, -4 },

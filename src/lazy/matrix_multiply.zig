@@ -112,11 +112,9 @@ pub fn matrixMultiply(graph: *Graph, x: Tensor, y: Tensor) !Tensor {
 }
 
 test "matrixMultiply identity" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, 0, 0 },
         .{ 0, 1, 0 },
@@ -128,24 +126,21 @@ test "matrixMultiply identity" {
         .{3},
     });
     const z = try matrixMultiply(&graph, x, y);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{1},
         .{2},
         .{3},
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
 }
 
 test "matrixMultiply flip" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, 0, 0 },
         .{ 0, -1, 0 },
@@ -157,24 +152,21 @@ test "matrixMultiply flip" {
         .{3},
     });
     const z = try matrixMultiply(&graph, x, y);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{1},
         .{-2},
         .{3},
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 3, 1 }));
 }
 
-test "matrixMultiply flip" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+test "matrixMultiply big" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 2, 5 },
@@ -187,25 +179,22 @@ test "matrixMultiply flip" {
         .{ 3, 9 },
     });
     const z = try matrixMultiply(&graph, x, y);
-    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 4, 2 }));
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(&[_]Tensor{z}, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 18, 41 },
         .{ 27, 65 },
         .{ 53, 102 },
         .{ 35, 69 },
     });
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
+    std.testing.expect(std.mem.eql(usize, z.shape, &[_]usize{ 4, 2 }));
 }
 
 test "gradient matrix multiply" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const a = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 5, 6 },
@@ -216,12 +205,10 @@ test "gradient matrix multiply" {
         .{ 11, 12 },
     });
     const c = try matrixMultiply(&graph, a, b);
-    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(allocator, &graph);
-    defer session.deinit();
-    const actual = try session.run(gradients, .{});
+    var session = try Session.init(&arena.allocator, &graph);
+    const actual = try session.run(gradients);
     const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 3.75, 4.75, 5.75 },
         .{ 3.75, 4.75, 5.75 },
@@ -233,14 +220,13 @@ test "gradient matrix multiply" {
     });
     expectEqual(f64, actual[0].f64, expected_a_gradient);
     expectEqual(f64, actual[1].f64, expected_b_gradient);
+    std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
 }
 
 test "matrixMultiply shape mismatch" {
-    const allocator = std.heap.page_allocator;
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var graph = try Graph.init(allocator);
-    defer graph.deinit();
+    var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, .{
         .{ 1, 2, 3 },
         .{ 4, 2, 5 },

@@ -26,9 +26,9 @@ test "kl divergence" {
     const q = try constant(f64, &graph, .{ 0.8, 0.15, 0.05 });
     const kl = try klDivergence(&graph, p, q);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{kl}, .{});
+    const actual = try session.run(kl);
     const expected = try eager.constant(f64, &arena.allocator, 1.9269);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "kl divergence same probability distribution" {
@@ -38,9 +38,9 @@ test "kl divergence same probability distribution" {
     const p = try constant(f64, &graph, .{ 0.1, 0.4, 0.5 });
     const kl = try klDivergence(&graph, p, p);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{kl}, .{});
+    const actual = try session.run(kl);
     const expected = try eager.constant(f64, &arena.allocator, 0);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "gradient kl divergence" {
@@ -52,9 +52,13 @@ test "gradient kl divergence" {
     const kl = try klDivergence(&graph, p, q);
     const gradients = try gradient(&graph, kl, &[_]Tensor{ p, q });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(gradients, .{});
-    const expected_p_gradient = try eager.constant(f64, &arena.allocator, .{ -1.5573, 2.8577, 4.7646 });
-    const expected_q_gradient = try eager.constant(f64, &arena.allocator, .{ -0.1803, -3.8471, -14.4269 });
+    const actual = try session.run(gradients);
+    const expected_p_gradient = try eager.constant(f64, &arena.allocator, .{
+        -1.5573, 2.8577, 4.7646,
+    });
+    const expected_q_gradient = try eager.constant(f64, &arena.allocator, .{
+        -0.1803, -3.8471, -14.4269,
+    });
     expectEqual(f64, actual[0].f64, expected_p_gradient);
     expectEqual(f64, actual[1].f64, expected_q_gradient);
 }

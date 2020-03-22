@@ -198,9 +198,9 @@ test "power rank 0" {
     const x = try constant(f64, &graph, -5);
     const y = try power(&graph, x, 2.0);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 25);
-    expectEqual(f64, actual[0].f64, expected);
+    expectEqual(f64, actual.f64, expected);
 }
 
 test "power rank 1" {
@@ -210,9 +210,9 @@ test "power rank 1" {
     const x = try constant(i32, &graph, .{ 1, -2, 3, -4, -5, 6 });
     const y = try power(&graph, x, 3);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    const actual = try session.run(y);
     const expected = try eager.constant(i32, &arena.allocator, .{ 1, -8, 27, -64, -125, 216 });
-    expectEqual(i32, actual[0].i32, expected);
+    expectEqual(i32, actual.i32, expected);
 }
 
 test "power rank 2" {
@@ -226,13 +226,13 @@ test "power rank 2" {
     });
     const y = try power(&graph, x, -2);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    const actual = try session.run(y);
     const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 0.25 },
         .{ 0.1111, 0.0625 },
         .{ 0.04, 0.0277 },
     });
-    expectEqual(f32, actual[0].f32, expected);
+    expectEqual(f32, actual.f32, expected);
 }
 
 test "power rank 2 float" {
@@ -246,13 +246,13 @@ test "power rank 2 float" {
     });
     const y = try power(&graph, x, 2.5);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{y}, .{});
+    const actual = try session.run(y);
     const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 5.6568 },
         .{ 15.5884, 32 },
         .{ 55.9016, 88.1816 },
     });
-    expectEqual(f32, actual[0].f32, expected);
+    expectEqual(f32, actual.f32, expected);
 }
 
 test "gradient power rank 2" {
@@ -267,7 +267,7 @@ test "gradient power rank 2" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(gradients, .{});
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.625, 1.7677 },
         .{ 3.2475, 5 },
