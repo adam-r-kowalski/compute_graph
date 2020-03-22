@@ -188,7 +188,7 @@ test "subtract broadcast scalar rank 2" {
     const c = try subtract(&graph, a, b);
     const d = try subtract(&graph, b, a);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{ c, d });
+    const actual = try session.run(.{ c, d });
     const expected = try eager.constant(f16, &arena.allocator, .{
         .{ 2, 5 },
         .{ 0, 7 },

@@ -40,8 +40,10 @@ test "softmax vector" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{ b, c, gradients[0] });
-    const expected = try eager.constant(f64, &arena.allocator, .{ 0.1621, 0.1792, 0.1980, 0.2188, 0.2419 });
+    const actual = try session.run(.{ b, c, gradients[0] });
+    const expected = try eager.constant(f64, &arena.allocator, .{
+        0.1621, 0.1792, 0.1980, 0.2188, 0.2419,
+    });
     const expected1 = try eager.constant(f64, &arena.allocator, 0.2);
     const expected2 = try eager.constant(f64, &arena.allocator, .{
         -4.6512e-18, -5.1404e-18, -5.6810e-18, -6.2785e-18, 2.1751e-17,
@@ -64,7 +66,7 @@ test "softmax matrix dimension 0" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{ b, c, gradients[0] });
+    const actual = try session.run(.{ b, c, gradients[0] });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.5498, 0.5986, 0.6456, 0.6899, 0.7310 },
         .{ 0.4501, 0.4013, 0.3543, 0.3100, 0.2689 },
@@ -91,7 +93,7 @@ test "softmax matrix dimension 1" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{ b, c, gradients[0] });
+    const actual = try session.run(.{ b, c, gradients[0] });
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.1621, 0.1791, 0.1980, 0.2188, 0.2418 },
         .{ 0.2418, 0.2188, 0.1980, 0.1791, 0.1621 },

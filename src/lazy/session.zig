@@ -352,18 +352,26 @@ fn extractEnvironment(allocator: *Allocator, parameters: var) Environment {
     return Environment.init(allocator);
 }
 
-fn isTensors(comptime T: type) bool {
-    return switch (@typeInfo(T)) {
-        .Struct => false,
-        else => true,
-    };
-}
-
-fn extractTensors(parameters: var) []const Tensor {
-    return if (comptime isTensors(@TypeOf(parameters)))
-        parameters
-    else
-        parameters.tensors;
+fn extractTensors(allocator: *Allocator, parameters: var) ![]const Tensor {
+    const T = @TypeOf(parameters);
+    switch (@typeInfo(T)) {
+        .Struct => |s| {
+            if (@hasField(T, "tensors"))
+                return parameters.tensors;
+            const tensors = try allocator.alloc(Tensor, s.fields.len);
+            errdefer allocator.free(tensors);
+            inline for (s.fields) |f, i|
+                tensors[i] = @field(parameters, f.name);
+            return tensors;
+        },
+        .Pointer => |p| {
+            switch (@typeInfo(p.child)) {
+                .Array, .Struct => return parameters,
+                else => @compileError("session.run expected array of tensors"),
+            }
+        },
+        else => @compileLog(@typeInfo(@TypeOf(parameters))),
+    }
 }
 
 pub fn runTensor(session: *Session, tensor: Tensor, environment: Environment) !CpuTensorUnion {
@@ -456,7 +464,7 @@ pub const Session = struct {
         if (@TypeOf(parameters) == Tensor) {
             return try runTensor(self, parameters, environment);
         } else {
-            const tensors = extractTensors(parameters);
+            const tensors = try extractTensors(&self.arena.allocator, parameters);
             return try runTensors(self, tensors, environment);
         }
     }
@@ -493,7 +501,7 @@ test "session run" {
     const loss = try mean(&graph, magnitude);
     const gradients = try gradient(&graph, loss, &[_]Tensor{ m, b });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(&[_]Tensor{ loss, gradients[0], gradients[1] });
+    const actual = try session.run(.{ loss, gradients[0], gradients[1] });
     const expected_loss = try eager.constant(f64, &arena.allocator, 26);
     const expected_m_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 1 / 3., 2 / 3., 1 },
