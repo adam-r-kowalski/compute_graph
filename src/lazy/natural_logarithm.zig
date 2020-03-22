@@ -85,7 +85,7 @@ test "naturalLogarithm scalar" {
     const x = try constant(f64, &graph, 5);
     const y = try naturalLogarithm(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f64, &arena.allocator, 1.6094);
     expectEqual(f64, actual[0].f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
@@ -102,7 +102,7 @@ test "naturalLogarithm matrix" {
     });
     const y = try naturalLogarithm(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0.6931 },
         .{ 1.0986, 1.3862 },
@@ -125,7 +125,7 @@ test "gradient naturalLogarithm" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.1666, 0.0833 },
         .{ 0.0555, 0.0416 },

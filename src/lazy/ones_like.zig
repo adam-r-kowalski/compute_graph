@@ -58,7 +58,7 @@ test "onesLike scalar" {
     const x = try constant(f64, &graph, -5);
     const y = try onesLike(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f64, &arena.allocator, 1);
     expectEqual(f64, actual[0].f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
@@ -75,7 +75,7 @@ test "onesLike matrix" {
     });
     const y = try onesLike(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 1 },
         .{ 1, 1 },
@@ -96,7 +96,7 @@ test "onesLike matrix i32" {
     });
     const y = try onesLike(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 1, 1 },
         .{ 1, 1 },

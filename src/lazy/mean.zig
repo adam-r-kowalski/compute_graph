@@ -110,7 +110,7 @@ test "mean scalar" {
     const x = try constant(f64, &graph, -5);
     const y = try mean(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f64, &arena.allocator, -5);
     expectEqual(f64, actual[0].f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
@@ -127,7 +127,7 @@ test "mean matrix" {
     });
     const y = try mean(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f64, &arena.allocator, 8);
     expectEqual(f64, actual[0].f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
@@ -144,7 +144,7 @@ test "mean matrix i32" {
     });
     const y = try mean(&graph, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f32, &arena.allocator, 8);
     expectEqual(f32, actual[0].f32, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
@@ -161,7 +161,7 @@ test "gradient mean" {
     const b = try mean(&graph, a);
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{gradients[0]} });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },

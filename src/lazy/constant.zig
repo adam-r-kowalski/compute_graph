@@ -39,7 +39,7 @@ test "constant scalar" {
     const x = try constant(f64, &graph, 5);
     const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{x} });
+    const actual = try session.run(&[_]Tensor{x});
     const expected = try eager.constant(f64, &arena.allocator, 5);
     expectEqual(f64, actual[0].f64, expected);
     std.testing.expectEqual(x.shape, &[_]usize{});
@@ -58,7 +58,7 @@ test "constant array" {
     });
     const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{x} });
+    const actual = try session.run(&[_]Tensor{x});
     const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },

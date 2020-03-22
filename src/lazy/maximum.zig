@@ -109,7 +109,7 @@ test "maximum rank 0" {
     const x = try constant(f64, &graph, -5);
     const y = try maximum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f64, &arena.allocator, -5);
     expectEqual(f64, actual[0].f64, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
@@ -122,7 +122,7 @@ test "maximum rank 1" {
     const x = try constant(i32, &graph, .{ 5, 10, 7, 8, 10 });
     const y = try maximum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i32, &arena.allocator, 10);
     expectEqual(i32, actual[0].i32, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
@@ -139,7 +139,7 @@ test "maximum rank 2" {
     });
     const y = try maximum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f16, &arena.allocator, 10);
     expectEqual(f16, actual[0].f16, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
@@ -156,7 +156,7 @@ test "maximum rank 2 across 0 dimension" {
     });
     const y = try maximum(&graph, x, .{ .dimension = 0 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(f16, &arena.allocator, .{ 5, 6 });
     expectEqual(f16, actual[0].f16, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{2}));
@@ -178,7 +178,7 @@ test "maximum rank 3" {
     });
     const y = try maximum(&graph, x, .{});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i8, &arena.allocator, 10);
     expectEqual(i8, actual[0].i8, expected);
     std.testing.expect(std.mem.eql(usize, y.shape, &[_]usize{}));
@@ -200,7 +200,7 @@ test "maximum rank 3 accross 0 dimension" {
     });
     const y = try maximum(&graph, x, .{ .dimension = 0 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 5, 6 },
         .{ 7, 8 },
@@ -225,7 +225,7 @@ test "maximum rank 3 accross 1 dimension" {
     });
     const y = try maximum(&graph, x, .{ .dimension = 1 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 1, 4 },
         .{ 7, 8 },
@@ -250,7 +250,7 @@ test "maximum rank 3 accross 2 dimension" {
     });
     const y = try maximum(&graph, x, .{ .dimension = 2 });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 2, 4 },
         .{ 6, 8 },
@@ -269,7 +269,7 @@ test "maximum keep dimensions" {
     });
     const y = try maximum(&graph, x, .{ .keep_dimensions = true });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{6},
     });
@@ -290,7 +290,7 @@ test "maximum keep dimensions 0" {
         .dimension = 0,
     });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{ 4, 5, 6 },
     });
@@ -311,7 +311,7 @@ test "maximum keep dimensions 1" {
         .dimension = 1,
     });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{y} });
+    const actual = try session.run(&[_]Tensor{y});
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{3}, .{6},
     });
@@ -327,7 +327,7 @@ test "gradient maximum rank 0" {
     const b = try maximum(&graph, a, .{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, 1);
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -340,7 +340,7 @@ test "gradient maximum rank 1" {
     const b = try maximum(&graph, a, .{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{ 0, 0, 0, 0, 1 });
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -353,7 +353,7 @@ test "gradient maximum rank 1 repeated max" {
     const b = try maximum(&graph, a, .{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{ 0, 0.5, 0, 0, 0.5 });
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -366,7 +366,7 @@ test "gradient maximum rank 1 thrice repeated max" {
     const b = try maximum(&graph, a, .{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{ 0, 0.3333, 0.3333, 0, 0.3333 });
     expectEqual(f64, actual[0].f64, expected);
 }
@@ -382,7 +382,7 @@ test "gradient maximum rank 2" {
     const b = try maximum(&graph, a, .{});
     const gradients = try gradient(&graph, b, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0 },
         .{ 0, 1 },
@@ -408,7 +408,7 @@ test "gradient maximum rank 3 dimension 0" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{
             .{ 0, 0.25 },
@@ -440,7 +440,7 @@ test "gradient maximum rank 3 dimension 1" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{
             .{ 0.25, 0.25 },
@@ -472,7 +472,7 @@ test "maximum backward rank 3 dimension 2" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{
             .{ 0, 0.25 },
@@ -504,7 +504,7 @@ test "maximum backward rank 3 dimension 2 repeating max" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{
             .{ 0.125, 0.125 },
@@ -530,7 +530,7 @@ test "gradient maximum keep dimensions" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0, 0 },
         .{ 0, 0, 1 },
@@ -553,7 +553,7 @@ test "gradient maximum keep dimensions 0" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0, 0 },
         .{ 1. / 3., 1. / 3., 1. / 3. },
@@ -576,7 +576,7 @@ test "maximum bacward keep dimensions 1" {
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0, 0.5 },
         .{ 0, 0, 0.5 },

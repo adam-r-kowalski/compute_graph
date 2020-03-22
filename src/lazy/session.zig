@@ -340,6 +340,32 @@ fn runPlaceholder(session: Session, cache: *Cache, environment: Environment, cur
     try cache.putNoClobber(current_tensor, desired_value);
 }
 
+fn extractEnvironment(allocator: *Allocator, parameters: var) Environment {
+    const T = @TypeOf(parameters);
+    switch (@typeInfo(T)) {
+        .Struct => {
+            if (@hasField(T, "environment"))
+                return parameters.environment;
+        },
+        else => {},
+    }
+    return Environment.init(allocator);
+}
+
+fn isTensors(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .Struct => false,
+        else => true,
+    };
+}
+
+fn extractTensors(parameters: var) []const Tensor {
+    return if (comptime isTensors(@TypeOf(parameters)))
+        parameters
+    else
+        parameters.tensors;
+}
+
 pub const Session = struct {
     arena: *std.heap.ArenaAllocator,
     graph: *const Graph,
@@ -368,8 +394,10 @@ pub const Session = struct {
         defer cache.deinit();
         var gradient_caches = GradientCaches.init(allocator);
         defer gradient_caches.deinit();
-        const environment = if (@hasField(@TypeOf(parameters), "environment")) parameters.environment else Environment.init(&self.arena.allocator);
-        const execution_order = try executionOrder(self.*, parameters.tensors, environment);
+        const environment = extractEnvironment(&self.arena.allocator, parameters);
+        // const tensors = if (@TypeOf(parameters) == []const Tensor) parameters else parameters.tensors;
+        const tensors = extractTensors(parameters);
+        const execution_order = try executionOrder(self.*, tensors, environment);
         for (execution_order) |current_tensor| {
             switch (current_tensor.tensorType) {
                 .constant => |index| try runConstant(self.*, &cache, index, current_tensor),
@@ -387,9 +415,9 @@ pub const Session = struct {
                 .placeholder => try runPlaceholder(self.*, &cache, environment, current_tensor),
             }
         }
-        const outputs = try self.arena.allocator.alloc(CpuTensorUnion, parameters.tensors.len);
+        const outputs = try self.arena.allocator.alloc(CpuTensorUnion, tensors.len);
         errdefer self.arena.allocator.free(outputs);
-        for (parameters.tensors) |tensor, index| outputs[index] = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
+        for (tensors) |tensor, index| outputs[index] = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
         return outputs;
     }
 };
@@ -425,7 +453,7 @@ test "session run" {
     const loss = try mean(&graph, magnitude);
     const gradients = try gradient(&graph, loss, &[_]Tensor{ m, b });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{ loss, gradients[0], gradients[1] } });
+    const actual = try session.run(&[_]Tensor{ loss, gradients[0], gradients[1] });
     const expected_loss = try eager.constant(f64, &arena.allocator, 26);
     const expected_m_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 1 / 3., 2 / 3., 1 },
@@ -452,7 +480,7 @@ test "variable" {
     });
     const b = try variable(&graph, a);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{b} });
+    const actual = try session.run(&[_]Tensor{b});
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 2 },
         .{ 3, 4 },
@@ -482,7 +510,7 @@ test "duplicate" {
     const g = try mean(&graph, f);
     const gradients = try gradient(&graph, g, &[_]Tensor{a});
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 3.5, 4 },
         .{ 4.5, 5 },

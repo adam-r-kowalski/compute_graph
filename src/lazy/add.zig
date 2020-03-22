@@ -117,7 +117,7 @@ test "add scalar" {
     const y = try constant(f64, &graph, 10);
     const z = try add(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(f64, &arena.allocator, 15);
     expectEqual(f64, actual[0].f64, expected);
     std.testing.expectEqual(z.shape, &[_]usize{});
@@ -135,7 +135,7 @@ test "add matrix" {
     });
     const z = try add(&graph, x, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
@@ -157,7 +157,7 @@ test "add matrix i32" {
     });
     const z = try add(&graph, x, x);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 2, -4 },
         .{ 6, -8 },
@@ -185,7 +185,7 @@ test "add broadcast scalar rank 3" {
     });
     const z = try add(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(i8, &arena.allocator, .{
         .{
             .{ -4, -7 },
@@ -230,7 +230,7 @@ test "add broadcast rank 3 to rank 4" {
     });
     const z = try add(&graph, x, y);
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = &[_]Tensor{z} });
+    const actual = try session.run(&[_]Tensor{z});
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{
             .{
@@ -288,7 +288,7 @@ test "gradient add" {
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
@@ -320,7 +320,7 @@ test "gradient add broadcast scalar rank 3" {
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     var session = try Session.init(&arena.allocator, &graph);
-    const actual = try session.run(.{ .tensors = gradients });
+    const actual = try session.run(gradients);
     const expected_a_gradient = try eager.constant(f32, &arena.allocator, 1);
     const expected_b_gradient = try eager.constant(f32, &arena.allocator, .{
         .{
