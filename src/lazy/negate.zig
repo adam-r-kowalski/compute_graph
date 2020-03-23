@@ -97,7 +97,7 @@ test "negate scalar" {
     var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, -5);
     const y = try negate(&graph, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 5);
     expectEqual(f64, actual.f64, expected);
@@ -114,7 +114,7 @@ test "negate matrix" {
         .{ -5, 6 },
     });
     const y = try negate(&graph, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ -1, 2 },
@@ -135,7 +135,7 @@ test "negate matrix i32" {
         .{ -5, 6 },
     });
     const y = try negate(&graph, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ -1, 2 },
@@ -157,7 +157,7 @@ test "gradient negate" {
     const b = try negate(&graph, a);
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ -0.25, -0.25 },

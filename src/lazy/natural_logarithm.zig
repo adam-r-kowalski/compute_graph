@@ -84,7 +84,7 @@ test "naturalLogarithm scalar" {
     var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, 5);
     const y = try naturalLogarithm(&graph, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 1.6094);
     expectEqual(f64, actual.f64, expected);
@@ -101,7 +101,7 @@ test "naturalLogarithm matrix" {
         .{ 5, 6 },
     });
     const y = try naturalLogarithm(&graph, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0.6931 },
@@ -124,7 +124,7 @@ test "gradient naturalLogarithm" {
     const b = try naturalLogarithm(&graph, a);
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.1666, 0.0833 },

@@ -116,7 +116,7 @@ test "multiply scalar" {
     const x = try constant(f64, &graph, 5);
     const y = try constant(f64, &graph, 10);
     const z = try multiply(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, 50);
     expectEqual(f64, actual.f64, expected);
@@ -133,7 +133,7 @@ test "multiply matrix" {
         .{ -5, 6 },
     });
     const z = try multiply(&graph, x, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 1, 4 },
@@ -154,7 +154,7 @@ test "multiply matrix i32" {
         .{ -5, 6 },
     });
     const z = try multiply(&graph, x, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 1, 4 },
@@ -181,7 +181,7 @@ test "multiply broadcast scalar rank 3" {
         },
     });
     const z = try multiply(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(i8, &arena.allocator, .{
         .{
@@ -226,7 +226,7 @@ test "multiply broadcast rank 3 to rank 4" {
         }},
     });
     const z = try multiply(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{
@@ -284,7 +284,7 @@ test "gradient multiply" {
     const c = try multiply(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 5 * 0.25, 6 * 0.25 },
@@ -317,7 +317,7 @@ test "gradient multiply broadcast scalar rank 3" {
     const c = try multiply(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_scalar_gradient = try eager.constant(f64, &arena.allocator, -0.5);
     const expected_tensor_gradient = try eager.constant(f64, &arena.allocator, .{
@@ -364,7 +364,7 @@ test "gradient multiply broadcast rank 3 to rank 4" {
     const c = try multiply(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_rank_3_gradient = try eager.constant(f64, &arena.allocator, .{
         .{.{ 1, 1.1667 }},

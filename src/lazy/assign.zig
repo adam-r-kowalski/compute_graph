@@ -56,7 +56,7 @@ test "assign" {
     const e = try assign(&graph, b, d);
     std.testing.expect(std.mem.eql(usize, e.shape, &[_]usize{ 2, 2 }));
     std.testing.expectEqual(e.scalarType, .f64);
-    var session = try Session.init(allocator, &graph);
+    var session = Session.init(allocator, &graph);
     defer session.deinit();
 
     const actual1 = try session.run(.{ e, b });
@@ -119,12 +119,12 @@ test "linear regression" {
     const db = try multiply(&graph, gradients[1], step_size);
     const improve_m = try assign(&graph, m, try subtract(&graph, m, dm));
     const improve_b = try assign(&graph, b, try subtract(&graph, b, db));
-    var session = try Session.init(allocator, &graph);
+    var session = Session.init(allocator, &graph);
     defer session.deinit();
 
-    var environments = try session.arena.allocator.alloc(Environment, xs.len);
+    var environments = try arena.allocator.alloc(Environment, xs.len);
     for (environments) |*environment, i| {
-        environment.* = Environment.init(&session.arena.allocator);
+        environment.* = Environment.init(&arena.allocator);
         try environment.putNoClobber(x, xs[i]);
         try environment.putNoClobber(y, ys[i]);
     }

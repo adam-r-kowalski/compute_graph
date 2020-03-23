@@ -25,7 +25,7 @@ test "kl divergence" {
     const p = try constant(f64, &graph, .{ 0.1, 0.4, 0.5 });
     const q = try constant(f64, &graph, .{ 0.8, 0.15, 0.05 });
     const kl = try klDivergence(&graph, p, q);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(kl);
     const expected = try eager.constant(f64, &arena.allocator, 1.9269);
     expectEqual(f64, actual.f64, expected);
@@ -37,7 +37,7 @@ test "kl divergence same probability distribution" {
     var graph = try Graph.init(&arena.allocator);
     const p = try constant(f64, &graph, .{ 0.1, 0.4, 0.5 });
     const kl = try klDivergence(&graph, p, p);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(kl);
     const expected = try eager.constant(f64, &arena.allocator, 0);
     expectEqual(f64, actual.f64, expected);
@@ -51,7 +51,7 @@ test "gradient kl divergence" {
     const q = try constant(f64, &graph, .{ 0.8, 0.15, 0.05 });
     const kl = try klDivergence(&graph, p, q);
     const gradients = try gradient(&graph, kl, &[_]Tensor{ p, q });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_p_gradient = try eager.constant(f64, &arena.allocator, .{
         -1.5573, 2.8577, 4.7646,

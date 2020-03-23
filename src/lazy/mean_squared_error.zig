@@ -23,7 +23,7 @@ test "meanSquaredError scalar" {
     const y = try constant(f64, &graph, -5);
     const y_hat = try constant(f64, &graph, 10);
     const loss = try meanSquaredError(&graph, y, y_hat);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(loss);
     const expected = try eager.constant(f64, &arena.allocator, 225);
     expectEqual(f64, actual.f64, expected);
@@ -45,7 +45,7 @@ test "meanSquaredError matrix" {
         .{ -5, 6 },
     });
     const loss = try meanSquaredError(&graph, y, y_hat);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(loss);
     const expected = try eager.constant(f64, &arena.allocator, 10.3333);
     expectEqual(f64, actual.f64, expected);
@@ -66,7 +66,7 @@ test "gradient meanSquaredError" {
     });
     const loss = try meanSquaredError(&graph, y, y_hat);
     const gradients = try gradient(&graph, loss, &[_]Tensor{ y, y_hat });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_y = try eager.constant(f64, &arena.allocator, .{
         .{ -5.0e-01, 2.0e+00 },

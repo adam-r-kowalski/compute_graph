@@ -116,7 +116,7 @@ test "subtract scalar" {
     const x = try constant(f64, &graph, 5);
     const y = try constant(f64, &graph, 10);
     const z = try subtract(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, -5);
     expectEqual(f64, actual.f64, expected);
@@ -138,7 +138,7 @@ test "subtract matrix" {
         .{ 5, -6 },
     });
     const z = try subtract(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 2, -4 },
@@ -164,7 +164,7 @@ test "subtract matrix i32" {
         .{ 5, -6 },
     });
     const z = try subtract(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 2, -4 },
@@ -187,7 +187,7 @@ test "subtract broadcast scalar rank 2" {
     });
     const c = try subtract(&graph, a, b);
     const d = try subtract(&graph, b, a);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(.{ c, d });
     const expected = try eager.constant(f16, &arena.allocator, .{
         .{ 2, 5 },
@@ -231,7 +231,7 @@ test "subtract broadcast rank 3 to rank 4" {
         }},
     });
     const c = try subtract(&graph, a, b);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(c);
     const expected = try eager.constant(i64, &arena.allocator, .{
         .{
@@ -287,7 +287,7 @@ test "gradient subtract" {
     const c = try subtract(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 0.25, 0.25 },
@@ -320,7 +320,7 @@ test "subtract backwards broadcast rank 3 to rank 4" {
     const c = try subtract(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_scalar_gradient = try eager.constant(f64, &arena.allocator, 1);
     const expected_tensor_gradient = try eager.constant(f64, &arena.allocator, .{
@@ -367,7 +367,7 @@ test "subtract backwards broadcast rank 3 to rank 4" {
     const c = try subtract(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_rank_3_gradient = try eager.constant(f64, &arena.allocator, .{
         .{.{ 0.16667, 0.16667 }},

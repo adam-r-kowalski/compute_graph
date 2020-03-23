@@ -40,9 +40,9 @@ test "placeholder" {
     });
     const c = try placeholder(&graph, &[_]usize{ 2, 2 }, .f64);
     std.testing.expect(std.mem.eql(usize, c.shape, &[_]usize{ 2, 2 }));
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
 
-    var environment = Environment.init(&session.arena.allocator);
+    var environment = Environment.init(&arena.allocator);
     try environment.putNoClobber(c, a);
     const actual = try session.run(.{
         .tensors = &[_]Tensor{c},
@@ -54,7 +54,7 @@ test "placeholder" {
     });
     expectEqual(f64, actual[0].f64, expected);
 
-    var environment2 = Environment.init(&session.arena.allocator);
+    var environment2 = Environment.init(&arena.allocator);
     try environment2.putNoClobber(c, b);
     const actual2 = try session.run(.{
         .tensors = &[_]Tensor{c},

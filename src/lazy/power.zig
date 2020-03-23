@@ -197,7 +197,7 @@ test "power rank 0" {
     var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, -5);
     const y = try power(&graph, x, 2.0);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 25);
     expectEqual(f64, actual.f64, expected);
@@ -209,7 +209,7 @@ test "power rank 1" {
     var graph = try Graph.init(&arena.allocator);
     const x = try constant(i32, &graph, .{ 1, -2, 3, -4, -5, 6 });
     const y = try power(&graph, x, 3);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(i32, &arena.allocator, .{ 1, -8, 27, -64, -125, 216 });
     expectEqual(i32, actual.i32, expected);
@@ -225,7 +225,7 @@ test "power rank 2" {
         .{ -5, 6 },
     });
     const y = try power(&graph, x, -2);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 0.25 },
@@ -245,7 +245,7 @@ test "power rank 2 float" {
         .{ 5, 6 },
     });
     const y = try power(&graph, x, 2.5);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 5.6568 },
@@ -266,7 +266,7 @@ test "gradient power rank 2" {
     const b = try power(&graph, a, 2.5);
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.625, 1.7677 },

@@ -26,7 +26,7 @@ test "cross entropy" {
     const q = try constant(f64, &graph, .{ 0.8, 0.15, 0.05 });
     const h_pq = try crossEntropy(&graph, p, q);
     const h_qp = try crossEntropy(&graph, q, p);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(.{ h_pq, h_qp });
     const expected_h_pq = try eager.constant(f64, &arena.allocator, 3.2879);
     const expected_h_qp = try eager.constant(f64, &arena.allocator, 2.9058);
@@ -42,7 +42,7 @@ test "gradient cross entropy" {
     const q = try constant(f64, &graph, .{ 0.8, 0.15, 0.05 });
     const h = try crossEntropy(&graph, p, q);
     const gradients = try gradient(&graph, h, &[_]Tensor{ p, q });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_p_gradient = try eager.constant(f64, &arena.allocator, .{
         0.3219, 2.7369, 4.3219,
@@ -62,7 +62,7 @@ test "cross entropy same distribution" {
     const q = try constant(f64, &graph, .{ 0.8, 0.15, 0.05 });
     const h_pp = try crossEntropy(&graph, p, p);
     const h_qq = try crossEntropy(&graph, q, q);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(.{ h_pp, h_qq });
     const expected_h_pp = try eager.constant(f64, &arena.allocator, 1.3609);
     const expected_h_qq = try eager.constant(f64, &arena.allocator, 0.8841);
@@ -77,7 +77,7 @@ test "gradient cross entropy same distribution" {
     const p = try constant(f64, &graph, .{ 0.1, 0.4, 0.5 });
     const h = try crossEntropy(&graph, p, p);
     const gradients = try gradient(&graph, h, &[_]Tensor{p});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_p_gradient = try eager.constant(f64, &arena.allocator, .{
         1.8792, -0.1207, -0.4426,

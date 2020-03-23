@@ -126,7 +126,7 @@ test "matrixMultiply identity" {
         .{3},
     });
     const z = try matrixMultiply(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{1},
@@ -152,7 +152,7 @@ test "matrixMultiply flip" {
         .{3},
     });
     const z = try matrixMultiply(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{1},
@@ -179,7 +179,7 @@ test "matrixMultiply big" {
         .{ 3, 9 },
     });
     const z = try matrixMultiply(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 18, 41 },
@@ -207,7 +207,7 @@ test "gradient matrix multiply" {
     const c = try matrixMultiply(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 3.75, 4.75, 5.75 },

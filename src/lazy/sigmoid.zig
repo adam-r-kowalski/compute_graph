@@ -27,7 +27,7 @@ test "sigmoid scalar" {
     var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, -5);
     const y = try sigmoid(&graph, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 0.0066);
     expectEqual(f64, actual.f64, expected);
@@ -44,7 +44,7 @@ test "sigmoid matrix" {
         .{ -5, 6 },
     });
     const y = try sigmoid(&graph, x);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.7310, 0.1192 },
@@ -66,7 +66,7 @@ test "gradient sigmoid" {
     const b = try sigmoid(&graph, a);
     const c = try mean(&graph, b);
     const gradients = try gradient(&graph, c, &[_]Tensor{a});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.0492, 0.0262 },

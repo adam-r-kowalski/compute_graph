@@ -116,7 +116,7 @@ test "divide scalar" {
     const x = try constant(f64, &graph, 5);
     const y = try constant(f64, &graph, 10);
     const z = try divide(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, 0.5);
     expectEqual(f64, actual.f64, expected);
@@ -139,7 +139,7 @@ test "divide matrix" {
         .{ -2, 1 },
     });
     const z = try divide(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(f64, &arena.allocator, .{
         .{ 0.1666, 0.4 },
@@ -166,7 +166,7 @@ test "divide matrix i32" {
         .{ -2, 1 },
     });
     const z = try divide(&graph, x, y);
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(z);
     const expected = try eager.constant(i32, &arena.allocator, .{
         .{ 0, 0 },
@@ -193,7 +193,7 @@ test "gradient divide" {
     const c = try divide(&graph, a, b);
     const d = try mean(&graph, c);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
         .{ 0.0238, 0.02083, 0.0185 },
@@ -230,7 +230,7 @@ test "gradient divide broadcast scalar rank 3" {
     const f = try mean(&graph, e);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     const gradients2 = try gradient(&graph, f, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const actual2 = try session.run(gradients2);
     const expected_a_gradient = try eager.constant(f64, &arena.allocator, 0.0793);
@@ -295,7 +295,7 @@ test "gradient divide broadcast rank 3 to rank 4" {
     const f = try mean(&graph, e);
     const gradients = try gradient(&graph, d, &[_]Tensor{ a, b });
     const gradients2 = try gradient(&graph, f, &[_]Tensor{ a, b });
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(gradients);
     const actual2 = try session.run(gradients2);
     const expected_a_gradient = try eager.constant(f64, &arena.allocator, .{
