@@ -6,6 +6,7 @@ const Tensor = @import("tensor.zig").Tensor;
 const GradientHandle = @import("tensor.zig").GradientHandle;
 const eager = @import("../eager.zig");
 const expectEqual = @import("../testing.zig").expectEqual;
+const CpuTensor = eager.CpuTensor;
 const CpuTensorUnion = eager.CpuTensorUnion;
 const constant = @import("constant.zig").constant;
 const add = @import("add.zig").add;
@@ -309,12 +310,22 @@ fn runVariable(session: Session, cache: *Cache, index: usize, current_tensor: Te
     }
 }
 
-fn runAssign(session: *Session, cache: *Cache, index: usize, current_tensor: Tensor) !void {
+fn runAssign(
+    allocator: *Allocator,
+    session: *Session,
+    cache: *Cache,
+    index: usize,
+    current_tensor: Tensor,
+) !void {
     const assign_tensor = session.graph.assigns.at(index);
     const value = try getValue(Cache, Tensor, CpuTensorUnion, cache.*, assign_tensor.value);
     try cache.putNoClobber(current_tensor, value);
     _ = try cache.put(assign_tensor.variable, value);
-    _ = try session.variableCache.put(assign_tensor.variable, value);
+    const copied_value = try copyTensorUnion(allocator, value);
+    if (session.variableCache.getValue(assign_tensor.variable)) |existing_value| {
+        existing_value.deinit(allocator);
+    }
+    _ = try session.variableCache.put(assign_tensor.variable, copied_value);
 }
 
 fn runPlaceholder(session: Session, cache: *Cache, environment: Environment, current_tensor: Tensor) !void {
@@ -357,6 +368,45 @@ fn extractTensors(allocator: *Allocator, parameters: var) ![]const Tensor {
     }
 }
 
+fn copyTensor(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !CpuTensor(T) {
+    const shape = try allocator.alloc(usize, tensor.shape.len);
+    errdefer allocator.free(shape);
+    for (tensor.shape) |s, i| shape[i] = s;
+    const stride = try allocator.alloc(usize, tensor.stride.len);
+    errdefer allocator.free(stride);
+    for (tensor.stride) |s, i| stride[i] = s;
+    switch (tensor.storage) {
+        .scalar => |scalar| {
+            return CpuTensor(T){
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .scalar = scalar },
+            };
+        },
+        .array => |array| {
+            const new_array = try allocator.alloc(T, array.len);
+            errdefer allocator.free(new_array);
+            for (array) |a, i| new_array[i] = a;
+            return CpuTensor(T){
+                .shape = shape,
+                .stride = stride,
+                .storage = .{ .array = new_array },
+            };
+        },
+    }
+}
+
+fn copyTensorUnion(allocator: *Allocator, tensor_union: CpuTensorUnion) !CpuTensorUnion {
+    return switch (tensor_union) {
+        .f64 => |tensor| .{ .f64 = try copyTensor(f64, allocator, tensor) },
+        .f32 => |tensor| .{ .f32 = try copyTensor(f32, allocator, tensor) },
+        .f16 => |tensor| .{ .f16 = try copyTensor(f16, allocator, tensor) },
+        .i64 => |tensor| .{ .i64 = try copyTensor(i64, allocator, tensor) },
+        .i32 => |tensor| .{ .i32 = try copyTensor(i32, allocator, tensor) },
+        .i8 => |tensor| .{ .i8 = try copyTensor(i8, allocator, tensor) },
+    };
+}
+
 pub fn runTensor(allocator: *Allocator, session: *Session, tensor: Tensor, environment: Environment) !CpuTensorUnion {
     const graph = session.graph;
     var cache = Cache.init(allocator);
@@ -378,11 +428,12 @@ pub fn runTensor(allocator: *Allocator, session: *Session, tensor: Tensor, envir
                 .current_tensor = current_tensor,
             }),
             .variable => |index| try runVariable(session.*, &cache, index, current_tensor),
-            .assign => |index| try runAssign(session, &cache, index, current_tensor),
+            .assign => |index| try runAssign(allocator, session, &cache, index, current_tensor),
             .placeholder => try runPlaceholder(session.*, &cache, environment, current_tensor),
         }
     }
-    return try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
+    const output = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
+    return try copyTensorUnion(session.allocator, output);
 }
 
 pub fn runTensors(allocator: *Allocator, session: *Session, tensors: []const Tensor, environment: Environment) ![]CpuTensorUnion {
@@ -406,13 +457,16 @@ pub fn runTensors(allocator: *Allocator, session: *Session, tensors: []const Ten
                 .current_tensor = current_tensor,
             }),
             .variable => |index| try runVariable(session.*, &cache, index, current_tensor),
-            .assign => |index| try runAssign(session, &cache, index, current_tensor),
+            .assign => |index| try runAssign(allocator, session, &cache, index, current_tensor),
             .placeholder => try runPlaceholder(session.*, &cache, environment, current_tensor),
         }
     }
-    const outputs = try allocator.alloc(CpuTensorUnion, tensors.len);
-    errdefer allocator.free(outputs);
-    for (tensors) |tensor, index| outputs[index] = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
+    const outputs = try session.allocator.alloc(CpuTensorUnion, tensors.len);
+    errdefer session.allocator.free(outputs);
+    for (tensors) |tensor, index| {
+        const output = try getValue(Cache, Tensor, CpuTensorUnion, cache, tensor);
+        outputs[index] = try copyTensorUnion(session.allocator, output);
+    }
     return outputs;
 }
 
@@ -440,7 +494,7 @@ pub const Session = struct {
 
     pub fn run(self: *Session, parameters: var) !RunOutputType(@TypeOf(parameters)) {
         var arena = std.heap.ArenaAllocator.init(self.allocator);
-        // defer arena.deinit();
+        defer arena.deinit();
         const environment = extractEnvironment(self.allocator, parameters);
         if (@TypeOf(parameters) == Tensor) {
             return try runTensor(&arena.allocator, self, parameters, environment);

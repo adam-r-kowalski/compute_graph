@@ -71,6 +71,15 @@ pub fn CpuTensor(comptime T: type) type {
 
         pub const ScalarType = T;
 
+        pub fn deinit(self: @This(), allocator: *Allocator) void {
+            allocator.free(self.shape);
+            allocator.free(self.stride);
+            switch (self.storage) {
+                .array => |array| allocator.free(array),
+                .scalar => {},
+            }
+        }
+
         pub fn format(
             self: @This(),
             comptime fmt: []const u8,
@@ -114,6 +123,17 @@ pub const CpuTensorUnion = union(tensorScalarType) {
             i8 => .{ .i8 = tensor },
             else => @compileError("ScalarType not supported"),
         };
+    }
+
+    pub fn deinit(self: @This(), allocator: *Allocator) void {
+        switch (self) {
+            .f64 => |tensor| tensor.deinit(allocator),
+            .f32 => |tensor| tensor.deinit(allocator),
+            .f16 => |tensor| tensor.deinit(allocator),
+            .i64 => |tensor| tensor.deinit(allocator),
+            .i32 => |tensor| tensor.deinit(allocator),
+            .i8 => |tensor| tensor.deinit(allocator),
+        }
     }
 
     pub fn format(
