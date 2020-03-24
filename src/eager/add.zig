@@ -13,7 +13,7 @@ const broadcastShape = broadcast.broadcastShape;
 const maximumCartesianIndex = broadcast.maximumCartesianIndex;
 const incrementCartesianIndex = broadcast.incrementCartesianIndex;
 const debroadcastIndex = broadcast.debroadcastIndex;
-const zip = broadcast.zip;
+const zip = @import("zip.zig").zip;
 const sum = @import("sum.zig").sum;
 const ReduceParameters = @import("reduce.zig").ReduceParameters;
 
@@ -302,17 +302,18 @@ pub fn addBackwardBroadcast(comptime T: type, context: backward.Context(T), outp
 
 pub fn addBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 2);
-    const outputs = try context.allocator.alloc(CpuTensor(T), 2);
-    errdefer context.allocator.free(outputs);
+    const allocator = context.allocator;
+    const outputs = try allocator.alloc(CpuTensor(T), 2);
+    errdefer allocator.free(outputs);
     const inputs = context.forward_inputs;
     if (std.mem.eql(usize, inputs[0].shape, inputs[1].shape)) {
-        outputs[0] = context.gradient_input;
-        outputs[1] = context.gradient_input;
+        outputs[0] = try context.gradient_input.copy(allocator);
+        outputs[1] = try context.gradient_input.copy(allocator);
     } else if (inputs[0].shape.len == 0) {
         outputs[0] = try sum(T, context.allocator, context.gradient_input, ReduceParameters{});
-        outputs[1] = context.gradient_input;
+        outputs[1] = try context.gradient_input.copy(allocator);
     } else if (inputs[1].shape.len == 0) {
-        outputs[0] = context.gradient_input;
+        outputs[0] = try context.gradient_input.copy(context.allocator);
         outputs[1] = try sum(T, context.allocator, context.gradient_input, ReduceParameters{});
     } else {
         try addBackwardBroadcast(T, context, outputs);

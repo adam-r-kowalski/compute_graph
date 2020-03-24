@@ -80,6 +80,34 @@ pub fn CpuTensor(comptime T: type) type {
             }
         }
 
+        fn copy(self: @This(), allocator: *Allocator) !@This() {
+            const shape = try allocator.alloc(usize, self.shape.len);
+            errdefer allocator.free(shape);
+            for (self.shape) |s, i| shape[i] = s;
+            const stride = try allocator.alloc(usize, self.stride.len);
+            errdefer allocator.free(stride);
+            for (self.stride) |s, i| stride[i] = s;
+            switch (self.storage) {
+                .scalar => |scalar| {
+                    return CpuTensor(T){
+                        .shape = shape,
+                        .stride = stride,
+                        .storage = .{ .scalar = scalar },
+                    };
+                },
+                .array => |array| {
+                    const new_array = try allocator.alloc(T, array.len);
+                    errdefer allocator.free(new_array);
+                    for (array) |a, i| new_array[i] = a;
+                    return CpuTensor(T){
+                        .shape = shape,
+                        .stride = stride,
+                        .storage = .{ .array = new_array },
+                    };
+                },
+            }
+        }
+
         pub fn format(
             self: @This(),
             comptime fmt: []const u8,
@@ -134,6 +162,17 @@ pub const CpuTensorUnion = union(tensorScalarType) {
             .i32 => |tensor| tensor.deinit(allocator),
             .i8 => |tensor| tensor.deinit(allocator),
         }
+    }
+
+    fn copy(self: @This(), allocator: *Allocator) !@This() {
+        return switch (self) {
+            .f64 => |tensor| .{ .f64 = try tensor.copy(allocator) },
+            .f32 => |tensor| .{ .f32 = try tensor.copy(allocator) },
+            .f16 => |tensor| .{ .f16 = try tensor.copy(allocator) },
+            .i64 => |tensor| .{ .i64 = try tensor.copy(allocator) },
+            .i32 => |tensor| .{ .i32 = try tensor.copy(allocator) },
+            .i8 => |tensor| .{ .i8 = try tensor.copy(allocator) },
+        };
     }
 
     pub fn format(
