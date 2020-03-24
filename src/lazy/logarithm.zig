@@ -35,7 +35,7 @@ test "logarithm scalar" {
     const x = try constant(f64, &graph, 5);
     const y = try logarithm(&graph, x, .{});
     const gradients = try gradient(&graph, y, &[_]Tensor{x});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(.{ y, gradients[0] });
     const expected_y = try eager.constant(f64, &arena.allocator, 1.6094);
     const expected_gradients = try eager.constant(f64, &arena.allocator, 0.2);
@@ -56,7 +56,7 @@ test "logarithm matrix" {
     const y = try logarithm(&graph, x, .{});
     const z = try mean(&graph, y);
     const gradients = try gradient(&graph, z, &[_]Tensor{x});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(.{ y, gradients[0] });
     const expected_y = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 0.6931 },
@@ -80,7 +80,7 @@ test "logarithm base 2 scalar" {
     const x = try constant(f64, &graph, 5);
     const y = try logarithm(&graph, x, .{ .base = 2 });
     const gradients = try gradient(&graph, y, &[_]Tensor{x});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(.{ y, gradients[0] });
     const expected_y = try eager.constant(f64, &arena.allocator, 2.3219);
     const expected_gradients = try eager.constant(f64, &arena.allocator, 0.2885);
@@ -101,7 +101,7 @@ test "logarithm base 2 matrix" {
     const y = try logarithm(&graph, x, .{ .base = 2 });
     const z = try mean(&graph, y);
     const gradients = try gradient(&graph, z, &[_]Tensor{x});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(.{ y, gradients[0] });
     const expected_y = try eager.constant(f64, &arena.allocator, .{
         .{ 0, 1 },

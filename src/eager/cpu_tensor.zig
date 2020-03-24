@@ -71,6 +71,43 @@ pub fn CpuTensor(comptime T: type) type {
 
         pub const ScalarType = T;
 
+        pub fn deinit(self: @This(), allocator: *Allocator) void {
+            allocator.free(self.shape);
+            allocator.free(self.stride);
+            switch (self.storage) {
+                .array => |array| allocator.free(array),
+                .scalar => {},
+            }
+        }
+
+        fn copy(self: @This(), allocator: *Allocator) !@This() {
+            const shape = try allocator.alloc(usize, self.shape.len);
+            errdefer allocator.free(shape);
+            for (self.shape) |s, i| shape[i] = s;
+            const stride = try allocator.alloc(usize, self.stride.len);
+            errdefer allocator.free(stride);
+            for (self.stride) |s, i| stride[i] = s;
+            switch (self.storage) {
+                .scalar => |scalar| {
+                    return CpuTensor(T){
+                        .shape = shape,
+                        .stride = stride,
+                        .storage = .{ .scalar = scalar },
+                    };
+                },
+                .array => |array| {
+                    const new_array = try allocator.alloc(T, array.len);
+                    errdefer allocator.free(new_array);
+                    for (array) |a, i| new_array[i] = a;
+                    return CpuTensor(T){
+                        .shape = shape,
+                        .stride = stride,
+                        .storage = .{ .array = new_array },
+                    };
+                },
+            }
+        }
+
         pub fn format(
             self: @This(),
             comptime fmt: []const u8,
@@ -113,6 +150,28 @@ pub const CpuTensorUnion = union(tensorScalarType) {
             i32 => .{ .i32 = tensor },
             i8 => .{ .i8 = tensor },
             else => @compileError("ScalarType not supported"),
+        };
+    }
+
+    pub fn deinit(self: @This(), allocator: *Allocator) void {
+        switch (self) {
+            .f64 => |tensor| tensor.deinit(allocator),
+            .f32 => |tensor| tensor.deinit(allocator),
+            .f16 => |tensor| tensor.deinit(allocator),
+            .i64 => |tensor| tensor.deinit(allocator),
+            .i32 => |tensor| tensor.deinit(allocator),
+            .i8 => |tensor| tensor.deinit(allocator),
+        }
+    }
+
+    fn copy(self: @This(), allocator: *Allocator) !@This() {
+        return switch (self) {
+            .f64 => |tensor| .{ .f64 = try tensor.copy(allocator) },
+            .f32 => |tensor| .{ .f32 = try tensor.copy(allocator) },
+            .f16 => |tensor| .{ .f16 = try tensor.copy(allocator) },
+            .i64 => |tensor| .{ .i64 = try tensor.copy(allocator) },
+            .i32 => |tensor| .{ .i32 = try tensor.copy(allocator) },
+            .i8 => |tensor| .{ .i8 = try tensor.copy(allocator) },
         };
     }
 

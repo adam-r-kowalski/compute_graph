@@ -38,7 +38,7 @@ test "constant scalar" {
     var graph = try Graph.init(&arena.allocator);
     const x = try constant(f64, &graph, 5);
     const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(x);
     const expected = try eager.constant(f64, &arena.allocator, 5);
     expectEqual(f64, actual.f64, expected);
@@ -57,7 +57,7 @@ test "constant array" {
         .{ 5, 6 },
     });
     const actualString = try std.fmt.allocPrint(&arena.allocator, "{}", .{x});
-    var session = try Session.init(&arena.allocator, &graph);
+    var session = Session.init(&arena.allocator, &graph);
     const actual = try session.run(x);
     const expected = try eager.constant(f32, &arena.allocator, .{
         .{ 1, 2 },
