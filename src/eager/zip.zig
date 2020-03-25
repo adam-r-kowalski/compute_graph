@@ -88,12 +88,12 @@ fn zipBroadcast(comptime T: type, allocator: *Allocator, x: CpuTensor(T), y: Cpu
     const stride = try tensorStride(allocator, shape);
     errdefer allocator.free(stride);
     const cartesian_index = try allocator.alloc(usize, shape.len);
-    errdefer allocator.free(cartesian_index);
+    defer allocator.free(cartesian_index);
     for (cartesian_index) |*e| e.* = 0;
     const x_cartesian_index = try allocator.alloc(usize, x.shape.len);
-    errdefer allocator.free(x_cartesian_index);
+    defer allocator.free(x_cartesian_index);
     const y_cartesian_index = try allocator.alloc(usize, y.shape.len);
-    errdefer allocator.free(y_cartesian_index);
+    defer allocator.free(y_cartesian_index);
     const array = try allocator.alloc(T, tensorLength(shape));
     errdefer allocator.free(array);
     const x_array = x.storage.array;
