@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const cpu_tensor = @import("cpu_tensor.zig");
+const copy = cpu_tensor.copy;
 const CpuTensor = cpu_tensor.CpuTensor;
 const tensorStride = cpu_tensor.tensorStride;
 const tensorLength = cpu_tensor.tensorLength;
@@ -252,13 +253,6 @@ test "add broadcast rank 3 to rank 4" {
         },
     });
     expectEqual(i64, actual, expected);
-}
-
-fn copy(comptime T: type, allocator: *Allocator, array: []const T) ![]T {
-    const output = try allocator.alloc(T, array.len);
-    errdefer allocator.free(output);
-    std.mem.copy(T, output, array);
-    return output;
 }
 
 pub fn addBackwardBroadcast(comptime T: type, context: backward.Context(T), outputs: []CpuTensor(T)) !void {

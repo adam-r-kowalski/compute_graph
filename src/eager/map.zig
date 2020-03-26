@@ -1,12 +1,16 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const cpu_tensor = @import("cpu_tensor.zig");
+const CpuTensor = cpu_tensor.CpuTensor;
+const copy = cpu_tensor.copy;
 const invoke = @import("invoke.zig").invoke;
 const backward = @import("backward.zig");
 
 pub fn map(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), invokable: var) !CpuTensor(T) {
-    const shape = tensor.shape;
-    const stride = tensor.stride;
+    const shape = try copy(usize, allocator, tensor.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, tensor.stride);
+    errdefer allocator.free(stride);
     switch (tensor.storage) {
         .scalar => |scalar| {
             return CpuTensor(T){
