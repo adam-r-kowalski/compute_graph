@@ -1,13 +1,16 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
+const copy = @import("cpu_tensor.zig").copy;
 const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
 
 pub fn onesLike(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !CpuTensor(T) {
-    const shape = tensor.shape;
-    const stride = tensor.stride;
+    const shape = try copy(usize, allocator, tensor.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, tensor.stride);
+    errdefer allocator.free(stride);
     switch (tensor.storage) {
         .scalar => |scalar| {
             return CpuTensor(T){
@@ -89,4 +92,16 @@ test "onesLike rank 3" {
         },
     });
     expectEqual(i8, actual, expected);
+}
+
+test "onesLike rank 1 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(i32, &leak_allocator.allocator, .{ 1, -2, 3, -4, -5, 6 });
+    const actual = try onesLike(i32, &leak_allocator.allocator, x);
+    defer actual.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    const expected = try constant(i32, &leak_allocator.allocator, .{ 1, 1, 1, 1, 1, 1 });
+    defer expected.deinit(&leak_allocator.allocator);
+    expectEqual(i32, actual, expected);
 }
