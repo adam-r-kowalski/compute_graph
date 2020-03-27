@@ -117,3 +117,45 @@ test "naturalLogarithm backward rank 2" {
     });
     expectEqual(f64, actual[0], expected);
 }
+
+test "naturalLogarithm rank 1 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f32, &leak_allocator.allocator, .{ 1, 2, 3, 4, 5, 6 });
+    const actual = try naturalLogarithm(f32, &leak_allocator.allocator, x);
+    defer actual.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    const expected = try constant(f32, &leak_allocator.allocator, .{
+        0, 0.6931, 1.0986, 1.3862, 1.6094, 1.7917,
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    expectEqual(f32, actual, expected);
+}
+
+test "gradient naturalLogarithm rank 1 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{ 1, 2, 3, 4, 5 });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{
+        0.2, 0.2, 0.2, 0.2, 0.2,
+    });
+    const forward_output = try naturalLogarithm(f64, &leak_allocator.allocator, x);
+    const actual = try naturalLogarithmBackward(f64, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){x},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        0.2, 0.1, 0.0666, 0.05, 0.04,
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected);
+}

@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const cpu_tensor = @import("cpu_tensor.zig");
+const copy = cpu_tensor.copy;
 const CpuTensor = cpu_tensor.CpuTensor;
 const tensorStride = cpu_tensor.tensorStride;
 const tensorLength = cpu_tensor.tensorLength;
@@ -205,8 +206,10 @@ test "sum keep dimensions 1" {
 fn sumBackwardAcrossDimension(comptime T: type, dimension: usize, context: backward.Context(T)) ![]CpuTensor(T) {
     const allocator = context.allocator;
     const input = context.forward_inputs[0];
-    const shape = input.shape;
-    const stride = input.stride;
+    const shape = try copy(usize, allocator, input.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, input.stride);
+    errdefer allocator.free(shape);
     const outputs = try allocator.alloc(CpuTensor(T), 1);
     errdefer context.allocator.free(outputs);
     const array = try allocator.alloc(T, input.storage.array.len);
@@ -250,8 +253,10 @@ fn sumBackwardAcrossDimension(comptime T: type, dimension: usize, context: backw
 fn sumBackwardAcrossKeepDimensions(comptime T: type, dimension: usize, context: backward.Context(T)) ![]CpuTensor(T) {
     const allocator = context.allocator;
     const input = context.forward_inputs[0];
-    const shape = input.shape;
-    const stride = input.stride;
+    const shape = try copy(usize, allocator, input.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, input.stride);
+    errdefer allocator.free(shape);
     const outputs = try allocator.alloc(CpuTensor(T), 1);
     errdefer context.allocator.free(outputs);
     const array = try allocator.alloc(T, input.storage.array.len);
@@ -295,20 +300,20 @@ fn sumBackwardAcrossKeepDimensions(comptime T: type, dimension: usize, context: 
 pub fn sumBackward(comptime T: type, parameters: ReduceParameters, context: backward.Context(T)) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 1);
     const input = context.forward_inputs[0];
-    const shape = input.shape;
-
     if (parameters.dimension) |d| {
-        if (shape.len > 1) {
+        if (input.shape.len > 1) {
             if (parameters.keep_dimensions)
                 return try sumBackwardAcrossKeepDimensions(T, d, context);
             return try sumBackwardAcrossDimension(T, d, context);
         }
     }
-
     const allocator = context.allocator;
     const outputs = try allocator.alloc(CpuTensor(T), 1);
     errdefer context.allocator.free(outputs);
-    const stride = input.stride;
+    const shape = try copy(usize, allocator, input.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, input.stride);
+    errdefer allocator.free(shape);
     switch (input.storage) {
         .scalar => |scalar| {
             const gradient = context.gradient_input.storage.scalar;
@@ -556,7 +561,7 @@ test "sum backward keep dimensions 0" {
     expectEqual(f64, actual[0], expected);
 }
 
-test "sum bacward keep dimensions 1" {
+test "sum backward keep dimensions 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const forward_input = try constant(f64, &arena.allocator, .{
@@ -579,5 +584,152 @@ test "sum bacward keep dimensions 1" {
         .{ 0.5, 0.5, 0.5 },
         .{ 0.5, 0.5, 0.5 },
     });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "sum rank 2 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f16, &leak_allocator.allocator, .{
+        .{ 5, 10 },
+        .{ 7, 8 },
+        .{ 10, 8 },
+    });
+    const actual = try sum(f16, &leak_allocator.allocator, x, ReduceParameters{});
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(f16, &leak_allocator.allocator, 48);
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    expectEqual(f16, actual, expected);
+}
+
+test "sum rank 2 across 0 dimension seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f16, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ -3, 4 },
+        .{ 5, 6 },
+    });
+    const actual = try sum(f16, &leak_allocator.allocator, x, ReduceParameters{ .dimension = 0 });
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(f16, &leak_allocator.allocator, .{ 3, 12 });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    expectEqual(f16, actual, expected);
+}
+
+test "sum keep dimensions 0 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(i64, &leak_allocator.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const actual = try sum(i64, &leak_allocator.allocator, x, ReduceParameters{
+        .keep_dimensions = true,
+        .dimension = 0,
+    });
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(i64, &leak_allocator.allocator, .{
+        .{ 5, 7, 9 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    expectEqual(i64, actual, expected);
+}
+
+test "sum backward rank 2 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const forward_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, 1);
+    const forward_output = try sum(f64, &leak_allocator.allocator, forward_input, ReduceParameters{});
+    const actual = try sumBackward(f64, ReduceParameters{}, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 1 },
+        .{ 1, 1 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    forward_input.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected);
+}
+
+test "sum backward rank 2 dimension 0 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const forward_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{ 0.5, 0.5 });
+    const parameters = ReduceParameters{ .dimension = 0 };
+    const forward_output = try sum(f64, &leak_allocator.allocator, forward_input, parameters);
+    const actual = try sumBackward(f64, parameters, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0.5, 0.5 },
+        .{ 0.5, 0.5 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    forward_input.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected);
+}
+
+test "sum backward rank 2 dimension 0 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const forward_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{.{ 0.5, 0.5 }});
+    const parameters = ReduceParameters{
+        .dimension = 0,
+        .keep_dimensions = true,
+    };
+    const forward_output = try sum(f64, &leak_allocator.allocator, forward_input, parameters);
+    const actual = try sumBackward(f64, parameters, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0.5, 0.5 },
+        .{ 0.5, 0.5 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    forward_input.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
     expectEqual(f64, actual[0], expected);
 }
