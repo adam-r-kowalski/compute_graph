@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const cpu_tensor = @import("cpu_tensor.zig");
+const copy = cpu_tensor.copy;
 const CpuTensor = cpu_tensor.CpuTensor;
 const linearIndex = cpu_tensor.linearIndex;
 const expectEqual = @import("../testing.zig").expectEqual;
@@ -116,7 +117,9 @@ fn outputs0(comptime T: type, context: backward.Context(T)) !CpuTensor(T) {
     const g = context.gradient_input;
     const allocator = context.allocator;
     const c = try onesLike(T, allocator, b);
+    defer c.deinit(allocator);
     const d = try divide(T, allocator, c, b);
+    defer d.deinit(allocator);
     return try multiply(T, allocator, d, g);
 }
 
@@ -126,7 +129,9 @@ fn outputs1(comptime T: type, context: backward.Context(T)) !CpuTensor(T) {
     const g = context.gradient_input;
     const allocator = context.allocator;
     const c = try divide(T, allocator, context.forward_output, b);
+    defer c.deinit(allocator);
     const d = try negate(T, allocator, c);
+    defer d.deinit(allocator);
     return try multiply(T, allocator, d, g);
 }
 
@@ -139,20 +144,27 @@ pub fn divideBackwardBroadcast(comptime T: type, context: backward.Context(T), o
     const gradient_cartesian_index = try allocator.alloc(usize, gradient_shape.len);
     defer allocator.free(gradient_cartesian_index);
     for (gradient_cartesian_index) |*e| e.* = 0;
-    const x_shape = context.forward_inputs[0].shape;
-    const x_stride = context.forward_inputs[0].stride;
+
+    const x_shape = try copy(usize, allocator, context.forward_inputs[0].shape);
+    errdefer allocator.free(x_shape);
+    const x_stride = try copy(usize, allocator, context.forward_inputs[0].stride);
+    errdefer allocator.free(x_stride);
     const x_array = try allocator.alloc(T, context.forward_inputs[0].storage.array.len);
     errdefer allocator.free(x_array);
     for (x_array) |*e| e.* = 0;
     const x_cartesian_index = try allocator.alloc(usize, x_shape.len);
     defer allocator.free(x_cartesian_index);
-    const y_shape = context.forward_inputs[1].shape;
-    const y_stride = context.forward_inputs[1].stride;
+
+    const y_shape = try copy(usize, allocator, context.forward_inputs[1].shape);
+    errdefer allocator.free(y_shape);
+    const y_stride = try copy(usize, allocator, context.forward_inputs[1].stride);
+    errdefer allocator.free(y_stride);
     const y_array = try allocator.alloc(T, context.forward_inputs[1].storage.array.len);
     errdefer allocator.free(y_array);
     for (y_array) |*e| e.* = 0;
     const y_cartesian_index = try allocator.alloc(usize, y_shape.len);
     defer allocator.free(y_cartesian_index);
+
     const x_forward_array = context.forward_inputs[0].storage.array;
     const y_forward_array = context.forward_inputs[1].storage.array;
     while (true) {
@@ -192,11 +204,15 @@ pub fn divideBackward(comptime T: type, context: backward.Context(T)) ![]CpuTens
         outputs[0] = try outputs0(T, context);
         outputs[1] = try outputs1(T, context);
     } else if (a.shape.len == 0) {
-        outputs[0] = try sum(T, allocator, try outputs0(T, context), ReduceParameters{});
+        const temp = try outputs0(T, context);
+        defer temp.deinit(allocator);
+        outputs[0] = try sum(T, allocator, temp, ReduceParameters{});
         outputs[1] = try outputs1(T, context);
     } else if (b.shape.len == 0) {
         outputs[0] = try outputs0(T, context);
-        outputs[1] = try sum(T, allocator, try outputs1(T, context), ReduceParameters{});
+        const temp = try outputs1(T, context);
+        defer temp.deinit(allocator);
+        outputs[1] = try sum(T, allocator, temp, ReduceParameters{});
     } else {
         try divideBackwardBroadcast(T, context, outputs);
     }
@@ -468,4 +484,256 @@ test "divide backwards broadcast rank 3 to rank 4" {
     expectEqual(f64, expected_rank_4_gradient, actual[1]);
     expectEqual(f64, expected2_rank_4_gradient, actual2[0]);
     expectEqual(f64, expected2_rank_3_gradient, actual2[1]);
+}
+
+test "divide matrix result seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const y = try constant(f64, &leak_allocator.allocator, .{
+        .{ 5, 6 },
+        .{ 7, 8 },
+    });
+    const actual = try divide(f64, &leak_allocator.allocator, x, y);
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1. / 5., 1. / 3. },
+        .{ 3. / 7., 1. / 2. },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual, expected);
+}
+
+test "divide matrix broadcast scalar result seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const y = try constant(f64, &leak_allocator.allocator, 5);
+    const actual = try divide(f64, &leak_allocator.allocator, x, y);
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1. / 5., 2. / 5. },
+        .{ 3. / 5., 4. / 5. },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual, expected);
+}
+
+test "divide scalar broadcast matrix result seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const y = try constant(f64, &leak_allocator.allocator, 5);
+    const actual = try divide(f64, &leak_allocator.allocator, y, x);
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 5, 5. / 2. },
+        .{ 5. / 3., 5. / 4. },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual, expected);
+}
+
+test "divide broadcast result seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{.{ 1, 2 }});
+    const y = try constant(f64, &leak_allocator.allocator, .{
+        .{.{ 1, 2 }},
+        .{.{ 3, 4 }},
+        .{.{ 5, 6 }},
+    });
+    const actual = try divide(f64, &leak_allocator.allocator, x, y);
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{.{ 1, 1 }},
+        .{.{ 1. / 3., 1. / 2. }},
+        .{.{ 1. / 5., 1. / 3. }},
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual, expected);
+}
+
+test "gradient divide matrix result seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const y = try constant(f64, &leak_allocator.allocator, .{
+        .{ 5, 6 },
+        .{ 7, 8 },
+    });
+    const forward_output = try divide(f64, &leak_allocator.allocator, x, y);
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+
+    const actual = try divideBackward(f64, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected_x_gradient = try constant(f64, &leak_allocator.allocator, .{
+        .{ 5.0e-02, 4.1666666666666664e-02 },
+        .{ 3.571428571428571e-02, 3.125e-02 },
+    });
+    defer expected_x_gradient.deinit(&leak_allocator.allocator);
+    const expected_y_gradient = try constant(f64, &leak_allocator.allocator, .{
+        .{ -1.0e-02, -1.3888888888888888e-02 },
+        .{ -1.5306122448979591e-02, -1.5625e-02 },
+    });
+    defer expected_y_gradient.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected_x_gradient);
+    expectEqual(f64, actual[1], expected_y_gradient);
+}
+
+test "gradient divide matrix broadcast scalar result seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const y = try constant(f64, &leak_allocator.allocator, 5);
+    const forward_output = try divide(f64, &leak_allocator.allocator, x, y);
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+
+    const actual = try divideBackward(f64, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected_x_gradient = try constant(f64, &leak_allocator.allocator, .{
+        .{ 5.0e-02, 5.0e-02 },
+        .{ 5.0e-02, 5.0e-02 },
+    });
+    defer expected_x_gradient.deinit(&leak_allocator.allocator);
+    const expected_y_gradient = try constant(f64, &leak_allocator.allocator, -0.1);
+    defer expected_y_gradient.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected_x_gradient);
+    expectEqual(f64, actual[1], expected_y_gradient);
+}
+
+test "gradient divide scalar broadcast matrix result seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const y = try constant(f64, &leak_allocator.allocator, 5);
+    const forward_output = try divide(f64, &leak_allocator.allocator, y, x);
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+
+    const actual = try divideBackward(f64, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ y, x },
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected_x_gradient = try constant(f64, &leak_allocator.allocator, .{
+        .{ -1.25e+00, -3.125e-01 },
+        .{ -1.388888888888889e-01, -7.8125e-02 },
+    });
+    defer expected_x_gradient.deinit(&leak_allocator.allocator);
+    const expected_y_gradient = try constant(f64, &leak_allocator.allocator, 5.208333333333333e-01);
+    defer expected_y_gradient.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected_y_gradient);
+    expectEqual(f64, actual[1], expected_x_gradient);
+}
+
+test "gradient divide broadcast result seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{.{ 1, 2 }});
+    const y = try constant(f64, &leak_allocator.allocator, .{
+        .{.{ 1, 2 }},
+        .{.{ 3, 4 }},
+        .{.{ 5, 6 }},
+    });
+    const forward_output = try divide(f64, &leak_allocator.allocator, x, y);
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{
+        .{.{ 0.25, 0.25 }},
+        .{.{ 0.25, 0.25 }},
+        .{.{ 0.25, 0.25 }},
+    });
+
+    const actual = try divideBackward(f64, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected_x_gradient = try constant(f64, &leak_allocator.allocator, .{
+        .{ 3.833333333333333e-01, 2.2916666666666666e-01 },
+    });
+    defer expected_x_gradient.deinit(&leak_allocator.allocator);
+    const expected_y_gradient = try constant(f64, &leak_allocator.allocator, .{
+        .{.{ -2.5e-01, -1.25e-01 }},
+        .{.{ -2.7777777777777776e-02, -3.125e-02 }},
+        .{.{ -1.0e-02, -1.3888888888888888e-02 }},
+    });
+    defer expected_y_gradient.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected_x_gradient);
+    expectEqual(f64, actual[1], expected_y_gradient);
 }

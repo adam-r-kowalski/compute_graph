@@ -268,3 +268,18 @@ test "linear index" {
     std.testing.expectEqual(linearIndex(stride, &[_]usize{ 1, 1 }), 4);
     std.testing.expectEqual(linearIndex(stride, &[_]usize{ 1, 2 }), 5);
 }
+
+pub fn copy(comptime T: type, allocator: *Allocator, array: []const T) ![]T {
+    const output = try allocator.alloc(T, array.len);
+    errdefer allocator.free(output);
+    std.mem.copy(T, output, array);
+    return output;
+}
+
+test "copy" {
+    const allocator = std.heap.page_allocator;
+    const xs = [_]f64{ 1, 2, 3, 4 };
+    const ys = try copy(f64, allocator, &xs);
+    defer allocator.free(ys);
+    std.testing.expect(std.mem.eql(f64, ys, &xs));
+}

@@ -1,12 +1,16 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const CpuTensor = @import("cpu_tensor.zig").CpuTensor;
+const cpu_tensor = @import("cpu_tensor.zig");
+const CpuTensor = cpu_tensor.CpuTensor;
+const copy = cpu_tensor.copy;
 const invoke = @import("invoke.zig").invoke;
 const backward = @import("backward.zig");
 
 pub fn map(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), invokable: var) !CpuTensor(T) {
-    const shape = tensor.shape;
-    const stride = tensor.stride;
+    const shape = try copy(usize, allocator, tensor.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, tensor.stride);
+    errdefer allocator.free(stride);
     switch (tensor.storage) {
         .scalar => |scalar| {
             return CpuTensor(T){
@@ -30,10 +34,10 @@ pub fn map(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T), invoka
 
 pub fn mapBackward(comptime T: type, context: backward.Context(T), invokable: var) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 1);
+    const allocator = context.allocator;
     const input = context.forward_inputs[0];
-    const outputs = try context.allocator.alloc(CpuTensor(T), 1);
-    errdefer context.allocator.free(outputs);
-
+    const outputs = try allocator.alloc(CpuTensor(T), 1);
+    errdefer allocator.free(outputs);
     switch (context.gradient_input.storage) {
         .scalar => |scalar| {
             outputs[0] = CpuTensor(T){
@@ -44,11 +48,16 @@ pub fn mapBackward(comptime T: type, context: backward.Context(T), invokable: va
         },
         .array => |array| {
             const input_array = input.storage.array;
-            var new_array = try context.allocator.alloc(T, input_array.len);
+            var new_array = try allocator.alloc(T, input_array.len);
+            errdefer allocator.free(new_array);
             for (new_array) |*e, i| e.* = invoke(invokable, .{ input_array[i], array[i] });
+            const shape = try copy(usize, allocator, input.shape);
+            errdefer allocator.free(shape);
+            const stride = try copy(usize, allocator, input.stride);
+            errdefer allocator.free(stride);
             outputs[0] = CpuTensor(T){
-                .shape = input.shape,
-                .stride = input.stride,
+                .shape = shape,
+                .stride = stride,
                 .storage = .{ .array = new_array },
             };
         },

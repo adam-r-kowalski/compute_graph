@@ -114,14 +114,17 @@ test "transpose matrix" {
 
 pub fn matrixMultiplyBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 2);
+    const allocator = context.allocator;
     const x = context.forward_inputs[0];
     const y = context.forward_inputs[1];
-    const outputs = try context.allocator.alloc(CpuTensor(T), 2);
-    errdefer context.allocator.free(outputs);
-    const x_transpose = try transpose(T, context.allocator, x);
-    const y_transpose = try transpose(T, context.allocator, y);
-    outputs[0] = try matrixMultiply(T, context.allocator, context.gradient_input, y_transpose);
-    outputs[1] = try matrixMultiply(T, context.allocator, x_transpose, context.gradient_input);
+    const outputs = try allocator.alloc(CpuTensor(T), 2);
+    errdefer allocator.free(outputs);
+    const x_transpose = try transpose(T, allocator, x);
+    defer x_transpose.deinit(allocator);
+    const y_transpose = try transpose(T, allocator, y);
+    defer y_transpose.deinit(allocator);
+    outputs[0] = try matrixMultiply(T, allocator, context.gradient_input, y_transpose);
+    outputs[1] = try matrixMultiply(T, allocator, x_transpose, context.gradient_input);
     return outputs;
 }
 
@@ -157,6 +160,77 @@ test "matrix multiply backward" {
         .{ 1.75, 1.75 },
         .{ 2.25, 2.25 },
     });
+    expectEqual(f64, actual[0], expected_x_gradient);
+    expectEqual(f64, actual[1], expected_y_gradient);
+}
+
+test "matrix multiply rank 1 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(i32, &leak_allocator.allocator, .{
+        .{ 1, -2 },
+        .{ 3, -4 },
+        .{ 5, -6 },
+    });
+    const y = try constant(i32, &leak_allocator.allocator, .{
+        .{ 1, -2, 3 },
+        .{ -4, 5, -6 },
+    });
+    const actual = try matrixMultiply(i32, &leak_allocator.allocator, x, y);
+    defer actual.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    const expected = try constant(i32, &leak_allocator.allocator, .{
+        .{ 9, -12, 15 },
+        .{ 19, -26, 33 },
+        .{ 29, -40, 51 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    expectEqual(i32, actual, expected);
+}
+
+test "matrix multiply backward" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const y = try constant(f64, &leak_allocator.allocator, .{
+        .{ 7, 8 },
+        .{ 9, 10 },
+        .{ 11, 12 },
+    });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0.25, 0.25 },
+        .{ 0.25, 0.25 },
+    });
+    const forward_output = try matrixMultiply(f64, &leak_allocator.allocator, x, y);
+    const actual = try matrixMultiplyBackward(f64, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){ x, y },
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected_x_gradient = try constant(f64, &leak_allocator.allocator, .{
+        .{ 3.75, 4.75, 5.75 },
+        .{ 3.75, 4.75, 5.75 },
+    });
+    defer expected_x_gradient.deinit(&leak_allocator.allocator);
+    const expected_y_gradient = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1.25, 1.25 },
+        .{ 1.75, 1.75 },
+        .{ 2.25, 2.25 },
+    });
+    defer expected_y_gradient.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    y.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
     expectEqual(f64, actual[0], expected_x_gradient);
     expectEqual(f64, actual[1], expected_y_gradient);
 }

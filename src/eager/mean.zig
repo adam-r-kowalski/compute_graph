@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const constant = @import("constant.zig").constant;
 const cpu_tensor = @import("cpu_tensor.zig");
+const copy = cpu_tensor.copy;
 const CpuTensor = cpu_tensor.CpuTensor;
 const CpuStorage = cpu_tensor.CpuStorage;
 const tensorStride = cpu_tensor.tensorStride;
@@ -9,47 +10,32 @@ const tensorLength = cpu_tensor.tensorLength;
 const expectEqual = @import("../testing.zig").expectEqual;
 const backward = @import("backward.zig");
 
-fn TensorType(comptime T: type) type {
-    const ScalarType = switch (T) {
-        f64, f32, f16 => T,
-        i64 => f64,
-        i32 => f32,
-        i8 => f16,
-        else => @compileError("ScalarType not supported"),
-    };
-    return CpuTensor(ScalarType);
-}
-
-fn coerceToFloat(comptime T: type, x: var) T {
-    return switch (@TypeOf(x)) {
-        f64, f32, f16 => @as(T, x),
-        else => @intToFloat(T, x),
-    };
+fn isFloat(comptime T: type) bool {
+    return T == f16 or T == f32 or T == f64;
 }
 
 // TODO(enhancement) mean should probably work across a particular dimension
-// TODO(refactor) mean should not be possible for int scalar type, implicit casting is a bad idea
-pub fn mean(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !TensorType(T) {
-    const Tensor = TensorType(T);
+pub fn mean(comptime T: type, allocator: *Allocator, tensor: CpuTensor(T)) !CpuTensor(T) {
+    comptime std.debug.assert(isFloat(T));
     const shape = try allocator.alloc(usize, 0);
     errdefer allocator.free(shape);
     const stride = try allocator.alloc(usize, 0);
     errdefer allocator.free(stride);
     switch (tensor.storage) {
         .scalar => |scalar| {
-            return Tensor{
+            return CpuTensor(T){
                 .shape = shape,
                 .stride = stride,
-                .storage = .{ .scalar = coerceToFloat(Tensor.ScalarType, scalar) },
+                .storage = .{ .scalar = scalar },
             };
         },
         .array => |array| {
-            var sum: Tensor.ScalarType = 0;
-            for (array) |e| sum += coerceToFloat(Tensor.ScalarType, e);
-            return Tensor{
+            var sum: T = 0;
+            for (array) |e| sum += e;
+            return CpuTensor(T){
                 .shape = shape,
                 .stride = stride,
-                .storage = .{ .scalar = sum / coerceToFloat(Tensor.ScalarType, array.len) },
+                .storage = .{ .scalar = sum / @intToFloat(T, array.len) },
             };
         },
     }
@@ -67,8 +53,8 @@ test "mean rank 0" {
 test "mean rank 1" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(i32, &arena.allocator, .{ 5, 10, 7, 8, 10 });
-    const actual = try mean(i32, &arena.allocator, x);
+    const x = try constant(f32, &arena.allocator, .{ 5, 10, 7, 8, 10 });
+    const actual = try mean(f32, &arena.allocator, x);
     const expected = try constant(f32, &arena.allocator, 8);
     expectEqual(f32, actual, expected);
 }
@@ -89,7 +75,7 @@ test "mean rank 2" {
 test "mean rank 3" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const x = try constant(i8, &arena.allocator, .{
+    const x = try constant(f16, &arena.allocator, .{
         .{
             .{ 5, 10 },
             .{ 7, 8 },
@@ -99,7 +85,7 @@ test "mean rank 3" {
             .{ 2, 6 },
         },
     });
-    const actual = try mean(i8, &arena.allocator, x);
+    const actual = try mean(f16, &arena.allocator, x);
     const expected = try constant(f16, &arena.allocator, 7);
     expectEqual(f16, actual, expected);
 }
@@ -135,8 +121,10 @@ test "length rank 2" {
     std.testing.expectEqual(length(f64, x), 4);
 }
 
-fn fill(comptime T: type, allocator: *Allocator, literal: T, shape: []const usize) !CpuTensor(T) {
-    const stride = try tensorStride(allocator, shape);
+fn fillLike(comptime T: type, allocator: *Allocator, literal: T, tensor: CpuTensor(T)) !CpuTensor(T) {
+    const shape = try copy(usize, allocator, tensor.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, tensor.stride);
     errdefer allocator.free(stride);
     if (shape.len == 0) {
         return CpuTensor(T){
@@ -155,26 +143,32 @@ fn fill(comptime T: type, allocator: *Allocator, literal: T, shape: []const usiz
     };
 }
 
-test "fill scalar" {
+test "fill like scalar" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const actual = try fill(f64, &arena.allocator, 0.15, &[_]usize{});
+    const x = try constant(f64, &arena.allocator, 1);
+    const actual = try fillLike(f64, &arena.allocator, 0.15, x);
     const expected = try constant(f64, &arena.allocator, 0.15);
     expectEqual(f64, actual, expected);
 }
 
-test "fill vector" {
+test "fill like vector" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const actual = try fill(f64, &arena.allocator, 0.5, &[_]usize{3});
+    const x = try constant(f64, &arena.allocator, .{ 1, 2, 3 });
+    const actual = try fillLike(f64, &arena.allocator, 0.5, x);
     const expected = try constant(f64, &arena.allocator, .{ 0.5, 0.5, 0.5 });
     expectEqual(f64, actual, expected);
 }
 
-test "fill matrix" {
+test "fill like matrix" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const actual = try fill(f64, &arena.allocator, 5, &[_]usize{ 2, 3 });
+    const x = try constant(f64, &arena.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 1, 2, 3 },
+    });
+    const actual = try fillLike(f64, &arena.allocator, 5, x);
     const expected = try constant(f64, &arena.allocator, .{
         .{ 5, 5, 5 },
         .{ 5, 5, 5 },
@@ -189,7 +183,7 @@ pub fn meanBackward(comptime T: type, context: backward.Context(T)) ![]CpuTensor
     errdefer context.allocator.free(outputs);
     const scalar = context.gradient_input.storage.scalar;
     const value = scalar / @intToFloat(T, length(T, input));
-    outputs[0] = try fill(T, context.allocator, value, context.forward_inputs[0].shape);
+    outputs[0] = try fillLike(T, context.allocator, value, input);
     return outputs;
 }
 
@@ -244,5 +238,41 @@ test "mean backward rank 2" {
         .{ 0.25, 0.25 },
         .{ 0.25, 0.25 },
     });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "mean rank 1 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f32, &leak_allocator.allocator, .{ 5, 10, 7, 8, 10 });
+    const actual = try mean(f32, &leak_allocator.allocator, x);
+    defer actual.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    const expected = try constant(f32, &leak_allocator.allocator, 8);
+    defer expected.deinit(&leak_allocator.allocator);
+    expectEqual(f32, actual, expected);
+}
+
+test "mean backward rank 1" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const forward_input = try constant(f64, &leak_allocator.allocator, .{ 1, 2, 3, 4, 5 });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, @as(f64, 1));
+    const forward_output = try mean(f64, &leak_allocator.allocator, forward_input);
+    const actual = try meanBackward(f64, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{ 0.2, 0.2, 0.2, 0.2, 0.2 });
+    defer expected.deinit(&leak_allocator.allocator);
+    forward_input.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
     expectEqual(f64, actual[0], expected);
 }
