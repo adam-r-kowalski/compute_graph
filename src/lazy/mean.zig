@@ -30,9 +30,7 @@ fn forward(context: Operation.ForwardContext) Operation.ForwardResult {
         .f64 => |t| .{ .f64 = try eager.mean(f64, context.allocator, t) },
         .f32 => |t| .{ .f32 = try eager.mean(f32, context.allocator, t) },
         .f16 => |t| .{ .f16 = try eager.mean(f16, context.allocator, t) },
-        .i64 => |t| .{ .f64 = try eager.mean(i64, context.allocator, t) },
-        .i32 => |t| .{ .f32 = try eager.mean(i32, context.allocator, t) },
-        .i8 => |t| .{ .f16 = try eager.mean(i8, context.allocator, t) },
+        else => return error.OperationNotDefinedForScalarType,
     };
 }
 
@@ -74,17 +72,6 @@ fn backward(context: Operation.BackwardContext) Operation.BackwardResult {
     return values;
 }
 
-fn tensorScalarType(scalarType: ScalarType) ScalarType {
-    return switch (scalarType) {
-        .f64 => .f64,
-        .f32 => .f32,
-        .f16 => .f16,
-        .i64 => .f64,
-        .i32 => .f32,
-        .i8 => .f16,
-    };
-}
-
 pub fn mean(graph: *Graph, x: Tensor) !Tensor {
     var mean_operation = try graph.arena.allocator.create(Mean);
     mean_operation.* = .{
@@ -99,7 +86,7 @@ pub fn mean(graph: *Graph, x: Tensor) !Tensor {
     return Tensor{
         .tensorType = .{ .operation = graph.operations.len - 1 },
         .shape = &[_]usize{},
-        .scalarType = tensorScalarType(x.scalarType),
+        .scalarType = x.scalarType,
     };
 }
 
@@ -130,23 +117,6 @@ test "mean matrix" {
     const actual = try session.run(y);
     const expected = try eager.constant(f64, &arena.allocator, 8);
     expectEqual(f64, actual.f64, expected);
-    std.testing.expectEqual(y.shape, &[_]usize{});
-}
-
-test "mean matrix i32" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    var graph = try Graph.init(&arena.allocator);
-    const x = try constant(i32, &graph, .{
-        .{ 5, 10 },
-        .{ 7, 8 },
-        .{ 10, 8 },
-    });
-    const y = try mean(&graph, x);
-    var session = Session.init(&arena.allocator, &graph);
-    const actual = try session.run(y);
-    const expected = try eager.constant(f32, &arena.allocator, 8);
-    expectEqual(f32, actual.f32, expected);
     std.testing.expectEqual(y.shape, &[_]usize{});
 }
 
