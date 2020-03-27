@@ -511,3 +511,150 @@ test "maximum bacward keep dimensions 1" {
     });
     expectEqual(f64, actual[0], expected);
 }
+
+test "maximum rank 2 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f16, &leak_allocator.allocator, .{
+        .{ 5, 10 },
+        .{ 7, 8 },
+        .{ 10, 8 },
+    });
+    const actual = try maximum(f16, &leak_allocator.allocator, x, ReduceParameters{});
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(f16, &leak_allocator.allocator, 10);
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    expectEqual(f16, actual, expected);
+}
+
+test "maximum rank 2 across 0 dimension seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f16, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ -3, 4 },
+        .{ 5, 6 },
+    });
+    const actual = try maximum(f16, &leak_allocator.allocator, x, ReduceParameters{ .dimension = 0 });
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(f16, &leak_allocator.allocator, .{ 5, 6 });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    expectEqual(f16, actual, expected);
+}
+
+test "maximum keep dimensions 0 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(i64, &leak_allocator.allocator, .{
+        .{ 1, 2, 3 },
+        .{ 4, 5, 6 },
+    });
+    const actual = try maximum(i64, &leak_allocator.allocator, x, ReduceParameters{
+        .keep_dimensions = true,
+        .dimension = 0,
+    });
+    defer actual.deinit(&leak_allocator.allocator);
+    const expected = try constant(i64, &leak_allocator.allocator, .{
+        .{ 4, 5, 6 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    expectEqual(i64, actual, expected);
+}
+
+test "maximum backward rank 2 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const forward_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, 1);
+    const forward_output = try maximum(f64, &leak_allocator.allocator, forward_input, ReduceParameters{});
+    const actual = try maximumBackward(f64, ReduceParameters{}, Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0, 0 },
+        .{ 0, 1 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    forward_input.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected);
+}
+
+test "maximum backward rank 2 dimension 0 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const forward_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{ 0.5, 0.5 });
+    const parameters = ReduceParameters{ .dimension = 0 };
+    const forward_output = try maximum(f64, &leak_allocator.allocator, forward_input, parameters);
+    const actual = try maximumBackward(f64, parameters, Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0, 0 },
+        .{ 0.5, 0.5 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    forward_input.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected);
+}
+
+test "maximum backward rank 2 dimension 0 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const forward_input = try constant(f64, &leak_allocator.allocator, .{
+        .{ 1, 2 },
+        .{ 3, 4 },
+    });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{.{ 0.5, 0.5 }});
+    const parameters = ReduceParameters{
+        .dimension = 0,
+        .keep_dimensions = true,
+    };
+    const forward_output = try maximum(f64, &leak_allocator.allocator, forward_input, parameters);
+    const actual = try maximumBackward(f64, parameters, Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){forward_input},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        .{ 0, 0 },
+        .{ 0.5, 0.5 },
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    forward_input.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
+    expectEqual(f64, actual[0], expected);
+}

@@ -2,6 +2,7 @@ const std = @import("std");
 const Context = @import("backward.zig").Context;
 const ReduceParameters = @import("reduce.zig").ReduceParameters;
 const cpu_tensor = @import("cpu_tensor.zig");
+const copy = cpu_tensor.copy;
 const CpuTensor = cpu_tensor.CpuTensor;
 const linearIndex = cpu_tensor.linearIndex;
 const broadcast = @import("broadcast.zig");
@@ -13,27 +14,23 @@ const zeroBroadcastedIndexKeepDimension = broadcast.zeroBroadcastedIndexKeepDime
 fn backwardAcrossDimension(comptime T: type, dimension: usize, context: Context(T)) ![]CpuTensor(T) {
     const allocator = context.allocator;
     const input = context.forward_inputs[0];
-    const shape = input.shape;
-    const stride = input.stride;
+    const shape = try copy(usize, allocator, input.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, input.stride);
+    errdefer allocator.free(stride);
     const forward_input = input.storage.array;
     const outputs = try allocator.alloc(CpuTensor(T), 1);
     errdefer context.allocator.free(outputs);
     const array = try allocator.alloc(T, forward_input.len);
     errdefer allocator.free(array);
-
     const gradient_array = context.gradient_input.storage.array;
-
     var gradient_cartesian_index = try allocator.alloc(usize, shape.len - 1);
     defer allocator.free(gradient_cartesian_index);
     for (gradient_cartesian_index) |*e| e.* = 0;
-
     var array_cartesian_index = try allocator.alloc(usize, shape.len);
     defer allocator.free(array_cartesian_index);
-
     const gradient_shape = context.gradient_input.shape;
-
     const forward_output = context.forward_output.storage.array;
-
     while (true) {
         const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
         const value = forward_output[gradient_linear_index];
@@ -73,27 +70,23 @@ fn backwardAcrossDimension(comptime T: type, dimension: usize, context: Context(
 fn backwardAcrossKeepDimensions(comptime T: type, dimension: usize, context: Context(T)) ![]CpuTensor(T) {
     const allocator = context.allocator;
     const input = context.forward_inputs[0];
-    const shape = input.shape;
-    const stride = input.stride;
+    const shape = try copy(usize, allocator, input.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, input.stride);
+    errdefer allocator.free(shape);
     const forward_input = input.storage.array;
     const outputs = try allocator.alloc(CpuTensor(T), 1);
     errdefer context.allocator.free(outputs);
     const array = try allocator.alloc(T, forward_input.len);
     errdefer allocator.free(array);
-
     const gradient_array = context.gradient_input.storage.array;
-
     var gradient_cartesian_index = try allocator.alloc(usize, shape.len);
     defer allocator.free(gradient_cartesian_index);
     for (gradient_cartesian_index) |*e| e.* = 0;
-
     var array_cartesian_index = try allocator.alloc(usize, shape.len);
     defer allocator.free(array_cartesian_index);
-
     const gradient_shape = context.gradient_input.shape;
-
     const forward_output = context.forward_output.storage.array;
-
     while (true) {
         const gradient_linear_index = linearIndex(context.gradient_input.stride, gradient_cartesian_index);
         const value = forward_output[gradient_linear_index];
@@ -133,10 +126,9 @@ fn backwardAcrossKeepDimensions(comptime T: type, dimension: usize, context: Con
 pub fn backward(comptime T: type, parameters: ReduceParameters, context: Context(T)) ![]CpuTensor(T) {
     std.debug.assert(context.forward_inputs.len == 1);
     const input = context.forward_inputs[0];
-    const shape = input.shape;
 
     if (parameters.dimension) |d| {
-        if (shape.len > 1) {
+        if (input.shape.len > 1) {
             if (parameters.keep_dimensions)
                 return try backwardAcrossKeepDimensions(T, d, context);
             return try backwardAcrossDimension(T, d, context);
@@ -146,7 +138,10 @@ pub fn backward(comptime T: type, parameters: ReduceParameters, context: Context
     const allocator = context.allocator;
     const outputs = try allocator.alloc(CpuTensor(T), 1);
     errdefer context.allocator.free(outputs);
-    const stride = input.stride;
+    const shape = try copy(usize, allocator, input.shape);
+    errdefer allocator.free(shape);
+    const stride = try copy(usize, allocator, input.stride);
+    errdefer allocator.free(stride);
     switch (input.storage) {
         .scalar => |scalar| {
             const gradient = context.gradient_input.storage.scalar;

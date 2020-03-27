@@ -29,7 +29,9 @@ test "exponentiate rank 1" {
     defer arena.deinit();
     const x = try constant(f32, &arena.allocator, .{ 1, -2, 3, -4, -5, 6 });
     const actual = try exponentiate(f32, &arena.allocator, x);
-    const expected = try constant(f32, &arena.allocator, .{ 2.7182, 0.1353, 20.0855, 0.0183, 0.00673, 403.4288 });
+    const expected = try constant(f32, &arena.allocator, .{
+        2.7182, 0.1353, 20.0855, 0.0183, 0.00673, 403.4288,
+    });
     expectEqual(f32, actual, expected);
 }
 
@@ -86,7 +88,9 @@ test "exponentiate backward rank 1" {
         .forward_inputs = &[_]CpuTensor(f64){x},
         .forward_output = forward_output,
     });
-    const expected = try constant(f64, &arena.allocator, .{ 2.0, 29.5562, 0.2987, 436.7852, 0.0673 });
+    const expected = try constant(f64, &arena.allocator, .{
+        2.0, 29.5562, 0.2987, 436.7852, 0.0673,
+    });
     expectEqual(f64, actual[0], expected);
 }
 
@@ -112,5 +116,45 @@ test "exponentiate backward rank 2" {
         .{ 2.0, 0.5413 },
         .{ 120.5132, 0.1465 },
     });
+    expectEqual(f64, actual[0], expected);
+}
+
+test "exponentiate rank 1 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f32, &leak_allocator.allocator, .{ 1, -2, 3, -4, -5, 6 });
+    const actual = try exponentiate(f32, &leak_allocator.allocator, x);
+    defer actual.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    const expected = try constant(f32, &leak_allocator.allocator, .{
+        2.7182, 0.1353, 20.0855, 0.0183, 0.00673, 403.4288,
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    expectEqual(f32, actual, expected);
+}
+
+test "gradient exponentiate rank 1 seperate lifetime" {
+    var leak_allocator = std.testing.LeakCountAllocator.init(std.heap.page_allocator);
+    defer leak_allocator.validate() catch unreachable;
+    const x = try constant(f64, &leak_allocator.allocator, .{ 0, 2, -3, 4, -5 });
+    const gradient_input = try constant(f64, &leak_allocator.allocator, .{ 2, 4, 6, 8, 10 });
+    const forward_output = try exponentiate(f64, &leak_allocator.allocator, x);
+    const actual = try exponentiateBackward(f64, backward.Context(f64){
+        .allocator = &leak_allocator.allocator,
+        .gradient_input = gradient_input,
+        .forward_inputs = &[_]CpuTensor(f64){x},
+        .forward_output = forward_output,
+    });
+    defer {
+        for (actual) |tensor| tensor.deinit(&leak_allocator.allocator);
+        leak_allocator.allocator.free(actual);
+    }
+    const expected = try constant(f64, &leak_allocator.allocator, .{
+        2.0, 29.5562, 0.2987, 436.7852, 0.0673,
+    });
+    defer expected.deinit(&leak_allocator.allocator);
+    x.deinit(&leak_allocator.allocator);
+    forward_output.deinit(&leak_allocator.allocator);
+    gradient_input.deinit(&leak_allocator.allocator);
     expectEqual(f64, actual[0], expected);
 }
