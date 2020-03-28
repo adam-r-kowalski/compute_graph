@@ -8,6 +8,7 @@ pub const cosine = @import("lazy/cosine.zig").cosine;
 pub const divide = @import("lazy/divide.zig").divide;
 pub const entropy = @import("lazy/entropy.zig").entropy;
 pub const crossEntropy = @import("lazy/cross_entropy.zig").crossEntropy;
+pub const binaryCrossEntropy = @import("lazy/binary_cross_entropy.zig").binaryCrossEntropy;
 pub const klDivergence = @import("lazy/kl_divergence.zig").klDivergence;
 pub const exponentiate = @import("lazy/exponentiate.zig").exponentiate;
 pub const gradient = @import("lazy/gradient.zig").gradient;
