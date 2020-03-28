@@ -1,3 +1,4 @@
+const std = @import("std");
 pub const absolute = @import("eager/absolute.zig").absolute;
 pub const add = @import("eager/add.zig").add;
 pub const constant = @import("eager/constant.zig").constant;
@@ -23,6 +24,5 @@ pub const broadcast = @import("eager/broadcast.zig");
 pub const invoke = @import("eager/invoke.zig");
 
 test "" {
-    const std = @import("std");
     std.meta.refAllDecls(@This());
 }

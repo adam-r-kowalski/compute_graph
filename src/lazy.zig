@@ -1,3 +1,4 @@
+const std = @import("std");
 pub const Operation = @import("lazy/operation.zig").Operation;
 pub const Graph = @import("lazy/graph.zig").Graph;
 pub const absolute = @import("lazy/absolute.zig").absolute;
@@ -32,6 +33,5 @@ pub const sum = @import("lazy/sum.zig").sum;
 pub const Tensor = @import("lazy/tensor.zig").Tensor;
 
 test "" {
-    const std = @import("std");
     std.meta.refAllDecls(@This());
 }

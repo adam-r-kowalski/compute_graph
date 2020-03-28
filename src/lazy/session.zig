@@ -322,7 +322,7 @@ fn runAssign(
     try cache.putNoClobber(current_tensor, value);
     _ = try cache.put(assign_tensor.variable, value);
     if (session.variableCache.getValue(assign_tensor.variable)) |existing_value| {
-        existing_value.deinit(allocator);
+        existing_value.deinit(session.allocator);
     }
     _ = try session.variableCache.put(assign_tensor.variable, try value.copy(session.allocator));
 }
@@ -403,6 +403,7 @@ pub fn runTensors(allocator: *Allocator, session: *Session, tensors: []const Ten
     var gradient_caches = GradientCaches.init(allocator);
     defer gradient_caches.deinit();
     const execution_order = try executionOrder(allocator, session.*, tensors, environment);
+    defer allocator.free(execution_order);
     for (execution_order) |current_tensor| {
         switch (current_tensor.tensorType) {
             .constant => |index| try runConstant(session.*, &cache, index, current_tensor),
@@ -449,17 +450,19 @@ pub const Session = struct {
     }
 
     pub fn deinit(self: *Session) void {
+        var iterator = self.variableCache.iterator();
+        while (iterator.next()) |kv| kv.value.deinit(self.allocator);
         self.variableCache.deinit();
     }
 
     pub fn run(self: *Session, parameters: var) !RunOutputType(@TypeOf(parameters)) {
         var arena = std.heap.ArenaAllocator.init(self.allocator);
         defer arena.deinit();
-        const environment = extractEnvironment(self.allocator, parameters);
+        const environment = extractEnvironment(&arena.allocator, parameters);
         if (@TypeOf(parameters) == Tensor) {
             return try runTensor(&arena.allocator, self, parameters, environment);
         } else {
-            const tensors = try extractTensors(self.allocator, parameters);
+            const tensors = try extractTensors(&arena.allocator, parameters);
             return try runTensors(&arena.allocator, self, tensors, environment);
         }
     }
