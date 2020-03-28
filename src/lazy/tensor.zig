@@ -18,6 +18,16 @@ pub const ScalarType = enum {
     f64, f32, f16, i64, i32, i8
 };
 
+/// Tensors are a generalization of arrays to N dimensions.
+///
+/// For example:
+/// Scalars are 0 dimensional tensors.
+/// Vectors are 1 dimensional tensors.
+/// Matrices are 2 dimensional tensors.
+///
+/// Tensors allow you to deal with data of arbitrary dimensionality with a uniform abstraction.
+/// Operations on tensors are lazy and will build a computation graph which can be manipulated
+/// and executed by sessions.
 pub const Tensor = struct {
     tensorType: TensorType,
     shape: []const usize,
