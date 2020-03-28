@@ -1,5 +1,5 @@
 test "" {
-    _ = @import("lazy.zig");
-    _ = @import("eager.zig");
-    _ = @import("util/array_info.zig");
+    const lazy = @import("lazy.zig");
+    const eager = @import("eager.zig");
+    const array_info = @import("util/array_info.zig");
 }
